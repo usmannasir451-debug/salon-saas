@@ -6,6 +6,8 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
+import type { UserRole } from '@/lib/types'
+import { ROLE_LABELS, ROLE_COLORS, ROLE_NAV } from '@/lib/roles'
 import {
   LayoutDashboard,
   CalendarDays,
@@ -17,30 +19,37 @@ import {
   ChevronRight,
   UserSearch,
   Building2,
+  UserCog,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Avatar } from '@/components/ui/avatar'
+import { Badge } from '@/components/ui/badge'
 
-const navItems = [
+const allNavItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, urdu: 'ڈیش بورڈ' },
   { href: '/appointments', label: 'Appointments', icon: CalendarDays, urdu: 'اپائنٹمنٹ' },
   { href: '/services', label: 'Services', icon: Scissors, urdu: 'سروسز' },
   { href: '/staff', label: 'Staff', icon: Users, urdu: 'اسٹاف' },
   { href: '/clients', label: 'Clients', icon: UserSearch, urdu: 'کلائنٹس' },
   { href: '/branches', label: 'Branches', icon: Building2, urdu: 'برانچز' },
+  { href: '/team', label: 'Team', icon: UserCog, urdu: 'ٹیم' },
 ]
 
 interface SidebarProps {
   salonName?: string
   userEmail?: string
+  role?: UserRole
 }
 
-export default function Sidebar({ salonName, userEmail }: SidebarProps) {
+export default function Sidebar({ salonName, userEmail, role = 'owner' }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
+
+  const allowedPaths = ROLE_NAV[role]
+  const navItems = allNavItems.filter((item) => allowedPaths.includes(item.href))
 
   async function handleLogout() {
     setLoggingOut(true)
@@ -56,7 +65,7 @@ export default function Sidebar({ salonName, userEmail }: SidebarProps) {
       {/* Logo */}
       <div className="px-4 py-5 border-b border-gray-100">
         <Link
-          href="/dashboard"
+          href={navItems[0]?.href ?? '/appointments'}
           className="flex items-center gap-2.5 group"
           onClick={() => setMobileOpen(false)}
         >
@@ -113,7 +122,14 @@ export default function Sidebar({ salonName, userEmail }: SidebarProps) {
             </span>
           </Avatar>
           <div className="overflow-hidden flex-1">
-            <p className="text-xs font-semibold text-gray-800 truncate">{salonName ?? 'My Salon'}</p>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <p className="text-xs font-semibold text-gray-800 truncate">{salonName ?? 'My Salon'}</p>
+              {role !== 'owner' && (
+                <Badge className={cn('text-[10px] px-1.5 py-0', ROLE_COLORS[role])}>
+                  {ROLE_LABELS[role]}
+                </Badge>
+              )}
+            </div>
             <p className="text-[10px] text-gray-400 truncate">{userEmail}</p>
           </div>
         </div>
@@ -140,7 +156,7 @@ export default function Sidebar({ salonName, userEmail }: SidebarProps) {
 
       {/* Mobile Header */}
       <header className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between shadow-sm">
-        <Link href="/dashboard" className="flex items-center gap-2">
+        <Link href={navItems[0]?.href ?? '/appointments'} className="flex items-center gap-2">
           <div className="w-7 h-7 bg-primary rounded-lg flex items-center justify-center">
             <Scissors className="w-3.5 h-3.5 text-white" />
           </div>

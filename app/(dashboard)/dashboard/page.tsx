@@ -2,7 +2,9 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import { format, subDays, startOfWeek, startOfMonth } from 'date-fns'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { useUserContext } from '@/components/RoleContext'
 import type { Branch } from '@/lib/types'
 import {
   BarChart,
@@ -92,6 +94,9 @@ function RevenueTooltip({ active, payload, label }: any) {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
+  const { role, ownerId } = useUserContext()
+  const router = useRouter()
+
   const [allAppointments, setAllAppointments] = useState<AppRow[]>([])
   const [salonName, setSalonName] = useState('')
   const [branches, setBranches] = useState<Branch[]>([])
@@ -100,27 +105,33 @@ export default function DashboardPage() {
   const [activeBranch, setActiveBranch] = useState('all')
   const [pdfLoading, setPdfLoading] = useState(false)
 
-  useEffect(() => { loadDashboard() }, [])
+  useEffect(() => {
+    if (!['owner', 'manager'].includes(role)) {
+      router.replace('/appointments')
+      return
+    }
+    loadDashboard()
+  }, [role, router]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!['owner', 'manager'].includes(role)) return null
 
   async function loadDashboard() {
     const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
 
     const monthStart = format(startOfMonth(new Date()), 'yyyy-MM-dd')
     const sevenDaysAgo = format(subDays(new Date(), 6), 'yyyy-MM-dd')
     const queryStart = monthStart < sevenDaysAgo ? monthStart : sevenDaysAgo
 
     const [profileRes, apptRes, branchRes] = await Promise.all([
-      supabase.from('profiles').select('salon_name').eq('id', user.id).single(),
+      supabase.from('profiles').select('salon_name').eq('id', ownerId).single(),
       supabase
         .from('appointments')
         .select('id, client_name, client_phone, service_id, staff_id, branch_id, appointment_date, appointment_time, status, notes, services(id, name, price), staff(id, name)')
-        .eq('user_id', user.id)
+        .eq('user_id', ownerId)
         .gte('appointment_date', queryStart)
         .order('appointment_date', { ascending: false })
         .order('appointment_time', { ascending: true }),
-      supabase.from('branches').select('*').eq('user_id', user.id).order('name'),
+      supabase.from('branches').select('*').eq('user_id', ownerId).order('name'),
     ])
 
     setSalonName(profileRes.data?.salon_name ?? '')

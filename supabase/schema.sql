@@ -149,3 +149,176 @@ create policy "Users can delete own branches" on public.branches
 
 -- Link appointments to a branch (nullable — works for single-branch salons too)
 alter table public.appointments add column if not exists branch_id uuid references public.branches(id) on delete set null;
+
+-- ============================================================
+-- MIGRATION v3: Role-Based Access Control (RBAC)
+-- Run this block in Supabase SQL Editor after v2
+-- ============================================================
+
+-- Payment tracking on appointments
+alter table public.appointments
+  add column if not exists payment_status text not null default 'unpaid'
+    check (payment_status in ('unpaid', 'paid'));
+
+alter table public.appointments
+  add column if not exists discount_amount numeric(10, 2) not null default 0;
+
+alter table public.appointments
+  add column if not exists feedback text;
+
+-- Link a staff member's portal account to their staff record
+alter table public.staff
+  add column if not exists linked_user_id uuid references auth.users(id) on delete set null;
+
+-- Salon team members (role-based portal access)
+create table if not exists public.salon_members (
+  id            uuid default uuid_generate_v4() primary key,
+  owner_id      uuid references public.profiles(id) on delete cascade not null,
+  member_user_id uuid references auth.users(id) on delete set null,
+  email         text not null,
+  role          text not null check (role in ('manager', 'receptionist', 'cashier', 'staff')),
+  staff_id      uuid references public.staff(id) on delete set null,
+  status        text not null default 'pending' check (status in ('pending', 'active')),
+  invited_at    timestamptz default now() not null,
+  joined_at     timestamptz,
+  unique(owner_id, email)
+);
+
+alter table public.salon_members enable row level security;
+
+-- Owners can fully manage their team
+create policy "Owners can manage their team" on public.salon_members
+  for all using (auth.uid() = owner_id);
+
+-- Members can see their own membership row
+create policy "Members can view own membership" on public.salon_members
+  for select using (auth.uid() = member_user_id);
+
+-- ─── Helper: returns the effective salon owner id for the current user ─────────
+-- For owners: returns their own auth.uid()
+-- For team members: returns the owner's profile id they belong to
+create or replace function public.get_effective_owner_id()
+returns uuid
+language sql security definer stable
+as $$
+  select coalesce(
+    (
+      select owner_id
+      from public.salon_members
+      where member_user_id = auth.uid()
+        and status = 'active'
+      limit 1
+    ),
+    auth.uid()
+  )
+$$;
+
+-- ─── Update RLS: replace user-only policies with owner+member policies ─────────
+
+-- APPOINTMENTS
+drop policy if exists "Users can view own appointments"   on public.appointments;
+drop policy if exists "Users can insert own appointments" on public.appointments;
+drop policy if exists "Users can update own appointments" on public.appointments;
+drop policy if exists "Users can delete own appointments" on public.appointments;
+
+create policy "View salon appointments" on public.appointments
+  for select using (user_id = get_effective_owner_id());
+
+create policy "Insert salon appointments" on public.appointments
+  for insert with check (user_id = get_effective_owner_id());
+
+create policy "Update salon appointments" on public.appointments
+  for update using (user_id = get_effective_owner_id());
+
+create policy "Delete salon appointments" on public.appointments
+  for delete using (
+    auth.uid() = user_id
+    or exists (
+      select 1 from public.salon_members
+      where member_user_id = auth.uid()
+        and owner_id = public.appointments.user_id
+        and role = 'manager'
+        and status = 'active'
+    )
+  );
+
+-- SERVICES
+drop policy if exists "Users can view own services"   on public.services;
+drop policy if exists "Users can insert own services" on public.services;
+drop policy if exists "Users can update own services" on public.services;
+drop policy if exists "Users can delete own services" on public.services;
+
+create policy "View salon services" on public.services
+  for select using (user_id = get_effective_owner_id());
+
+create policy "Insert salon services" on public.services
+  for insert with check (user_id = get_effective_owner_id());
+
+create policy "Update salon services" on public.services
+  for update using (user_id = get_effective_owner_id());
+
+create policy "Delete salon services" on public.services
+  for delete using (
+    auth.uid() = user_id
+    or exists (
+      select 1 from public.salon_members
+      where member_user_id = auth.uid()
+        and owner_id = public.services.user_id
+        and role = 'manager'
+        and status = 'active'
+    )
+  );
+
+-- STAFF
+drop policy if exists "Users can view own staff"   on public.staff;
+drop policy if exists "Users can insert own staff" on public.staff;
+drop policy if exists "Users can update own staff" on public.staff;
+drop policy if exists "Users can delete own staff" on public.staff;
+
+create policy "View salon staff" on public.staff
+  for select using (user_id = get_effective_owner_id());
+
+create policy "Insert salon staff" on public.staff
+  for insert with check (user_id = get_effective_owner_id());
+
+create policy "Update salon staff" on public.staff
+  for update using (user_id = get_effective_owner_id());
+
+create policy "Delete salon staff" on public.staff
+  for delete using (
+    auth.uid() = user_id
+    or exists (
+      select 1 from public.salon_members
+      where member_user_id = auth.uid()
+        and owner_id = public.staff.user_id
+        and role = 'manager'
+        and status = 'active'
+    )
+  );
+
+-- BRANCHES
+drop policy if exists "Users can view own branches"   on public.branches;
+drop policy if exists "Users can insert own branches" on public.branches;
+drop policy if exists "Users can update own branches" on public.branches;
+drop policy if exists "Users can delete own branches" on public.branches;
+
+create policy "View salon branches" on public.branches
+  for select using (user_id = get_effective_owner_id());
+
+create policy "Insert salon branches" on public.branches
+  for insert with check (user_id = get_effective_owner_id());
+
+create policy "Update salon branches" on public.branches
+  for update using (user_id = get_effective_owner_id());
+
+create policy "Delete salon branches" on public.branches
+  for delete using (
+    auth.uid() = user_id
+    or exists (
+      select 1 from public.salon_members
+      where member_user_id = auth.uid()
+        and owner_id = public.branches.user_id
+        and role = 'manager'
+        and status = 'active'
+    )
+  );

@@ -1,8 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
+import { useUserContext } from '@/components/RoleContext'
 import type { Branch } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -29,6 +31,9 @@ import {
 const emptyForm = { name: '', address: '', phone: '' }
 
 export default function BranchesPage() {
+  const { role, ownerId } = useUserContext()
+  const router = useRouter()
+
   const [branches, setBranches] = useState<Branch[]>([])
   const [apptCounts, setApptCounts] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
@@ -38,16 +43,19 @@ export default function BranchesPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState(emptyForm)
 
-  useEffect(() => { loadData() }, [])
+  useEffect(() => {
+    if (!['owner', 'manager'].includes(role)) { router.replace('/appointments'); return }
+    loadData()
+  }, [role, router]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!['owner', 'manager'].includes(role)) return null
 
   async function loadData() {
     const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
 
     const [branchRes, apptRes] = await Promise.all([
-      supabase.from('branches').select('*').eq('user_id', user.id).order('created_at', { ascending: true }),
-      supabase.from('appointments').select('branch_id').eq('user_id', user.id).not('branch_id', 'is', null),
+      supabase.from('branches').select('*').eq('user_id', ownerId).order('created_at', { ascending: true }),
+      supabase.from('appointments').select('branch_id').eq('user_id', ownerId).not('branch_id', 'is', null),
     ])
 
     setBranches((branchRes.data as Branch[]) ?? [])
@@ -78,14 +86,12 @@ export default function BranchesPage() {
     if (!form.name.trim()) { toast.error('Branch name is required'); return }
     setSaving(true)
     const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setSaving(false); return }
 
     const payload = {
       name: form.name.trim(),
       address: form.address.trim() || null,
       phone: form.phone.trim() || null,
-      user_id: user.id,
+      user_id: ownerId,
     }
 
     if (editingId) {

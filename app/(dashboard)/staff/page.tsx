@@ -1,8 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
+import { useUserContext } from '@/components/RoleContext'
 import type { StaffMember } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -21,6 +23,9 @@ import { Users, Plus, Pencil, Trash2, Loader2, Phone } from 'lucide-react'
 const emptyForm = { name: '', phone: '' }
 
 export default function StaffPage() {
+  const { role, ownerId } = useUserContext()
+  const router = useRouter()
+
   const [staff, setStaff] = useState<StaffMember[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -29,16 +34,19 @@ export default function StaffPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState(emptyForm)
 
-  useEffect(() => { loadStaff() }, [])
+  useEffect(() => {
+    if (!['owner', 'manager'].includes(role)) { router.replace('/appointments'); return }
+    loadStaff()
+  }, [role, router]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!['owner', 'manager'].includes(role)) return null
 
   async function loadStaff() {
     const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
     const { data } = await supabase
       .from('staff')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', ownerId)
       .order('name')
     setStaff(data ?? [])
     setLoading(false)
@@ -64,13 +72,11 @@ export default function StaffPage() {
     }
     setSaving(true)
     const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setSaving(false); return }
 
     const payload = {
       name: form.name.trim(),
       phone: form.phone.trim(),
-      user_id: user.id,
+      user_id: ownerId,
     }
 
     if (editingId) {

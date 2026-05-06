@@ -1,3 +1,5 @@
+export type UserRole = 'owner' | 'manager' | 'receptionist' | 'cashier' | 'staff'
+
 export type Service = {
   id: string
   user_id: string
@@ -12,6 +14,7 @@ export type StaffMember = {
   user_id: string
   name: string
   phone: string
+  linked_user_id?: string | null
   created_at: string
 }
 
@@ -28,6 +31,9 @@ export type Appointment = {
   appointment_date: string
   appointment_time: string
   status: AppointmentStatus
+  payment_status: 'unpaid' | 'paid'
+  discount_amount: number
+  feedback?: string | null
   notes?: string
   created_at: string
   services?: Service
@@ -49,4 +55,17 @@ export type Branch = {
   address?: string
   phone?: string
   created_at: string
+}
+
+export type SalonMember = {
+  id: string
+  owner_id: string
+  member_user_id: string | null
+  email: string
+  role: Exclude<UserRole, 'owner'>
+  staff_id?: string | null
+  status: 'pending' | 'active'
+  invited_at: string
+  joined_at?: string | null
+  staff?: { id: string; name: string } | null
 }

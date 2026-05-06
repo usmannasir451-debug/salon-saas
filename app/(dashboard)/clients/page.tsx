@@ -1,8 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { createClient } from '@/lib/supabase/client'
+import { useUserContext } from '@/components/RoleContext'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import {
@@ -29,21 +31,27 @@ function formatPKR(n: number) {
 }
 
 export default function ClientsPage() {
+  const { role, ownerId } = useUserContext()
+  const router = useRouter()
+
   const [clients, setClients] = useState<ClientSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
 
-  useEffect(() => { loadClients() }, [])
+  useEffect(() => {
+    if (!['owner', 'manager', 'receptionist'].includes(role)) { router.replace('/appointments'); return }
+    loadClients()
+  }, [role, router]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!['owner', 'manager', 'receptionist'].includes(role)) return null
 
   async function loadClients() {
     const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
 
     const { data } = await supabase
       .from('appointments')
       .select('client_name, status, appointment_date, services(price)')
-      .eq('user_id', user.id)
+      .eq('user_id', ownerId)
       .order('appointment_date', { ascending: false })
 
     if (!data) { setLoading(false); return }

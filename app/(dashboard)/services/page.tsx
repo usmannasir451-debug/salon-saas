@@ -1,8 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
+import { useUserContext } from '@/components/RoleContext'
 import type { Service } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,6 +27,9 @@ function formatPKR(amount: number) {
 const emptyForm = { name: '', duration: '', price: '' }
 
 export default function ServicesPage() {
+  const { role, ownerId } = useUserContext()
+  const router = useRouter()
+
   const [services, setServices] = useState<Service[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -33,16 +38,19 @@ export default function ServicesPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState(emptyForm)
 
-  useEffect(() => { loadServices() }, [])
+  useEffect(() => {
+    if (!['owner', 'manager'].includes(role)) { router.replace('/appointments'); return }
+    loadServices()
+  }, [role, router]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!['owner', 'manager'].includes(role)) return null
 
   async function loadServices() {
     const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
     const { data } = await supabase
       .from('services')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', ownerId)
       .order('name')
     setServices(data ?? [])
     setLoading(false)
@@ -68,14 +76,12 @@ export default function ServicesPage() {
     }
     setSaving(true)
     const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setSaving(false); return }
 
     const payload = {
       name: form.name.trim(),
       duration: parseInt(form.duration),
       price: parseFloat(form.price),
-      user_id: user.id,
+      user_id: ownerId,
     }
 
     if (editingId) {

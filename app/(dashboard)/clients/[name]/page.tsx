@@ -3,6 +3,7 @@
 import { use, useEffect, useState } from 'react'
 import { format } from 'date-fns'
 import { createClient } from '@/lib/supabase/client'
+import { useUserContext } from '@/components/RoleContext'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -48,6 +49,7 @@ function whatsappUrl(phone: string, clientName: string) {
 }
 
 export default function ClientProfilePage({ params }: { params: Promise<{ name: string }> }) {
+  const { ownerId } = useUserContext()
   const { name } = use(params)
   const clientName = decodeURIComponent(name)
 
@@ -61,13 +63,11 @@ export default function ClientProfilePage({ params }: { params: Promise<{ name: 
 
   async function loadClient() {
     const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
 
     const { data } = await supabase
       .from('appointments')
       .select('id, appointment_date, appointment_time, status, notes, client_phone, services(name, price), staff(name)')
-      .eq('user_id', user.id)
+      .eq('user_id', ownerId)
       .eq('client_name', clientName)
       .order('appointment_date', { ascending: false })
       .order('appointment_time', { ascending: false })
