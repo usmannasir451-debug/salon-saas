@@ -107,3 +107,85 @@ export type WalkIn = {
   services?: Service
   staff?: StaffMember
 }
+
+export type ExpenseCategory =
+  | 'staff_refreshments'
+  | 'salon_materials'
+  | 'inventory'
+  | 'utilities'
+  | 'rent'
+  | 'marketing'
+  | 'miscellaneous'
+
+export type Expense = {
+  id: string
+  user_id: string
+  category: ExpenseCategory
+  description: string
+  amount: number
+  expense_date: string
+  paid_by?: string
+  notes?: string
+  is_recurring: boolean
+  created_at: string
+}
+
+export type InventoryCategory =
+  | 'hair_products'
+  | 'skin_products'
+  | 'tools'
+  | 'equipment'
+  | 'consumables'
+
+export type InventoryItem = {
+  id: string
+  user_id: string
+  name: string
+  category: InventoryCategory
+  quantity: number
+  unit: string
+  reorder_level: number
+  cost_price: number
+  supplier?: string
+  created_at: string
+}
+
+export type StockAdjustment = {
+  id: string
+  user_id: string
+  item_id: string
+  adjustment: number
+  reason: string
+  adjusted_by?: string
+  created_at: string
+}
+
+export type SalaryType = 'fixed' | 'commission' | 'both'
+
+export type StaffSalary = {
+  id: string
+  user_id: string
+  staff_id: string
+  salary_type: SalaryType
+  fixed_amount: number
+  commission_pct: number
+  created_at: string
+  staff?: StaffMember
+}
+
+export type PayrollEntry = {
+  id: string
+  user_id: string
+  staff_id: string
+  month: string
+  fixed_salary: number
+  revenue_generated: number
+  commission_earned: number
+  total_payable: number
+  is_paid: boolean
+  paid_date?: string
+  paid_method?: string
+  notes?: string
+  created_at: string
+  staff?: StaffMember
+}

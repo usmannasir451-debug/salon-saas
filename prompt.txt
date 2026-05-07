@@ -1,69 +1,50 @@
-You are an expert SaaS developer building "SalonPro" - a world-class white-label salon management platform. This is an existing Next.js + Supabase project. Do ALL of the following:
+You are an expert SaaS developer building "SalonPro" - a world-class white-label salon management platform. This is an existing Next.js + Supabase project. Continue building these features:
 
-PART 1 - REBRANDING & CLEANUP
-- Find and replace every instance of "SalonPro Pakistan" with "SalonPro" in ALL files
-- Remove "Pakistan" from everywhere - UI, metadata, page titles, components
-- Remove ALL Urdu and Roman Urdu text completely from every file - English only
-- Add "Powered by SalonPro" in footer of every page
+PART 8 - EXPENSE MANAGEMENT (/expenses)
+- Add expense: category, description, amount, date, paid by, notes
+- Categories: Staff Refreshments, Salon Materials, Inventory, Utilities, Rent, Marketing, Miscellaneous
+- Recurring expense option
+- Monthly expense summary by category with chart
+- Edit and delete expenses
 
-PART 2 - WHITE-LABEL SYSTEM
-- Add columns to profiles table: salon_name, salon_logo_url, salon_primary_color, salon_address, salon_phone, salon_email, salon_timezone, salon_currency
-- In dashboard header: fetch logged-in user's salon_name and salon_logo_url from profiles table
-- Show their uploaded logo if exists, otherwise show salon_name as text
-- Every salon sees their own branding when logged in
+PART 9 - INVENTORY MANAGEMENT (/inventory)
+- Add products: name, category, quantity, unit, reorder level, cost price, supplier
+- Categories: Hair Products, Skin Products, Tools, Equipment, Consumables
+- Low stock alert when quantity below reorder level
+- Low stock notification on dashboard
+- Inventory valuation: total cost of current stock
+- Adjust stock manually with reason
 
-PART 3 - SETTINGS PAGE (/settings)
-- Salon owner can update: salon name, address, phone, email, timezone, currency
-- Upload salon logo - store in Supabase storage bucket called "logos"
-- Choose brand color
-- Save updates profiles table
-- Header immediately reflects new salon name and logo
-- "Powered by SalonPro" always stays at bottom
+PART 10 - SALARY & PAYROLL (/payroll)
+- Staff salary setup: fixed monthly, commission percentage on revenue, or both
+- Monthly payroll: staff name, fixed salary, revenue generated, commission earned, total payable
+- Mark salary as paid with date and method
+- Salary history per staff
+- Salaries count as expense in P&L
 
-PART 4 - USER ROLES & PERMISSIONS
-- Roles: Owner, Regional Manager, Manager, Receptionist, Cashier, Staff
-- Owner can invite team via email with assigned role
-- Permissions:
-  - Owner: full access to everything
-  - Regional Manager: dashboard and reports only, all branches, no settings
-  - Manager: appointments, staff, services, clients, reports - no billing or user management
-  - Receptionist: appointments and clients only
-  - Cashier: appointments view, mark payment done, apply discounts, collect feedback
-  - Staff: view only their own appointments for today
-- Navigation items hidden based on role
-- Invite flow: owner enters email, selects role, Supabase sends invite email
+PART 11 - PROFIT & LOSS REPORT (/reports/pnl)
+- Month selector
+- INCOME: appointment revenue, walk-in revenue, gross revenue, less discounts, net revenue
+- EXPENSES: salaries, commissions, materials, refreshments, utilities, rent, marketing, other, total expenses
+- NET PROFIT = Net Revenue minus Total Expenses
+- 6 month trend chart: revenue vs expenses vs profit
+- Export P&L as PDF with salon logo
 
-PART 5 - CALENDAR VIEW (/calendar)
-- Full calendar like Google Calendar and Mangomint
-- Day view and week view toggle at top
-- Each appointment shown as colored block with: time slot, client name, service name, staff name
-- Color coded by status: confirmed=green, pending=yellow, done=blue, cancelled=red, no-show=gray
-- Click any block to open fully editable appointment modal
-- Staff filter dropdown to view one staff schedule
-- Today button, previous and next navigation arrows
-- Mobile responsive
-
-PART 6 - WALK-IN CUSTOMERS (/walkin)
-- "New Walk-in" quick button on dashboard
-- Walk-in form: client name optional, phone optional, service, staff, payment method: cash, card, jazzcash, easypaisa
-- Instant discount: fixed amount or percentage with reason field
-- Auto-calculate: subtotal, discount amount, total payable
-- Mark as paid instantly
-- Receipt generation
-- Walk-ins listed separately with their own page
-- Walk-ins included in dashboard stats and reports
-
-PART 7 - DISCOUNT SYSTEM
-- Walk-ins: apply discount instantly at time of service
-- Appointments: cashier applies discount at checkout
-- Two types: fixed amount or percentage
-- Discount reason: loyalty, promo, staff discount, birthday, other
-- Owner sets max discount percentage per role in settings
-- Reports show gross revenue, total discounts, net revenue
+PART 12 - ENHANCED DASHBOARD KPIs
+- Today: revenue, appointments, walk-ins, avg bill
+- This month: revenue, expenses, net profit, clients served
+- Revenue change percentage vs last month
+- Top 5 services by revenue
+- Top 5 staff by revenue
+- New vs returning clients
+- Busiest hours chart
+- Busiest days chart
+- Low inventory alerts
+- Today appointment timeline
 
 TECHNICAL REQUIREMENTS FOR THIS SESSION:
 - Generate complete SQL migration at the end for ALL new tables and columns
 - RLS policies on every new table
 - Mobile responsive throughout
 - Pink/rose theme with shadcn/ui components
-- Role based navigation
+- Recharts for all charts

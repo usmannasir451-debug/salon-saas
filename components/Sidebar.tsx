@@ -24,6 +24,10 @@ import {
   UserCog,
   Settings,
   Zap,
+  DollarSign,
+  Package,
+  Wallet,
+  BarChart2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -39,6 +43,10 @@ const allNavItems = [
   { href: '/clients', label: 'Clients', icon: UserSearch },
   { href: '/branches', label: 'Branches', icon: Building2 },
   { href: '/team', label: 'Team', icon: UserCog },
+  { href: '/expenses', label: 'Expenses', icon: DollarSign },
+  { href: '/inventory', label: 'Inventory', icon: Package },
+  { href: '/payroll', label: 'Payroll', icon: Wallet },
+  { href: '/reports/pnl', label: 'P&L Report', icon: BarChart2 },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
 

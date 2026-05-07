@@ -12,7 +12,9 @@
       "Bash(npm install *)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Tesla Laptops\\\\salon-saas\" -Recurse -Directory)",
       "Bash(Select-Object -ExpandProperty FullName)",
-      "Bash(npx next *)"
+      "Bash(npx next *)",
+      "Bash(Format-Table -AutoSize)",
+      "PowerShell(New-Item *)"
     ]
   }
 }

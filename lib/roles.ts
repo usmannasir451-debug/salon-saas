@@ -19,9 +19,9 @@ export const ROLE_COLORS: Record<UserRole, string> = {
 }
 
 export const ROLE_NAV: Record<UserRole, string[]> = {
-  owner: ['/dashboard', '/appointments', '/calendar', '/walkin', '/services', '/staff', '/clients', '/branches', '/team', '/settings'],
-  regional_manager: ['/dashboard', '/branches'],
-  manager: ['/dashboard', '/appointments', '/calendar', '/walkin', '/services', '/staff', '/clients', '/branches'],
+  owner: ['/dashboard', '/appointments', '/calendar', '/walkin', '/services', '/staff', '/clients', '/branches', '/team', '/expenses', '/inventory', '/payroll', '/reports/pnl', '/settings'],
+  regional_manager: ['/dashboard', '/branches', '/reports/pnl'],
+  manager: ['/dashboard', '/appointments', '/calendar', '/walkin', '/services', '/staff', '/clients', '/branches', '/expenses', '/inventory', '/payroll', '/reports/pnl'],
   receptionist: ['/appointments', '/calendar', '/walkin', '/clients'],
   cashier: ['/appointments', '/calendar', '/walkin'],
   staff: ['/appointments'],
