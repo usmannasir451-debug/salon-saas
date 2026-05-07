@@ -322,3 +322,112 @@ create policy "Delete salon branches" on public.branches
         and status = 'active'
     )
   );
+
+-- ============================================================
+-- MIGRATION v4: White-label, Walk-ins, Discounts, New Roles
+-- Run this block in Supabase SQL Editor after v3
+-- ============================================================
+
+-- ─── White-label columns on profiles ─────────────────────────────────────────
+alter table public.profiles
+  add column if not exists salon_logo_url       text,
+  add column if not exists salon_primary_color  text,
+  add column if not exists salon_address        text,
+  add column if not exists salon_phone          text,
+  add column if not exists salon_email          text,
+  add column if not exists salon_timezone       text default 'UTC',
+  add column if not exists salon_currency       text default 'USD',
+  add column if not exists max_discount_owner   integer default 100,
+  add column if not exists max_discount_manager integer default 30,
+  add column if not exists max_discount_cashier integer default 15;
+
+-- ─── Appointment enhancements ─────────────────────────────────────────────────
+-- No-show status (drop and recreate the check constraint)
+alter table public.appointments
+  drop constraint if exists appointments_status_check;
+
+alter table public.appointments
+  add constraint appointments_status_check
+    check (status in ('pending', 'confirmed', 'completed', 'cancelled', 'no_show'));
+
+-- Discount type and reason fields
+alter table public.appointments
+  add column if not exists discount_type   text check (discount_type in ('fixed', 'percentage')),
+  add column if not exists discount_reason text check (discount_reason in ('loyalty', 'promo', 'staff_discount', 'birthday', 'other'));
+
+-- ─── Update salon_members to include regional_manager role ────────────────────
+alter table public.salon_members
+  drop constraint if exists salon_members_role_check;
+
+alter table public.salon_members
+  add constraint salon_members_role_check
+    check (role in ('regional_manager', 'manager', 'receptionist', 'cashier', 'staff'));
+
+-- ─── Walk-ins table ────────────────────────────────────────────────────────────
+create table if not exists public.walk_ins (
+  id              uuid default uuid_generate_v4() primary key,
+  user_id         uuid references public.profiles(id) on delete cascade not null,
+  client_name     text,
+  client_phone    text,
+  service_id      uuid references public.services(id) on delete set null,
+  staff_id        uuid references public.staff(id) on delete set null,
+  branch_id       uuid references public.branches(id) on delete set null,
+  payment_method  text not null default 'cash'
+                    check (payment_method in ('cash', 'card', 'jazzcash', 'easypaisa')),
+  subtotal        numeric(10, 2) not null default 0,
+  discount_type   text check (discount_type in ('fixed', 'percentage')),
+  discount_value  numeric(10, 2) not null default 0,
+  discount_amount numeric(10, 2) not null default 0,
+  discount_reason text check (discount_reason in ('loyalty', 'promo', 'staff_discount', 'birthday', 'other')),
+  total           numeric(10, 2) not null default 0,
+  payment_status  text not null default 'unpaid'
+                    check (payment_status in ('unpaid', 'paid')),
+  notes           text,
+  created_at      timestamptz default now() not null
+);
+
+alter table public.walk_ins enable row level security;
+
+create policy "View salon walk_ins" on public.walk_ins
+  for select using (user_id = get_effective_owner_id());
+
+create policy "Insert salon walk_ins" on public.walk_ins
+  for insert with check (user_id = get_effective_owner_id());
+
+create policy "Update salon walk_ins" on public.walk_ins
+  for update using (user_id = get_effective_owner_id());
+
+create policy "Delete salon walk_ins" on public.walk_ins
+  for delete using (
+    auth.uid() = user_id
+    or exists (
+      select 1 from public.salon_members
+      where member_user_id = auth.uid()
+        and owner_id = public.walk_ins.user_id
+        and role in ('manager')
+        and status = 'active'
+    )
+  );
+
+-- ─── Supabase Storage: logos bucket ──────────────────────────────────────────
+-- Run the following in the Supabase Dashboard → Storage → New bucket
+-- or via the SQL editor:
+insert into storage.buckets (id, name, public)
+  values ('logos', 'logos', true)
+  on conflict (id) do nothing;
+
+-- Allow authenticated users to upload to their own folder
+create policy "Salon owners can upload logos" on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'logos' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "Logos are publicly readable" on storage.objects
+  for select using (bucket_id = 'logos');
+
+create policy "Salon owners can update their logos" on storage.objects
+  for update to authenticated
+  using (bucket_id = 'logos' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "Salon owners can delete their logos" on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'logos' and (storage.foldername(name))[1] = auth.uid()::text);

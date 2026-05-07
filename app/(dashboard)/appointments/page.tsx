@@ -54,6 +54,7 @@ const statusConfig: Record<AppointmentStatus, { label: string; className: string
   confirmed: { label: 'Confirmed', className: 'bg-blue-50 text-blue-700 border-blue-200' },
   completed: { label: 'Completed', className: 'bg-green-50 text-green-700 border-green-200' },
   cancelled: { label: 'Cancelled', className: 'bg-red-50 text-red-700 border-red-200' },
+  no_show: { label: 'No Show', className: 'bg-gray-50 text-gray-600 border-gray-200' },
 }
 
 const emptyForm = {

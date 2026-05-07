@@ -10,15 +10,16 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             <Scissors className="w-4 h-4 text-white" />
           </div>
           <span className="font-bold text-gray-900 group-hover:text-primary transition-colors">
-            SalonPro <span className="text-primary">Pakistan</span>
+            SalonPro
           </span>
         </Link>
       </header>
       <main className="flex-1 flex items-center justify-center px-4 py-8">
         {children}
       </main>
-      <footer className="text-center text-xs text-gray-400 py-4">
-        © 2024 SalonPro Pakistan. All rights reserved.
+      <footer className="text-center text-xs text-gray-400 py-4 space-y-1">
+        <p>© 2024 SalonPro. All rights reserved.</p>
+        <p className="text-gray-300">Powered by SalonPro</p>
       </footer>
     </div>
   )

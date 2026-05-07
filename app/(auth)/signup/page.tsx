@@ -65,8 +65,6 @@ export default function SignupPage() {
       <CardHeader className="text-center pb-2">
         <CardTitle className="text-2xl">Create Your Account</CardTitle>
         <CardDescription>
-          <span className="font-urdu text-base">اپنا اکاؤنٹ بنائیں</span>
-          <br />
           Start your 14-day free trial — no credit card required
         </CardDescription>
       </CardHeader>

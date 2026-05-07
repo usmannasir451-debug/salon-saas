@@ -10,7 +10,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   if (!user) redirect('/login')
 
-  // Check if this user is a team member of an owner's salon
   const { data: membership } = await supabase
     .from('salon_members')
     .select('owner_id, role, staff_id')
@@ -30,7 +29,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('salon_name')
+    .select('salon_name, salon_logo_url')
     .eq('id', ownerId)
     .single()
 
@@ -39,11 +38,19 @@ export default async function DashboardLayout({ children }: { children: React.Re
   return (
     <div className="min-h-screen bg-gray-50">
       <RoleProvider value={ctx}>
-        <Sidebar salonName={profile?.salon_name ?? undefined} userEmail={user.email} role={role} />
+        <Sidebar
+          salonName={profile?.salon_name ?? undefined}
+          salonLogoUrl={profile?.salon_logo_url ?? undefined}
+          userEmail={user.email}
+          role={role}
+        />
         <div className="lg:pl-60">
           <main className="pt-16 lg:pt-0 min-h-screen">
             {children}
           </main>
+          <footer className="lg:block text-center py-3 text-xs text-gray-300">
+            Powered by SalonPro
+          </footer>
         </div>
       </RoleProvider>
     </div>

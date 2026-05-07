@@ -17,45 +17,39 @@ import {
   Menu,
   X,
   Sparkles,
-  Clock,
   TrendingUp,
+  Zap,
 } from 'lucide-react'
 
 const features = [
   {
     icon: Calendar,
     title: 'Appointment Management',
-    urdu: 'اپائنٹمنٹ مینجمنٹ',
     desc: 'Easily book, reschedule, and manage all client appointments in one place.',
   },
   {
     icon: Users,
     title: 'Staff Management',
-    urdu: 'اسٹاف مینجمنٹ',
     desc: 'Add and manage your salon staff with their contact details and schedules.',
   },
   {
     icon: Scissors,
     title: 'Service Catalog',
-    urdu: 'سروس کیٹالاگ',
-    desc: 'List all your services with prices in PKR and durations.',
+    desc: 'List all your services with prices and durations.',
   },
   {
     icon: BarChart3,
     title: 'Revenue Tracking',
-    urdu: 'آمدنی کا حساب',
-    desc: 'Track your daily and monthly revenue with real-time dashboard.',
+    desc: 'Track your daily and monthly revenue with a real-time dashboard.',
   },
   {
     icon: Smartphone,
     title: 'Mobile Friendly',
-    urdu: 'موبائل فرینڈلی',
     desc: 'Fully responsive — works perfectly on phones, tablets, and desktops.',
   },
   {
     icon: Shield,
     title: 'Secure & Reliable',
-    urdu: 'محفوظ اور قابل اعتماد',
     desc: 'Your data is safe with enterprise-grade security powered by Supabase.',
   },
 ]
@@ -63,8 +57,7 @@ const features = [
 const plans = [
   {
     name: 'Starter',
-    nameUrdu: 'بنیادی',
-    price: 2499,
+    price: '$29',
     period: '/month',
     desc: 'Perfect for small salons just getting started.',
     features: [
@@ -79,15 +72,14 @@ const plans = [
   },
   {
     name: 'Professional',
-    nameUrdu: 'پروفیشنل',
-    price: 4999,
+    price: '$59',
     period: '/month',
     desc: 'Ideal for growing salons with multiple staff.',
     features: [
-      'Up to 5 staff members',
+      'Up to 10 staff members',
       'Unlimited appointments',
-      'Service catalog',
-      'Revenue analytics',
+      'Calendar & walk-in module',
+      'Revenue analytics & reports',
       'Priority support',
     ],
     popular: true,
@@ -95,15 +87,14 @@ const plans = [
   },
   {
     name: 'Business',
-    nameUrdu: 'بزنس',
-    price: 9999,
+    price: '$99',
     period: '/month',
     desc: 'For established salons and spa chains.',
     features: [
       'Unlimited staff',
       'Unlimited appointments',
-      'Advanced analytics',
-      'Custom branding',
+      'Multi-branch support',
+      'White-label branding',
       '24/7 dedicated support',
     ],
     popular: false,
@@ -112,10 +103,10 @@ const plans = [
 ]
 
 const stats = [
-  { value: '500+', label: 'Salons', labelUrdu: 'سیلون' },
-  { value: '50,000+', label: 'Appointments', labelUrdu: 'اپائنٹمنٹ' },
-  { value: '2,000+', label: 'Staff Managed', labelUrdu: 'اسٹاف' },
-  { value: '98%', label: 'Satisfaction', labelUrdu: 'اطمینان' },
+  { value: '2,500+', label: 'Salons' },
+  { value: '500K+', label: 'Appointments' },
+  { value: '10K+', label: 'Staff Managed' },
+  { value: '98%', label: 'Satisfaction' },
 ]
 
 export default function LandingPage() {
@@ -131,25 +122,17 @@ export default function LandingPage() {
               <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                 <Scissors className="w-4 h-4 text-white" />
               </div>
-              <span className="font-bold text-lg text-gray-900">
-                SalonPro <span className="text-primary">Pakistan</span>
-              </span>
+              <span className="font-bold text-lg text-gray-900">SalonPro</span>
             </div>
 
             <div className="hidden md:flex items-center gap-8">
-              <a href="#features" className="text-sm text-gray-600 hover:text-primary transition-colors">
-                Features
-              </a>
-              <a href="#pricing" className="text-sm text-gray-600 hover:text-primary transition-colors">
-                Pricing
-              </a>
+              <a href="#features" className="text-sm text-gray-600 hover:text-primary transition-colors">Features</a>
+              <a href="#pricing" className="text-sm text-gray-600 hover:text-primary transition-colors">Pricing</a>
               <Link href="/login">
                 <Button variant="ghost" size="sm">Log In</Button>
               </Link>
               <Link href="/signup">
-                <Button size="sm" className="bg-primary hover:bg-primary/90">
-                  Get Started Free
-                </Button>
+                <Button size="sm" className="bg-primary hover:bg-primary/90">Get Started Free</Button>
               </Link>
             </div>
 
@@ -186,20 +169,16 @@ export default function LandingPage() {
           <div className="text-center max-w-4xl mx-auto">
             <Badge className="mb-6 bg-primary/10 text-primary border-primary/20 hover:bg-primary/10">
               <Sparkles className="w-3 h-3 mr-1" />
-              Pakistan Ka No. 1 Salon Software
+              World-Class Salon Management
             </Badge>
 
-            <h1 className="text-4xl md:text-6xl font-bold text-gray-900 leading-tight mb-4">
+            <h1 className="text-4xl md:text-6xl font-bold text-gray-900 leading-tight mb-6">
               Manage Your Salon{' '}
               <span className="text-primary">Smarter</span>
             </h1>
 
-            <p className="font-urdu text-2xl md:text-3xl text-gray-700 mb-4 leading-relaxed">
-              اپنے سیلون کو آسانی سے چلائیں
-            </p>
-
             <p className="text-lg text-gray-600 mb-10 max-w-2xl mx-auto">
-              Complete salon management software built for Pakistan. Track appointments, manage staff, catalog services, and grow your business — all in one beautiful dashboard.
+              Complete salon management software for modern businesses. Track appointments, manage staff, catalog services, accept walk-ins, and grow your revenue — all in one beautiful dashboard.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
@@ -224,8 +203,8 @@ export default function LandingPage() {
                   <div className="w-3 h-3 rounded-full bg-yellow-400" />
                   <div className="w-3 h-3 rounded-full bg-green-400" />
                   <div className="flex-1 mx-4">
-                    <div className="bg-white rounded-md mx-auto border border-gray-200 flex items-center justify-center w-56 h-4">
-                      <span className="text-[9px] text-gray-400">app.salonpro.pk/dashboard</span>
+                    <div className="bg-white rounded-md mx-auto border border-gray-200 flex items-center justify-center w-48 h-4">
+                      <span className="text-[9px] text-gray-400">app.salonpro.com/dashboard</span>
                     </div>
                   </div>
                 </div>
@@ -237,7 +216,7 @@ export default function LandingPage() {
                       </div>
                       <span className="text-xs font-bold text-gray-800">SalonPro</span>
                     </div>
-                    {['Dashboard', 'Appointments', 'Services', 'Staff'].map((item, i) => (
+                    {['Dashboard', 'Appointments', 'Calendar', 'Walk-In'].map((item, i) => (
                       <div key={item} className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-xs ${i === 0 ? 'bg-primary/10 text-primary font-medium' : 'text-gray-500'}`}>
                         <div className={`w-1.5 h-1.5 rounded-full ${i === 0 ? 'bg-primary' : 'bg-gray-300'}`} />
                         {item}
@@ -251,10 +230,10 @@ export default function LandingPage() {
                     </div>
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
                       {[
-                        { label: "Today's Appts", value: '12', bg: 'bg-primary/10', text: 'text-primary' },
-                        { label: 'Revenue', value: 'PKR 45K', bg: 'bg-green-50', text: 'text-green-600' },
-                        { label: 'Services', value: '8', bg: 'bg-blue-50', text: 'text-blue-600' },
-                        { label: 'Staff', value: '5', bg: 'bg-purple-50', text: 'text-purple-600' },
+                        { label: "Today's Appts", value: '14', bg: 'bg-primary/10', text: 'text-primary' },
+                        { label: 'Revenue', value: '$2,840', bg: 'bg-green-50', text: 'text-green-600' },
+                        { label: 'Services', value: '12', bg: 'bg-blue-50', text: 'text-blue-600' },
+                        { label: 'Staff', value: '8', bg: 'bg-purple-50', text: 'text-purple-600' },
                       ].map((s) => (
                         <div key={s.label} className={`rounded-lg p-3 ${s.bg}`}>
                           <p className="text-[10px] text-gray-500 mb-1">{s.label}</p>
@@ -263,7 +242,7 @@ export default function LandingPage() {
                       ))}
                     </div>
                     <div className="bg-gray-50 rounded-lg p-3 space-y-2">
-                      {['Fatima Ahmed — Hair Cut — 10:00 AM', 'Sara Khan — Facial — 11:30 AM', 'Ayesha Ali — Manicure — 2:00 PM'].map((appt) => (
+                      {['Emma Johnson — Hair Cut — 10:00 AM', 'Sara Williams — Facial — 11:30 AM', 'Alex Chen — Manicure — 2:00 PM'].map((appt) => (
                         <div key={appt} className="flex items-center gap-2 bg-white rounded p-2 border border-gray-100">
                           <div className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
                           <span className="text-[10px] text-gray-600 truncate">{appt}</span>
@@ -287,7 +266,6 @@ export default function LandingPage() {
               <div key={stat.label} className="text-center">
                 <p className="text-3xl md:text-4xl font-bold text-white mb-1">{stat.value}</p>
                 <p className="text-sm text-pink-100">{stat.label}</p>
-                <p className="text-xs font-urdu text-pink-200 mt-0.5">{stat.labelUrdu}</p>
               </div>
             ))}
           </div>
@@ -298,9 +276,9 @@ export default function LandingPage() {
       <section id="features" className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <Badge className="mb-4 bg-primary/10 text-primary border-primary/20">Features / خصوصیات</Badge>
+            <Badge className="mb-4 bg-primary/10 text-primary border-primary/20">Features</Badge>
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Everything Your Salon Needs</h2>
-            <p className="font-urdu text-xl text-gray-600">آپ کے سیلون کو جو چاہیے سب کچھ یہاں ہے</p>
+            <p className="text-gray-500">A complete platform to run your salon efficiently</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {features.map((feature) => (
@@ -310,7 +288,6 @@ export default function LandingPage() {
                     <feature.icon className="w-6 h-6 text-primary" />
                   </div>
                   <CardTitle className="text-gray-900">{feature.title}</CardTitle>
-                  <p className="font-urdu text-sm text-primary">{feature.urdu}</p>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-gray-600">{feature.desc}</p>
@@ -326,13 +303,13 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">How It Works</h2>
-            <p className="font-urdu text-xl text-gray-600">کیسے کام کرتا ہے</p>
+            <p className="text-gray-500">Get up and running in minutes</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {[
-              { step: '01', icon: Sparkles, title: 'Sign Up Free', urdu: 'مفت رجسٹر کریں', desc: 'Create your account in 2 minutes with your salon name and email.' },
-              { step: '02', icon: Scissors, title: 'Add Services & Staff', urdu: 'سروسز اور اسٹاف شامل کریں', desc: 'Set up your service menu with PKR prices and add your staff members.' },
-              { step: '03', icon: TrendingUp, title: 'Manage & Grow', urdu: 'مینج کریں اور ترقی کریں', desc: 'Book appointments, track revenue, and watch your business grow.' },
+              { step: '01', icon: Sparkles, title: 'Sign Up Free', desc: 'Create your account in 2 minutes with your salon name and email.' },
+              { step: '02', icon: Scissors, title: 'Add Services & Staff', desc: 'Set up your service menu with prices and add your team members.' },
+              { step: '03', icon: TrendingUp, title: 'Manage & Grow', desc: 'Book appointments, accept walk-ins, track revenue, and grow your business.' },
             ].map((step) => (
               <div key={step.step} className="text-center">
                 <div className="relative inline-block mb-6">
@@ -343,8 +320,7 @@ export default function LandingPage() {
                     {step.step}
                   </span>
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-1">{step.title}</h3>
-                <p className="font-urdu text-sm text-primary mb-2">{step.urdu}</p>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">{step.title}</h3>
                 <p className="text-gray-600 text-sm">{step.desc}</p>
               </div>
             ))}
@@ -356,10 +332,9 @@ export default function LandingPage() {
       <section id="pricing" className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <Badge className="mb-4 bg-primary/10 text-primary border-primary/20">Pricing / قیمت</Badge>
+            <Badge className="mb-4 bg-primary/10 text-primary border-primary/20">Pricing</Badge>
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Simple, Transparent Pricing</h2>
-            <p className="font-urdu text-xl text-gray-600 mb-2">سادہ اور واضح قیمتیں</p>
-            <p className="text-gray-500 text-sm">All prices in Pakistani Rupees (PKR). 14-day free trial on all plans.</p>
+            <p className="text-gray-500 text-sm">14-day free trial on all plans. No credit card required.</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
             {plans.map((plan) => (
@@ -379,11 +354,9 @@ export default function LandingPage() {
                   </div>
                 )}
                 <div className="mb-6">
-                  <h3 className={`text-xl font-bold mb-0.5 ${plan.popular ? 'text-white' : 'text-gray-900'}`}>{plan.name}</h3>
-                  <p className={`font-urdu text-sm mb-3 ${plan.popular ? 'text-pink-100' : 'text-primary'}`}>{plan.nameUrdu}</p>
+                  <h3 className={`text-xl font-bold mb-4 ${plan.popular ? 'text-white' : 'text-gray-900'}`}>{plan.name}</h3>
                   <div className="flex items-baseline gap-1">
-                    <span className={`text-sm font-medium ${plan.popular ? 'text-pink-100' : 'text-gray-500'}`}>PKR</span>
-                    <span className={`text-4xl font-bold ${plan.popular ? 'text-white' : 'text-gray-900'}`}>{plan.price.toLocaleString()}</span>
+                    <span className={`text-4xl font-bold ${plan.popular ? 'text-white' : 'text-gray-900'}`}>{plan.price}</span>
                     <span className={`text-sm ${plan.popular ? 'text-pink-100' : 'text-gray-500'}`}>{plan.period}</span>
                   </div>
                   <p className={`text-sm mt-2 ${plan.popular ? 'text-pink-100' : 'text-gray-500'}`}>{plan.desc}</p>
@@ -410,13 +383,12 @@ export default function LandingPage() {
       {/* Testimonials */}
       <section className="py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-center text-gray-900 mb-4">Trusted by Salon Owners</h2>
-          <p className="font-urdu text-xl text-center text-gray-600 mb-12">سیلون مالکان کا بھروسہ</p>
+          <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">Trusted by Salon Owners</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[
-              { name: 'Zara Malik', salon: 'Zara Beauty Lounge, Lahore', quote: 'SalonPro ne hamare appointment system ko bilkul badal diya. Ab koi appointment miss nahi hoti!', stars: 5 },
-              { name: 'Ayesha Siddiqui', salon: 'Glamour Studio, Karachi', quote: 'PKR mein pricing aur Urdu support ke saath yeh software Pakistan ke liye perfect hai.', stars: 5 },
-              { name: 'Nadia Khan', salon: 'Serenity Spa, Islamabad', quote: 'Staff management aur revenue tracking ne humari business ko 40% grow kiya.', stars: 5 },
+              { name: 'Emma Clarke', salon: 'Bloom Beauty Studio, London', quote: 'SalonPro completely transformed how we manage appointments. No more double bookings and our staff love it!', stars: 5 },
+              { name: 'Sarah Williams', salon: 'Luxe Hair & Spa, New York', quote: 'The walk-in module and calendar view are game-changers. We can see the whole day at a glance.', stars: 5 },
+              { name: 'Nadia Hassan', salon: 'Serenity Spa, Dubai', quote: 'The white-label branding makes our salon stand out. Clients see our logo and brand colors everywhere.', stars: 5 },
             ].map((t) => (
               <Card key={t.name} className="border-gray-100">
                 <CardContent className="pt-6">
@@ -425,7 +397,7 @@ export default function LandingPage() {
                       <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
                     ))}
                   </div>
-                  <p className="text-gray-700 text-sm mb-4 italic">"{t.quote}"</p>
+                  <p className="text-gray-700 text-sm mb-4 italic">&quot;{t.quote}&quot;</p>
                   <p className="font-semibold text-gray-900 text-sm">{t.name}</p>
                   <p className="text-xs text-gray-500">{t.salon}</p>
                 </CardContent>
@@ -439,11 +411,10 @@ export default function LandingPage() {
       <section className="py-20 bg-primary">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/20 mb-6">
-            <Scissors className="w-8 h-8 text-white" />
+            <Zap className="w-8 h-8 text-white" />
           </div>
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-3">Ready to Transform Your Salon?</h2>
-          <p className="font-urdu text-2xl text-pink-100 mb-4">ابھی شروع کریں اور اپنے سیلون کو آگے بڑھائیں</p>
-          <p className="text-pink-100 mb-8">Join 500+ salon owners across Pakistan. 14-day free trial, no credit card required.</p>
+          <p className="text-pink-100 mb-8">Join thousands of salon owners worldwide. 14-day free trial, no credit card required.</p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link href="/signup">
               <Button size="lg" className="bg-white text-primary hover:bg-pink-50 px-8 h-12 text-base font-semibold shadow-lg">
@@ -468,10 +439,9 @@ export default function LandingPage() {
                 <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                   <Scissors className="w-4 h-4 text-white" />
                 </div>
-                <span className="font-bold text-white">SalonPro Pakistan</span>
+                <span className="font-bold text-white">SalonPro</span>
               </div>
-              <p className="text-sm mb-2">Pakistan ka number 1 salon management software.</p>
-              <p className="font-urdu text-sm text-gray-500">پاکستانی سیلون مالکان کے لیے</p>
+              <p className="text-sm mb-2">World-class salon management software for modern businesses.</p>
             </div>
             <div>
               <h4 className="text-white font-semibold mb-3 text-sm">Product</h4>
@@ -491,11 +461,8 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="border-t border-gray-800 pt-6 flex flex-col md:flex-row items-center justify-between gap-2">
-            <p className="text-xs">© 2024 SalonPro Pakistan. All rights reserved.</p>
-            <div className="flex items-center gap-1">
-              <Clock className="w-3 h-3" />
-              <span className="text-xs">Pakistan Standard Time (PKT)</span>
-            </div>
+            <p className="text-xs">© 2024 SalonPro. All rights reserved.</p>
+            <p className="text-xs text-gray-600">Powered by SalonPro</p>
           </div>
         </div>
       </footer>

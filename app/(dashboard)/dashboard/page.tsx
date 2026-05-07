@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import { format, subDays, startOfWeek, startOfMonth } from 'date-fns'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useUserContext } from '@/components/RoleContext'
@@ -31,6 +32,7 @@ import {
   Sun,
   Sunset,
   Moon,
+  Zap,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -58,8 +60,8 @@ type AppRow = {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function formatPKR(n: number) {
-  return `PKR ${Math.round(n).toLocaleString('en-PK')}`
+function formatCurrency(n: number, currency = 'USD') {
+  return `${currency} ${Math.round(n).toLocaleString()}`
 }
 
 function whatsappUrl(phone: string, clientName: string, date: string, time: string, salonName: string) {
@@ -67,7 +69,7 @@ function whatsappUrl(phone: string, clientName: string, date: string, time: stri
   const wa = digits.startsWith('0') ? '92' + digits.slice(1) : digits.startsWith('92') ? digits : '92' + digits
   const d = format(new Date(date + 'T00:00:00'), 'EEEE, MMMM d')
   const t = time.slice(0, 5)
-  const msg = `Assalamu Alaikum ${clientName}! Aapki appointment ${d} ko ${t} baje hai. ${salonName || 'Salon'} mein aapka intezaar hai. Shukriya! 🌸`
+  const msg = `Hello ${clientName}! Your appointment is on ${d} at ${t}. ${salonName || 'Salon'} looks forward to seeing you. Thank you!`
   return `https://wa.me/${wa}?text=${encodeURIComponent(msg)}`
 }
 
@@ -76,17 +78,18 @@ const statusConfig: Record<string, { label: string; className: string }> = {
   confirmed: { label: 'Confirmed', className: 'bg-blue-50 text-blue-700 border-blue-200' },
   completed: { label: 'Completed', className: 'bg-green-50 text-green-700 border-green-200' },
   cancelled: { label: 'Cancelled', className: 'bg-red-50 text-red-700 border-red-200' },
+  no_show: { label: 'No Show', className: 'bg-gray-50 text-gray-600 border-gray-200' },
 }
 
-// ─── Custom Tooltip for Revenue Chart ────────────────────────────────────────
+// ─── Custom Tooltip ───────────────────────────────────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function RevenueTooltip({ active, payload, label }: any) {
+function RevenueTooltip({ active, payload, label, currency }: any) {
   if (!active || !payload?.length) return null
   return (
     <div className="bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-lg text-sm">
       <p className="font-medium text-gray-700 mb-0.5">{label}</p>
-      <p className="font-bold text-primary">{formatPKR(payload[0].value)}</p>
+      <p className="font-bold text-primary">{formatCurrency(payload[0].value, currency)}</p>
     </div>
   )
 }
@@ -99,6 +102,7 @@ export default function DashboardPage() {
 
   const [allAppointments, setAllAppointments] = useState<AppRow[]>([])
   const [salonName, setSalonName] = useState('')
+  const [currency, setCurrency] = useState('USD')
   const [branches, setBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(true)
   const [activeFilter, setActiveFilter] = useState<'today' | 'week' | 'month'>('month')
@@ -106,14 +110,14 @@ export default function DashboardPage() {
   const [pdfLoading, setPdfLoading] = useState(false)
 
   useEffect(() => {
-    if (!['owner', 'manager'].includes(role)) {
+    if (!['owner', 'regional_manager', 'manager'].includes(role)) {
       router.replace('/appointments')
       return
     }
     loadDashboard()
   }, [role, router]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!['owner', 'manager'].includes(role)) return null
+  if (!['owner', 'regional_manager', 'manager'].includes(role)) return null
 
   async function loadDashboard() {
     const supabase = createClient()
@@ -123,7 +127,7 @@ export default function DashboardPage() {
     const queryStart = monthStart < sevenDaysAgo ? monthStart : sevenDaysAgo
 
     const [profileRes, apptRes, branchRes] = await Promise.all([
-      supabase.from('profiles').select('salon_name').eq('id', ownerId).single(),
+      supabase.from('profiles').select('salon_name, salon_currency').eq('id', ownerId).single(),
       supabase
         .from('appointments')
         .select('id, client_name, client_phone, service_id, staff_id, branch_id, appointment_date, appointment_time, status, notes, services(id, name, price), staff(id, name)')
@@ -135,6 +139,7 @@ export default function DashboardPage() {
     ])
 
     setSalonName(profileRes.data?.salon_name ?? '')
+    setCurrency(profileRes.data?.salon_currency ?? 'USD')
     setAllAppointments((apptRes.data as unknown as AppRow[]) ?? [])
     setBranches((branchRes.data as Branch[]) ?? [])
     setLoading(false)
@@ -146,13 +151,13 @@ export default function DashboardPage() {
     return allAppointments.filter((a) => a.branch_id === activeBranch)
   }, [allAppointments, activeBranch])
 
-  // ── Monthly data (always for charts + top lists) ──
+  // ── Monthly data ──
   const monthlyData = useMemo(() => {
     const monthStart = startOfMonth(new Date())
     return branchFiltered.filter((a) => new Date(a.appointment_date + 'T00:00:00') >= monthStart)
   }, [branchFiltered])
 
-  // ── Period-filtered (for summary cards + appointments list) ──
+  // ── Period-filtered ──
   const periodFiltered = useMemo(() => {
     const todayStr = format(new Date(), 'yyyy-MM-dd')
     const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 })
@@ -178,7 +183,7 @@ export default function DashboardPage() {
     })
   }, [branchFiltered])
 
-  // ── Summary stats (period) ──
+  // ── Summary stats ──
   const stats = useMemo(() => {
     const completed = periodFiltered.filter((a) => a.status === 'completed')
     const revenue = completed.reduce((sum, a) => sum + Number(a.services?.price ?? 0), 0)
@@ -190,7 +195,7 @@ export default function DashboardPage() {
     }
   }, [periodFiltered])
 
-  // ── Top services (monthly, by revenue) ──
+  // ── Top services ──
   const topServices = useMemo(() => {
     const map = new Map<string, { name: string; revenue: number; count: number }>()
     monthlyData
@@ -205,7 +210,7 @@ export default function DashboardPage() {
     return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue).slice(0, 5)
   }, [monthlyData])
 
-  // ── Top staff (monthly, by appointment count) ──
+  // ── Top staff ──
   const topStaff = useMemo(() => {
     const map = new Map<string, { name: string; count: number }>()
     monthlyData
@@ -219,7 +224,7 @@ export default function DashboardPage() {
     return Array.from(map.values()).sort((a, b) => b.count - a.count).slice(0, 5)
   }, [monthlyData])
 
-  // ── Busy hours (monthly) ──
+  // ── Busy hours ──
   const busyHours = useMemo(() => {
     let morning = 0, afternoon = 0, evening = 0
     monthlyData.forEach((a) => {
@@ -230,9 +235,9 @@ export default function DashboardPage() {
     })
     const peak = Math.max(morning, afternoon, evening, 1)
     return [
-      { label: 'Morning', urdu: 'صبح', time: '8am–12pm', count: morning, pct: Math.round((morning / peak) * 100), icon: Sun, color: 'bg-amber-400' },
-      { label: 'Afternoon', urdu: 'دوپہر', time: '12pm–5pm', count: afternoon, pct: Math.round((afternoon / peak) * 100), icon: Sunset, color: 'bg-orange-400' },
-      { label: 'Evening', urdu: 'شام', time: '5pm–9pm', count: evening, pct: Math.round((evening / peak) * 100), icon: Moon, color: 'bg-primary' },
+      { label: 'Morning', time: '8am–12pm', count: morning, pct: Math.round((morning / peak) * 100), icon: Sun, color: 'bg-amber-400' },
+      { label: 'Afternoon', time: '12pm–5pm', count: afternoon, pct: Math.round((afternoon / peak) * 100), icon: Sunset, color: 'bg-orange-400' },
+      { label: 'Evening', time: '5pm–9pm', count: evening, pct: Math.round((evening / peak) * 100), icon: Moon, color: 'bg-primary' },
     ]
   }, [monthlyData])
 
@@ -253,7 +258,7 @@ export default function DashboardPage() {
       doc.setTextColor(255, 255, 255)
       doc.setFontSize(22)
       doc.setFont('helvetica', 'bold')
-      doc.text('SalonPro Pakistan', 14, 16)
+      doc.text('SalonPro', 14, 16)
       doc.setFontSize(11)
       doc.setFont('helvetica', 'normal')
       doc.text(`Monthly Report — ${format(new Date(), 'MMMM yyyy')}`, 14, 26)
@@ -271,8 +276,8 @@ export default function DashboardPage() {
         body: [
           [`Total Appointments (${monthLabel})`, stats.total.toString()],
           ['Completed', stats.completed.toString()],
-          ['Total Revenue', `PKR ${stats.revenue.toLocaleString()}`],
-          ['Average Bill per Client', `PKR ${stats.avgBill.toLocaleString()}`],
+          ['Total Revenue', formatCurrency(stats.revenue, currency)],
+          ['Average Bill per Client', formatCurrency(stats.avgBill, currency)],
         ],
         theme: 'striped',
         headStyles: { fillColor: [244, 63, 94] },
@@ -287,7 +292,7 @@ export default function DashboardPage() {
         doc.text('Top Services This Month', 14, y)
         autoTable(doc, {
           startY: y + 4,
-          head: [['Service', 'Revenue (PKR)', 'Bookings']],
+          head: [['Service', `Revenue (${currency})`, 'Bookings']],
           body: topServices.map((s) => [s.name, s.revenue.toLocaleString(), s.count.toString()]),
           theme: 'striped',
           headStyles: { fillColor: [244, 63, 94] },
@@ -360,20 +365,27 @@ export default function DashboardPage() {
             <h1 className="text-2xl font-bold text-gray-900">{salonName || 'Dashboard'}</h1>
           </div>
           <p className="text-gray-500 text-sm">
-            {format(new Date(), 'EEEE, MMMM d, yyyy')} •{' '}
-            <span className="font-urdu">خوش آمدید</span>
+            {format(new Date(), 'EEEE, MMMM d, yyyy')}
           </p>
         </div>
-        <Button
-          onClick={downloadPDF}
-          disabled={pdfLoading}
-          variant="outline"
-          className="gap-2 border-primary/30 text-primary hover:bg-primary/5 flex-shrink-0"
-        >
-          {pdfLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-          <span className="hidden sm:inline">Monthly Report</span>
-          <span className="sm:hidden">PDF</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Link href="/walkin">
+            <Button variant="outline" className="gap-2 border-primary/30 text-primary hover:bg-primary/5">
+              <Zap className="w-4 h-4" />
+              <span className="hidden sm:inline">New Walk-In</span>
+            </Button>
+          </Link>
+          <Button
+            onClick={downloadPDF}
+            disabled={pdfLoading}
+            variant="outline"
+            className="gap-2 border-primary/30 text-primary hover:bg-primary/5 flex-shrink-0"
+          >
+            {pdfLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            <span className="hidden sm:inline">Monthly Report</span>
+            <span className="sm:hidden">PDF</span>
+          </Button>
+        </div>
       </div>
 
       {/* ── Quick Filters ── */}
@@ -416,7 +428,6 @@ export default function DashboardPage() {
         {[
           {
             title: 'Appointments',
-            urdu: 'اپائنٹمنٹ',
             value: stats.total,
             icon: CalendarDays,
             color: 'text-primary',
@@ -424,7 +435,6 @@ export default function DashboardPage() {
           },
           {
             title: 'Completed',
-            urdu: 'مکمل',
             value: stats.completed,
             icon: CheckCircle2,
             color: 'text-green-600',
@@ -432,16 +442,14 @@ export default function DashboardPage() {
           },
           {
             title: 'Revenue',
-            urdu: 'آمدنی',
-            value: formatPKR(stats.revenue),
+            value: formatCurrency(stats.revenue, currency),
             icon: TrendingUp,
             color: 'text-blue-600',
             bg: 'bg-blue-50',
           },
           {
             title: 'Avg Bill',
-            urdu: 'اوسط بل',
-            value: formatPKR(stats.avgBill),
+            value: formatCurrency(stats.avgBill, currency),
             icon: ReceiptText,
             color: 'text-purple-600',
             bg: 'bg-purple-50',
@@ -454,22 +462,18 @@ export default function DashboardPage() {
               </div>
               <p className="text-xl font-bold text-gray-900 mb-0.5 leading-tight">{s.value}</p>
               <p className="text-xs text-gray-500">{s.title}</p>
-              <p className="font-urdu text-xs text-gray-400">{s.urdu}</p>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      {/* ── Revenue Chart (last 7 days) ── */}
+      {/* ── Revenue Chart ── */}
       <Card className="border-gray-100">
         <CardHeader className="pb-2 border-b border-gray-50">
           <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-base">Revenue — Last 7 Days</CardTitle>
-              <p className="font-urdu text-xs text-gray-400 mt-0.5">گزشتہ 7 دن کی آمدنی</p>
-            </div>
+            <CardTitle className="text-base">Revenue — Last 7 Days</CardTitle>
             <Badge className="bg-primary/10 text-primary border-primary/20 text-xs">
-              {formatPKR(revenueChartData.reduce((s, d) => s + d.revenue, 0))} total
+              {formatCurrency(revenueChartData.reduce((s, d) => s + d.revenue, 0), currency)} total
             </Badge>
           </div>
         </CardHeader>
@@ -478,7 +482,6 @@ export default function DashboardPage() {
             <div className="flex flex-col items-center justify-center h-40 text-gray-400">
               <TrendingUp className="w-8 h-8 mb-2 opacity-30" />
               <p className="text-sm">No revenue data yet</p>
-              <p className="font-urdu text-xs mt-1">ابھی کوئی ڈیٹا نہیں</p>
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={200}>
@@ -492,7 +495,7 @@ export default function DashboardPage() {
                   tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}
                   width={36}
                 />
-                <Tooltip content={<RevenueTooltip />} cursor={{ fill: '#fdf2f4' }} />
+                <Tooltip content={<RevenueTooltip currency={currency} />} cursor={{ fill: '#fdf2f4' }} />
                 <Bar dataKey="revenue" fill="#f43f5e" radius={[6, 6, 0, 0]} maxBarSize={48} />
               </BarChart>
             </ResponsiveContainer>
@@ -502,15 +505,12 @@ export default function DashboardPage() {
 
       {/* ── Top Services + Busy Hours ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-
-        {/* Top Services */}
         <Card className="border-gray-100">
           <CardHeader className="pb-2 border-b border-gray-50">
             <CardTitle className="text-base flex items-center gap-2">
               <Scissors className="w-4 h-4 text-primary" />
               Top Services This Month
             </CardTitle>
-            <p className="font-urdu text-xs text-gray-400">اس ماہ کی بہترین سروسز</p>
           </CardHeader>
           <CardContent className="pt-4">
             {topServices.length === 0 ? (
@@ -529,7 +529,7 @@ export default function DashboardPage() {
                           <span className="font-medium text-gray-800 truncate">{s.name}</span>
                         </div>
                         <div className="text-right flex-shrink-0 ml-2">
-                          <span className="font-bold text-primary text-xs">{formatPKR(s.revenue)}</span>
+                          <span className="font-bold text-primary text-xs">{formatCurrency(s.revenue, currency)}</span>
                           <span className="text-gray-400 text-xs ml-1">({s.count})</span>
                         </div>
                       </div>
@@ -547,14 +547,12 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Busy Hours */}
         <Card className="border-gray-100">
           <CardHeader className="pb-2 border-b border-gray-50">
             <CardTitle className="text-base flex items-center gap-2">
               <Clock className="w-4 h-4 text-primary" />
               Busy Hours This Month
             </CardTitle>
-            <p className="font-urdu text-xs text-gray-400">مصروف اوقات</p>
           </CardHeader>
           <CardContent className="pt-5">
             {monthlyData.length === 0 ? (
@@ -563,13 +561,14 @@ export default function DashboardPage() {
               <div className="grid grid-cols-3 gap-3">
                 {busyHours.map((h) => (
                   <div key={h.label} className="flex flex-col items-center">
-                    <div className={`w-10 h-10 rounded-xl ${h.color} bg-opacity-15 flex items-center justify-center mb-2`}
-                         style={{ backgroundColor: h.label === 'Morning' ? '#fef3c7' : h.label === 'Afternoon' ? '#ffedd5' : '#fff1f3' }}>
+                    <div
+                      className="w-10 h-10 rounded-xl flex items-center justify-center mb-2"
+                      style={{ backgroundColor: h.label === 'Morning' ? '#fef3c7' : h.label === 'Afternoon' ? '#ffedd5' : '#fff1f3' }}
+                    >
                       <h.icon className={`w-5 h-5 ${h.label === 'Morning' ? 'text-amber-500' : h.label === 'Afternoon' ? 'text-orange-500' : 'text-primary'}`} />
                     </div>
                     <p className="text-xl font-bold text-gray-900">{h.count}</p>
                     <p className="text-xs font-medium text-gray-700">{h.label}</p>
-                    <p className="font-urdu text-xs text-gray-400">{h.urdu}</p>
                     <p className="text-[10px] text-gray-400 mt-0.5">{h.time}</p>
                     <div className="w-full mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                       <div
@@ -593,7 +592,6 @@ export default function DashboardPage() {
               <Users className="w-4 h-4 text-primary" />
               Top Staff This Month
             </CardTitle>
-            <p className="font-urdu text-xs text-gray-400">اس ماہ کا بہترین اسٹاف</p>
           </CardHeader>
           <CardContent className="pt-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -625,16 +623,13 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {/* ── Appointments List (filtered by period) ── */}
+      {/* ── Appointments List ── */}
       <Card className="border-gray-100">
         <CardHeader className="pb-3 border-b border-gray-50">
           <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-base">
-                {filterLabels[activeFilter]} Appointments
-              </CardTitle>
-              <p className="font-urdu text-xs text-gray-400 mt-0.5">اپائنٹمنٹ</p>
-            </div>
+            <CardTitle className="text-base">
+              {filterLabels[activeFilter]} Appointments
+            </CardTitle>
             <Badge className="bg-primary/10 text-primary border-primary/20">
               {periodFiltered.length} total
             </Badge>
@@ -645,7 +640,6 @@ export default function DashboardPage() {
             <div className="text-center py-10">
               <CalendarDays className="w-10 h-10 text-gray-200 mx-auto mb-3" />
               <p className="text-gray-500 font-medium">No appointments</p>
-              <p className="font-urdu text-sm text-gray-400 mt-1">کوئی اپائنٹمنٹ نہیں</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -666,7 +660,7 @@ export default function DashboardPage() {
                           <>
                             <span className="text-gray-300">•</span>
                             <p className="text-sm text-gray-600 truncate">{appt.services.name}</p>
-                            <span className="text-xs font-medium text-primary">{formatPKR(appt.services.price)}</span>
+                            <span className="text-xs font-medium text-primary">{formatCurrency(appt.services.price, currency)}</span>
                           </>
                         )}
                       </div>

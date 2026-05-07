@@ -40,8 +40,6 @@ export default function LoginPage() {
       <CardHeader className="text-center pb-2">
         <CardTitle className="text-2xl">Welcome Back</CardTitle>
         <CardDescription>
-          <span className="font-urdu text-base">واپس خوش آمدید</span>
-          <br />
           Sign in to your SalonPro account
         </CardDescription>
       </CardHeader>

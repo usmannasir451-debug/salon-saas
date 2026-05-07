@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { toast } from 'sonner'
@@ -11,6 +12,7 @@ import { ROLE_LABELS, ROLE_COLORS, ROLE_NAV } from '@/lib/roles'
 import {
   LayoutDashboard,
   CalendarDays,
+  CalendarRange,
   Scissors,
   Users,
   LogOut,
@@ -20,29 +22,34 @@ import {
   UserSearch,
   Building2,
   UserCog,
+  Settings,
+  Zap,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 
 const allNavItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, urdu: 'ڈیش بورڈ' },
-  { href: '/appointments', label: 'Appointments', icon: CalendarDays, urdu: 'اپائنٹمنٹ' },
-  { href: '/services', label: 'Services', icon: Scissors, urdu: 'سروسز' },
-  { href: '/staff', label: 'Staff', icon: Users, urdu: 'اسٹاف' },
-  { href: '/clients', label: 'Clients', icon: UserSearch, urdu: 'کلائنٹس' },
-  { href: '/branches', label: 'Branches', icon: Building2, urdu: 'برانچز' },
-  { href: '/team', label: 'Team', icon: UserCog, urdu: 'ٹیم' },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/appointments', label: 'Appointments', icon: CalendarDays },
+  { href: '/calendar', label: 'Calendar', icon: CalendarRange },
+  { href: '/walkin', label: 'Walk-In', icon: Zap },
+  { href: '/services', label: 'Services', icon: Scissors },
+  { href: '/staff', label: 'Staff', icon: Users },
+  { href: '/clients', label: 'Clients', icon: UserSearch },
+  { href: '/branches', label: 'Branches', icon: Building2 },
+  { href: '/team', label: 'Team', icon: UserCog },
+  { href: '/settings', label: 'Settings', icon: Settings },
 ]
 
 interface SidebarProps {
   salonName?: string
+  salonLogoUrl?: string
   userEmail?: string
   role?: UserRole
 }
 
-export default function Sidebar({ salonName, userEmail, role = 'owner' }: SidebarProps) {
+export default function Sidebar({ salonName, salonLogoUrl, userEmail, role = 'owner' }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -60,32 +67,32 @@ export default function Sidebar({ salonName, userEmail, role = 'owner' }: Sideba
     router.refresh()
   }
 
+  const initials = salonName ? salonName[0].toUpperCase() : userEmail?.[0]?.toUpperCase() ?? 'S'
+
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
-      {/* Logo */}
+      {/* Brand / Logo */}
       <div className="px-4 py-5 border-b border-gray-100">
         <Link
           href={navItems[0]?.href ?? '/appointments'}
           className="flex items-center gap-2.5 group"
           onClick={() => setMobileOpen(false)}
         >
-          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center shadow-sm shadow-primary/30 flex-shrink-0">
-            <Scissors className="w-4 h-4 text-white" />
+          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center shadow-sm shadow-primary/30 flex-shrink-0 overflow-hidden">
+            {salonLogoUrl ? (
+              <Image src={salonLogoUrl} alt="Salon logo" width={32} height={32} className="object-cover w-full h-full" unoptimized />
+            ) : (
+              <Scissors className="w-4 h-4 text-white" />
+            )}
           </div>
           <div className="overflow-hidden">
-            <p className="font-bold text-sm text-gray-900 leading-tight truncate">SalonPro</p>
-            <p className="text-[10px] text-primary font-medium leading-tight">Pakistan</p>
+            <p className="font-bold text-sm text-gray-900 leading-tight truncate">
+              {salonName || 'My Salon'}
+            </p>
+            <p className="text-[10px] text-primary font-medium leading-tight">SalonPro</p>
           </div>
         </Link>
       </div>
-
-      {/* Salon name */}
-      {salonName && (
-        <div className="px-4 py-3 bg-primary/5 border-b border-primary/10">
-          <p className="text-xs text-gray-500 mb-0.5">Your Salon</p>
-          <p className="text-sm font-semibold text-gray-800 truncate">{salonName}</p>
-        </div>
-      )}
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
@@ -116,11 +123,13 @@ export default function Sidebar({ salonName, userEmail, role = 'owner' }: Sideba
       {/* User section */}
       <div className="px-4 py-4 space-y-3">
         <div className="flex items-center gap-3 px-1">
-          <Avatar className="w-8 h-8 bg-primary/20 flex items-center justify-center rounded-full flex-shrink-0">
-            <span className="text-primary text-xs font-bold">
-              {salonName ? salonName[0].toUpperCase() : userEmail?.[0]?.toUpperCase() ?? 'U'}
-            </span>
-          </Avatar>
+          <div className="w-8 h-8 bg-primary/20 flex items-center justify-center rounded-full flex-shrink-0 overflow-hidden">
+            {salonLogoUrl ? (
+              <Image src={salonLogoUrl} alt="Logo" width={32} height={32} className="object-cover w-full h-full" unoptimized />
+            ) : (
+              <span className="text-primary text-xs font-bold">{initials}</span>
+            )}
+          </div>
           <div className="overflow-hidden flex-1">
             <div className="flex items-center gap-1.5 flex-wrap">
               <p className="text-xs font-semibold text-gray-800 truncate">{salonName ?? 'My Salon'}</p>
@@ -144,6 +153,11 @@ export default function Sidebar({ salonName, userEmail, role = 'owner' }: Sideba
           {loggingOut ? 'Logging out...' : 'Log Out'}
         </Button>
       </div>
+
+      {/* Powered by */}
+      <div className="px-4 pb-3 text-center">
+        <p className="text-[10px] text-gray-300">Powered by SalonPro</p>
+      </div>
     </div>
   )
 
@@ -157,11 +171,15 @@ export default function Sidebar({ salonName, userEmail, role = 'owner' }: Sideba
       {/* Mobile Header */}
       <header className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between shadow-sm">
         <Link href={navItems[0]?.href ?? '/appointments'} className="flex items-center gap-2">
-          <div className="w-7 h-7 bg-primary rounded-lg flex items-center justify-center">
-            <Scissors className="w-3.5 h-3.5 text-white" />
+          <div className="w-7 h-7 bg-primary rounded-lg flex items-center justify-center overflow-hidden">
+            {salonLogoUrl ? (
+              <Image src={salonLogoUrl} alt="Logo" width={28} height={28} className="object-cover w-full h-full" unoptimized />
+            ) : (
+              <Scissors className="w-3.5 h-3.5 text-white" />
+            )}
           </div>
           <span className="font-bold text-sm text-gray-900">
-            SalonPro <span className="text-primary">Pakistan</span>
+            {salonName || 'SalonPro'}
           </span>
         </Link>
         <button

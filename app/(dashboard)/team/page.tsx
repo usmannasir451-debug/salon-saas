@@ -41,8 +41,9 @@ import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
 
 const INVITE_ROLES: Array<{ value: Exclude<UserRole, 'owner'>; desc: string }> = [
-  { value: 'manager', desc: 'Full access except billing & team' },
-  { value: 'receptionist', desc: 'Appointments & clients only' },
+  { value: 'regional_manager', desc: 'Dashboard & reports, all branches, no settings' },
+  { value: 'manager', desc: 'Full access except billing & team management' },
+  { value: 'receptionist', desc: 'Appointments, walk-ins & clients only' },
   { value: 'cashier', desc: 'Payments, discounts & feedback' },
   { value: 'staff', desc: 'Own appointments for today only' },
 ]
@@ -144,7 +145,7 @@ export default function TeamPage() {
             Team Members
           </h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            <span className="font-urdu">ٹیم مینجمنٹ</span> — Invite staff to access the portal with limited permissions
+            Invite staff to access the portal with role-based permissions
           </p>
         </div>
         <Button onClick={() => setDialogOpen(true)} className="bg-primary hover:bg-primary/90 gap-2">
@@ -175,9 +176,6 @@ export default function TeamPage() {
             <UserCog className="w-8 h-8 text-primary" />
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-1">No team members yet</h3>
-          <p className="text-gray-500 text-sm mb-2">
-            <span className="font-urdu">ابھی کوئی ٹیم ممبر نہیں</span>
-          </p>
           <p className="text-gray-400 text-sm mb-6">Invite staff to let them log in with role-based access</p>
           <Button onClick={() => setDialogOpen(true)} className="bg-primary hover:bg-primary/90 gap-2">
             <Plus className="w-4 h-4" /> Invite First Member
