@@ -7,6 +7,31 @@ import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { useUserContext } from '@/components/RoleContext'
 import type { DiscountType, DiscountReason, PaymentMethod, WalkIn, Service, StaffMember } from '@/lib/types'
+
+type DealItem = {
+  id: string
+  name: string
+  description: string | null
+  price: number
+  is_active: boolean
+  deal_services: { services: { id: string; name: string; price: number; duration: number } | null }[]
+}
+
+type PaymentMethodConfig = { value: string; label: string; enabled: boolean }
+
+const DEFAULT_PAYMENT_METHODS: PaymentMethodConfig[] = [
+  { value: 'cash', label: 'Cash', enabled: true },
+  { value: 'card', label: 'Card', enabled: true },
+  { value: 'easypaisa', label: 'EasyPaisa', enabled: true },
+  { value: 'jazzcash', label: 'JazzCash', enabled: true },
+]
+
+const PAYMENT_ICON_MAP: Record<string, { icon: React.ElementType; color: string }> = {
+  cash: { icon: Banknote, color: 'bg-green-500 hover:bg-green-600' },
+  card: { icon: CreditCard, color: 'bg-blue-500 hover:bg-blue-600' },
+  jazzcash: { icon: Smartphone, color: 'bg-red-500 hover:bg-red-600' },
+  easypaisa: { icon: Wallet, color: 'bg-emerald-600 hover:bg-emerald-700' },
+}
 import FeedbackModal from '@/components/FeedbackModal'
 import InvoiceModal, { type InvoiceData } from '@/components/InvoiceModal'
 import {
@@ -24,13 +49,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 function formatCurrency(n: number, currency = 'PKR') {
   return `${currency} ${Math.round(n).toLocaleString()}`
 }
-
-const PAYMENT_BUTTONS: { value: PaymentMethod; label: string; icon: React.ElementType; color: string }[] = [
-  { value: 'cash', label: 'Cash', icon: Banknote, color: 'bg-green-500 hover:bg-green-600' },
-  { value: 'card', label: 'Card', icon: CreditCard, color: 'bg-blue-500 hover:bg-blue-600' },
-  { value: 'jazzcash', label: 'JazzCash', icon: Smartphone, color: 'bg-red-500 hover:bg-red-600' },
-  { value: 'easypaisa', label: 'EasyPaisa', icon: Wallet, color: 'bg-emerald-600 hover:bg-emerald-700' },
-]
 
 const DISCOUNT_REASONS: { value: DiscountReason; label: string }[] = [
   { value: 'loyalty', label: 'Loyalty Reward' },
@@ -52,6 +70,7 @@ const emptyForm = {
   client_name: '',
   client_phone: '',
   service_ids: [] as string[],
+  deal_id: '',
   staff_id: '',
   payment_method: 'cash' as PaymentMethod,
   discount_type: 'percentage' as DiscountType,
@@ -135,6 +154,8 @@ export default function WalkInPage() {
   const [walkIns, setWalkIns] = useState<WalkIn[]>([])
   const [services, setServices] = useState<ServiceItem[]>([])
   const [staffList, setStaffList] = useState<StaffItem[]>([])
+  const [deals, setDeals] = useState<DealItem[]>([])
+  const [paymentMethodConfig, setPaymentMethodConfig] = useState<PaymentMethodConfig[]>(DEFAULT_PAYMENT_METHODS)
   const [currency, setCurrency] = useState('PKR')
   const [salonName, setSalonName] = useState('')
   const [salonAddress, setSalonAddress] = useState('')
@@ -164,7 +185,7 @@ export default function WalkInPage() {
 
   async function loadData() {
     const supabase = createClient()
-    const [walkRes, svcRes, staffRes, profileRes] = await Promise.all([
+    const [walkRes, svcRes, staffRes, profileRes, dealsRes] = await Promise.all([
       supabase
         .from('walk_ins')
         .select('*, services(id, name, price, duration), staff(id, name), walk_in_services(services(id, name, price, duration))')
@@ -173,7 +194,8 @@ export default function WalkInPage() {
         .limit(50),
       supabase.from('services').select('id, name, price, duration').eq('user_id', ownerId).order('name'),
       supabase.from('staff').select('id, name').eq('user_id', ownerId).eq('is_active', true).order('name'),
-      supabase.from('profiles').select('salon_currency, salon_name, salon_address, tax_percentage, loyalty_enabled, loyalty_earn_pct').eq('id', ownerId).single(),
+      supabase.from('profiles').select('salon_currency, salon_name, salon_address, tax_percentage, loyalty_enabled, loyalty_earn_pct, payment_methods').eq('id', ownerId).single(),
+      supabase.from('deals').select('id, name, description, price, is_active, deal_services(services(id, name, price, duration))').eq('user_id', ownerId).eq('is_active', true).order('name'),
     ])
     setWalkIns((walkRes.data as unknown as WalkIn[]) ?? [])
     setServices((svcRes.data ?? []) as ServiceItem[])
@@ -184,6 +206,10 @@ export default function WalkInPage() {
     setTaxPercentage(profileRes.data?.tax_percentage ?? 0)
     setLoyaltyEnabled(profileRes.data?.loyalty_enabled ?? false)
     setLoyaltyEarnPct(profileRes.data?.loyalty_earn_pct ?? 10)
+    setDeals((dealsRes.data as unknown as DealItem[]) ?? [])
+    const pm = profileRes.data?.payment_methods
+    if (pm && Array.isArray(pm) && pm.length > 0) setPaymentMethodConfig(pm as PaymentMethodConfig[])
+    else setPaymentMethodConfig(DEFAULT_PAYMENT_METHODS)
     setLoading(false)
   }
 
@@ -196,7 +222,7 @@ export default function WalkInPage() {
       .select('name, loyalty_balance')
       .eq('user_id', ownerId)
       .eq('phone', phone)
-      .single()
+      .maybeSingle()
     setClientProfile(data ? { name: data.name, loyalty_balance: data.loyalty_balance ?? 0 } : null)
     if (data && !form.client_name) {
       setForm(f => ({ ...f, client_name: data.name }))
@@ -218,7 +244,25 @@ export default function WalkInPage() {
     [services, form.service_ids]
   )
 
-  const subtotal = useMemo(() => selectedServices.reduce((s, svc) => s + Number(svc.price), 0), [selectedServices])
+  const selectedDeal = useMemo(
+    () => deals.find(d => d.id === form.deal_id) ?? null,
+    [deals, form.deal_id]
+  )
+
+  const dealServiceIds = useMemo(
+    () => selectedDeal?.deal_services?.map(ds => ds.services?.id).filter(Boolean) as string[] ?? [],
+    [selectedDeal]
+  )
+
+  const additionalServices = useMemo(
+    () => selectedServices.filter(s => !dealServiceIds.includes(s.id)),
+    [selectedServices, dealServiceIds]
+  )
+
+  const subtotal = useMemo(() => {
+    if (selectedDeal) return Number(selectedDeal.price) + additionalServices.reduce((s, svc) => s + Number(svc.price), 0)
+    return selectedServices.reduce((s, svc) => s + Number(svc.price), 0)
+  }, [selectedDeal, selectedServices, additionalServices])
 
   const discountAmount = useMemo(() => {
     const val = parseFloat(form.discount_value) || 0
@@ -240,12 +284,16 @@ export default function WalkInPage() {
   }, [loyaltyEnabled, total, loyaltyEarnPct])
 
   async function handleSubmit(method: PaymentMethod) {
-    if (form.service_ids.length === 0) {
-      toast.error('Please select at least one service')
+    if (form.service_ids.length === 0 && !form.deal_id) {
+      toast.error('Please select at least one service or deal')
       return
     }
     setSubmitting(true)
     const supabase = createClient()
+
+    const allServiceIds = form.deal_id && selectedDeal
+      ? [...dealServiceIds, ...form.service_ids.filter(id => !dealServiceIds.includes(id))]
+      : form.service_ids
 
     const { data, error } = await supabase
       .from('walk_ins')
@@ -253,7 +301,7 @@ export default function WalkInPage() {
         user_id: ownerId,
         client_name: form.client_name.trim() || null,
         client_phone: form.client_phone.trim() || null,
-        service_id: form.service_ids[0] || null,
+        service_id: allServiceIds[0] || null,
         staff_id: form.staff_id || null,
         payment_method: method,
         subtotal,
@@ -262,6 +310,7 @@ export default function WalkInPage() {
         discount_amount: discountAmount,
         discount_reason: form.discount_reason || null,
         loyalty_redeemed: loyaltyRedeemAmount,
+        deal_id: form.deal_id || null,
         total,
         payment_status: 'paid',
         notes: form.notes.trim() || null,
@@ -277,10 +326,10 @@ export default function WalkInPage() {
 
     const walkinData = data as unknown as WalkIn
 
-    // Insert junction rows for multi-service
-    if (form.service_ids.length > 0) {
+    // Insert junction rows for all services (deal + individual)
+    if (allServiceIds.length > 0) {
       await supabase.from('walk_in_services').insert(
-        form.service_ids.map(sid => ({ walk_in_id: walkinData.id, service_id: sid, user_id: ownerId }))
+        allServiceIds.map(sid => ({ walk_in_id: walkinData.id, service_id: sid, user_id: ownerId }))
       )
     }
 
@@ -296,33 +345,36 @@ export default function WalkInPage() {
       const loyaltyUpdates: Promise<unknown>[] = []
 
       if (loyaltyRedeemAmount > 0) {
-        loyaltyUpdates.push(
-          supabase.rpc('decrement_loyalty', { p_user_id: ownerId, p_phone: phone, p_amount: loyaltyRedeemAmount })
-            .then(() => supabase.from('loyalty_transactions').insert({
-              user_id: ownerId,
-              client_phone: phone,
-              client_name: form.client_name.trim() || null,
-              transaction_type: 'redeemed',
-              amount: loyaltyRedeemAmount,
-              reference_id: walkinData.id,
-              reference_type: 'walk_in',
-            }))
-        )
+        const redeemTask = async () => {
+          await supabase.rpc('decrement_loyalty', { p_user_id: ownerId, p_phone: phone, p_amount: loyaltyRedeemAmount })
+          await supabase.from('loyalty_transactions').insert({
+            user_id: ownerId,
+            client_phone: phone,
+            client_name: form.client_name.trim() || null,
+            transaction_type: 'redeemed',
+            amount: loyaltyRedeemAmount,
+            reference_id: walkinData.id,
+            reference_type: 'walk_in',
+          })
+        }
+        loyaltyUpdates.push(redeemTask())
       }
 
       if (loyaltyEarned > 0) {
-        loyaltyUpdates.push(
-          supabase.from('clients').update({ loyalty_balance: (clientProfile?.loyalty_balance ?? 0) - loyaltyRedeemAmount + loyaltyEarned })
+        const earnTask = async () => {
+          await supabase.from('clients').update({ loyalty_balance: (clientProfile?.loyalty_balance ?? 0) - loyaltyRedeemAmount + loyaltyEarned })
             .eq('user_id', ownerId).eq('phone', phone)
-            .then(() => supabase.from('loyalty_transactions').insert({
-              user_id: ownerId,
-              client_phone: phone,
-              client_name: form.client_name.trim() || null,
-              transaction_type: 'earned',
-              amount: loyaltyEarned,
-              reference_id: walkinData.id,
-              reference_type: 'walk_in',
-            }))
+          await supabase.from('loyalty_transactions').insert({
+            user_id: ownerId,
+            client_phone: phone,
+            client_name: form.client_name.trim() || null,
+            transaction_type: 'earned',
+            amount: loyaltyEarned,
+            reference_id: walkinData.id,
+            reference_type: 'walk_in',
+          })
+        }
+        loyaltyUpdates.push(earnTask()
         )
       }
 
@@ -349,7 +401,9 @@ export default function WalkInPage() {
       }),
     ])
 
-    const svcNames = selectedServices.map(s => s.name)
+    const svcNames = selectedDeal
+      ? [selectedDeal.name + ' (Deal)', ...additionalServices.map(s => s.name)]
+      : selectedServices.map(s => s.name)
     setReceiptServiceNames(svcNames)
     setForm(emptyForm)
     setClientProfile(null)
@@ -435,9 +489,48 @@ export default function WalkInPage() {
               </div>
             </div>
 
+            {/* Deals section */}
+            {deals.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold">Deal / Package <span className="text-gray-400 font-normal text-xs">(optional)</span></Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {deals.map(deal => {
+                    const isSelected = form.deal_id === deal.id
+                    return (
+                      <button
+                        key={deal.id}
+                        type="button"
+                        onClick={() => {
+                          if (isSelected) {
+                            setForm(f => ({ ...f, deal_id: '', service_ids: [] }))
+                          } else {
+                            const svcIds = deal.deal_services.map(ds => ds.services?.id).filter(Boolean) as string[]
+                            setForm(f => ({ ...f, deal_id: deal.id, service_ids: svcIds }))
+                          }
+                        }}
+                        className={`flex flex-col items-start p-3 rounded-xl text-left transition-all border ${
+                          isSelected
+                            ? 'bg-primary text-white border-primary shadow-md ring-2 ring-primary/30'
+                            : 'bg-gray-50 border-gray-200 hover:border-primary/40 hover:bg-primary/5'
+                        }`}
+                      >
+                        <span className={`font-semibold text-sm ${isSelected ? 'text-white' : 'text-gray-900'}`}>{deal.name}</span>
+                        <span className={`text-xs mt-0.5 ${isSelected ? 'text-white/80' : 'text-gray-500'}`}>
+                          {deal.deal_services.map(ds => ds.services?.name).filter(Boolean).join(', ')}
+                        </span>
+                        <span className={`text-sm font-bold mt-1 ${isSelected ? 'text-white' : 'text-primary'}`}>
+                          PKR {Number(deal.price).toLocaleString()}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Services grid */}
             <div className="space-y-2">
-              <Label className="text-sm font-semibold">Select Services *</Label>
+              <Label className="text-sm font-semibold">{deals.length > 0 && form.deal_id ? 'Extra Services' : 'Select Services *'}</Label>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-64 overflow-y-auto">
                 {services.map((s) => {
                   const selected = form.service_ids.includes(s.id)
@@ -479,8 +572,12 @@ export default function WalkInPage() {
             {/* Staff */}
             <div className="space-y-1.5">
               <Label>Staff <span className="text-gray-400 font-normal text-xs">(optional)</span></Label>
-              <Select value={form.staff_id} onValueChange={(v) => setForm(f => ({ ...f, staff_id: v ?? '' }))}>
-                <SelectTrigger className="h-10"><SelectValue placeholder="Select staff member" /></SelectTrigger>
+              <Select value={form.staff_id || undefined} onValueChange={(v) => setForm(f => ({ ...f, staff_id: v ?? '' }))}>
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder="Select staff member">
+                    {form.staff_id ? (staffList.find(s => s.id === form.staff_id)?.name ?? undefined) : undefined}
+                  </SelectValue>
+                </SelectTrigger>
                 <SelectContent>
                   {staffList.map((s) => (
                     <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
@@ -493,11 +590,15 @@ export default function WalkInPage() {
             <div className="rounded-xl bg-gray-50 border border-gray-100 p-4 space-y-3">
               <p className="text-sm font-semibold text-gray-700">Discount <span className="text-xs font-normal text-gray-400">(optional)</span></p>
               <div className="grid grid-cols-2 gap-3">
-                <Select value={form.discount_type} onValueChange={(v) => setForm(f => ({ ...f, discount_type: (v ?? 'percentage') as DiscountType }))}>
-                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <Select value={form.discount_type || undefined} onValueChange={(v) => setForm(f => ({ ...f, discount_type: (v ?? 'percentage') as DiscountType }))}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue>
+                      {form.discount_type === 'fixed' ? 'Fixed (PKR)' : 'Percentage (%)'}
+                    </SelectValue>
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="percentage">Percentage (%)</SelectItem>
-                    <SelectItem value="fixed">Fixed Amount</SelectItem>
+                    <SelectItem value="fixed">Fixed (PKR)</SelectItem>
                   </SelectContent>
                 </Select>
                 <Input
@@ -573,22 +674,26 @@ export default function WalkInPage() {
               )}
             </div>
 
-            {/* ONE-CLICK PAYMENT BUTTONS */}
+            {/* ONE-CLICK PAYMENT BUTTONS (dynamic from settings) */}
             <div className="space-y-2">
               <Label className="text-sm font-semibold">Pay & Complete</Label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {PAYMENT_BUTTONS.map(({ value, label, icon: Icon, color }) => (
-                  <button
-                    key={value}
-                    type="button"
-                    disabled={submitting || form.service_ids.length === 0}
-                    onClick={() => handleSubmit(value)}
-                    className={`flex flex-col items-center justify-center gap-2 py-4 px-3 rounded-xl text-white font-semibold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed ${color} shadow-sm`}
-                  >
-                    {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Icon className="w-5 h-5" />}
-                    <span>{label}</span>
-                  </button>
-                ))}
+                {paymentMethodConfig.filter(pm => pm.enabled).map(pm => {
+                  const iconInfo = PAYMENT_ICON_MAP[pm.value] ?? { icon: CreditCard, color: 'bg-gray-500 hover:bg-gray-600' }
+                  const Icon = iconInfo.icon
+                  return (
+                    <button
+                      key={pm.value}
+                      type="button"
+                      disabled={submitting || (form.service_ids.length === 0 && !form.deal_id)}
+                      onClick={() => handleSubmit(pm.value as PaymentMethod)}
+                      className={`flex flex-col items-center justify-center gap-2 py-4 px-3 rounded-xl text-white font-semibold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed ${iconInfo.color} shadow-sm`}
+                    >
+                      {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Icon className="w-5 h-5" />}
+                      <span>{pm.label}</span>
+                    </button>
+                  )
+                })}
               </div>
             </div>
 

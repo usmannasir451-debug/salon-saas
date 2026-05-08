@@ -13,7 +13,7 @@ import {
 import {
   CalendarDays, TrendingUp, Scissors, Users, Clock, Loader2, Sparkles, Download, MessageCircle,
   Building2, CheckCircle2, ReceiptText, Sun, Sunset, Moon, Zap, AlertTriangle, Package,
-  TrendingDown, UserCheck, Star, Gift,
+  TrendingDown, UserCheck, Star, Gift, ChevronRight, CreditCard,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -34,6 +34,7 @@ type AppRow = {
   appointment_date: string
   appointment_time: string
   status: string
+  payment_method?: string | null
   notes?: string
   services?: ServiceRef | null
   staff?: StaffRef | null
@@ -45,6 +46,7 @@ type WalkInRow = {
   branch_id?: string
   total: number
   created_at: string
+  payment_method?: string | null
   services?: ServiceRef | null
 }
 
@@ -132,13 +134,13 @@ export default function DashboardPage() {
     const [profileRes, apptRes, walkInRes, branchRes, expenseRes, lastMonthApptRes, lastMonthWalkinRes, inventoryRes, reviewRes, clientBdayRes, staffBdayRes] = await Promise.all([
       supabase.from('profiles').select('salon_name, salon_currency').eq('id', ownerId).single(),
       supabase.from('appointments')
-        .select('id, client_name, client_phone, service_id, staff_id, branch_id, appointment_date, appointment_time, status, notes, services(id, name, price), staff(id, name)')
+        .select('id, client_name, client_phone, service_id, staff_id, branch_id, appointment_date, appointment_time, status, payment_method, notes, services(id, name, price), staff(id, name)')
         .eq('user_id', ownerId)
         .gte('appointment_date', queryStart)
         .order('appointment_date', { ascending: false })
         .order('appointment_time', { ascending: true }),
       supabase.from('walk_ins')
-        .select('id, staff_id, branch_id, total, created_at, services(id, name, price)')
+        .select('id, staff_id, branch_id, total, created_at, payment_method, services(id, name, price)')
         .eq('user_id', ownerId)
         .gte('created_at', monthStart + 'T00:00:00'),
       supabase.from('branches').select('*').eq('user_id', ownerId).order('name'),
@@ -374,6 +376,25 @@ export default function DashboardPage() {
     ]
   }, [monthlyAppts])
 
+  // ── Revenue by payment method ──
+  const paymentBreakdown = useMemo(() => {
+    const periodWalkIns = activeFilter === 'today' ? todayWalkIns : branchFilteredWalkIns
+    const completed = periodFiltered.filter(a => a.status === 'completed')
+    const map = new Map<string, number>()
+    periodWalkIns.forEach(w => {
+      const m = w.payment_method ?? 'cash'
+      map.set(m, (map.get(m) ?? 0) + Number(w.total ?? 0))
+    })
+    completed.forEach(a => {
+      const m = a.payment_method ?? 'cash'
+      map.set(m, (map.get(m) ?? 0) + Number(a.services?.price ?? 0))
+    })
+    return Array.from(map.entries())
+      .map(([method, amount]) => ({ method: method.charAt(0).toUpperCase() + method.slice(1).replace(/_/g, ' '), amount }))
+      .filter(e => e.amount > 0)
+      .sort((a, b) => b.amount - a.amount)
+  }, [periodFiltered, activeFilter, todayWalkIns, branchFilteredWalkIns])
+
   // ── Busiest days of week ──
   const busyDays = useMemo(() => {
     const counts = [0, 0, 0, 0, 0, 0, 0]
@@ -492,24 +513,17 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ── PROMINENT WALK-IN BANNER ── */}
+      {/* ── Quick Walk-In Tile ── */}
       <Link href="/walkin">
-        <div className="relative overflow-hidden bg-gradient-to-r from-primary to-rose-400 rounded-2xl p-5 sm:p-6 flex items-center gap-5 shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all group cursor-pointer">
-          <div className="w-14 h-14 sm:w-16 sm:h-16 bg-white/20 rounded-2xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
-            <Zap className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
+        <div className="flex items-center gap-4 bg-primary/5 border border-primary/20 rounded-xl px-5 py-3.5 hover:bg-primary/10 transition-all group cursor-pointer">
+          <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm shadow-primary/30 group-hover:scale-105 transition-transform">
+            <Zap className="w-5 h-5 text-white" />
           </div>
-          <div className="flex-1">
-            <h2 className="text-lg sm:text-xl font-bold text-white">New Walk-In</h2>
-            <p className="text-white/80 text-sm mt-0.5">Quick POS — select services, collect payment instantly</p>
-            <div className="flex gap-2 mt-2">
-              {['Cash', 'Card', 'JazzCash', 'EasyPaisa'].map(m => (
-                <span key={m} className="bg-white/20 text-white text-xs rounded-full px-2.5 py-0.5 font-medium">{m}</span>
-              ))}
-            </div>
+          <div>
+            <p className="font-semibold text-gray-900 text-sm">New Walk-In</p>
+            <p className="text-xs text-gray-500">Quick POS — collect payment instantly</p>
           </div>
-          <div className="hidden sm:flex text-white/60 group-hover:text-white transition-colors flex-shrink-0">
-            <CheckCircle2 className="w-6 h-6" />
-          </div>
+          <ChevronRight className="w-4 h-4 text-gray-400 ml-auto flex-shrink-0 group-hover:text-primary transition-colors" />
         </div>
       </Link>
 
@@ -709,6 +723,33 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* Payment Method Breakdown */}
+      {paymentBreakdown.length > 0 && (
+        <Card className="border-gray-100">
+          <CardHeader className="pb-2 border-b border-gray-50">
+            <CardTitle className="text-base flex items-center gap-2">
+              <CreditCard className="w-4 h-4 text-primary" /> Revenue by Payment Method
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {paymentBreakdown.map(({ method, amount }) => {
+                const max = paymentBreakdown[0].amount || 1
+                return (
+                  <div key={method} className="bg-gray-50 rounded-xl p-3">
+                    <p className="text-xs text-gray-500 mb-1">{method}</p>
+                    <p className="text-sm font-bold text-gray-900">{formatCurrency(amount, currency)}</p>
+                    <div className="h-1 bg-gray-200 rounded-full mt-2">
+                      <div className="h-full bg-primary rounded-full" style={{ width: `${(amount / max) * 100}%` }} />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Revenue Chart */}

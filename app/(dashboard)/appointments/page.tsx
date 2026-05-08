@@ -50,11 +50,29 @@ import {
 
 type ServiceRef = { id: string; name: string; price: number; duration: number }
 
+type DealItem = {
+  id: string
+  name: string
+  description: string | null
+  price: number
+  is_active: boolean
+  deal_services: { services: ServiceRef | null }[]
+}
+
+type PaymentMethodConfig = { value: string; label: string; enabled: boolean }
+
 type AppointmentRow = Appointment & {
   services?: { id: string; name: string; price: number } | null
   staff?: { id: string; name: string } | null
   appointment_services?: { services: ServiceRef }[]
 }
+
+const DEFAULT_PAYMENT_METHODS: PaymentMethodConfig[] = [
+  { value: 'cash', label: 'Cash', enabled: true },
+  { value: 'card', label: 'Card', enabled: true },
+  { value: 'easypaisa', label: 'EasyPaisa', enabled: true },
+  { value: 'jazzcash', label: 'JazzCash', enabled: true },
+]
 
 const statusConfig: Record<AppointmentStatus, { label: string; className: string }> = {
   pending: { label: 'Pending', className: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
@@ -68,6 +86,7 @@ const emptyForm = {
   client_name: '',
   client_phone: '',
   service_ids: [] as string[],
+  deal_id: '',
   staff_id: '',
   branch_id: '',
   appointment_date: format(new Date(), 'yyyy-MM-dd'),
@@ -108,6 +127,8 @@ export default function AppointmentsPage() {
   const [services, setServices] = useState<ServiceRef[]>([])
   const [staff, setStaff] = useState<StaffMember[]>([])
   const [branches, setBranches] = useState<Branch[]>([])
+  const [deals, setDeals] = useState<DealItem[]>([])
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodConfig[]>(DEFAULT_PAYMENT_METHODS)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
@@ -118,7 +139,7 @@ export default function AppointmentsPage() {
   const [filterAll, setFilterAll] = useState(false)
 
   const [payDialog, setPayDialog] = useState<{ open: boolean; appt: AppointmentRow | null }>({ open: false, appt: null })
-  const [payForm, setPayForm] = useState({ discount: '', feedback: '' })
+  const [payForm, setPayForm] = useState({ discount: '', payment_method: 'cash', feedback: '' })
   const [paying, setPaying] = useState(false)
 
   const [feedbackAppt, setFeedbackAppt] = useState<AppointmentRow | null>(null)
@@ -146,12 +167,13 @@ export default function AppointmentsPage() {
       apptQuery = apptQuery.eq('staff_id', staffId)
     }
 
-    const [apptRes, serviceRes, staffRes, branchRes, profileRes] = await Promise.all([
+    const [apptRes, serviceRes, staffRes, branchRes, profileRes, dealsRes] = await Promise.all([
       apptQuery,
       supabase.from('services').select('id, name, price, duration').eq('user_id', ownerId).order('name'),
       supabase.from('staff').select('*').eq('user_id', ownerId).eq('is_active', true).order('name'),
       supabase.from('branches').select('*').eq('user_id', ownerId).order('name'),
-      supabase.from('profiles').select('salon_name, salon_address, salon_currency, tax_percentage').eq('id', ownerId).single(),
+      supabase.from('profiles').select('salon_name, salon_address, salon_currency, tax_percentage, payment_methods').eq('id', ownerId).single(),
+      supabase.from('deals').select('id, name, description, price, is_active, deal_services(services(id, name, price, duration))').eq('user_id', ownerId).eq('is_active', true).order('name'),
     ])
 
     setAppointments((apptRes.data as unknown as AppointmentRow[]) ?? [])
@@ -162,6 +184,10 @@ export default function AppointmentsPage() {
     setSalonAddress(profileRes.data?.salon_address ?? '')
     setCurrency(profileRes.data?.salon_currency ?? 'PKR')
     setTaxPercentage(profileRes.data?.tax_percentage ?? 0)
+    setDeals((dealsRes.data as unknown as DealItem[]) ?? [])
+    const pm = profileRes.data?.payment_methods
+    if (pm && Array.isArray(pm) && pm.length > 0) setPaymentMethods(pm as PaymentMethodConfig[])
+    else setPaymentMethods(DEFAULT_PAYMENT_METHODS)
 
     if (isStaffRole) {
       setFilterDate(today)
@@ -181,7 +207,26 @@ export default function AppointmentsPage() {
     () => services.filter(s => form.service_ids.includes(s.id)),
     [services, form.service_ids]
   )
-  const formTotal = selectedServices.reduce((sum, s) => sum + s.price, 0)
+
+  const selectedDeal = useMemo(
+    () => deals.find(d => d.id === form.deal_id) ?? null,
+    [deals, form.deal_id]
+  )
+
+  const dealServiceIds = useMemo(
+    () => selectedDeal?.deal_services?.map(ds => ds.services?.id).filter(Boolean) as string[] ?? [],
+    [selectedDeal]
+  )
+
+  const additionalServices = useMemo(
+    () => selectedServices.filter(s => !dealServiceIds.includes(s.id)),
+    [selectedServices, dealServiceIds]
+  )
+
+  const formTotal = selectedDeal
+    ? selectedDeal.price + additionalServices.reduce((sum, s) => sum + s.price, 0)
+    : selectedServices.reduce((sum, s) => sum + s.price, 0)
+
   const formDuration = selectedServices.reduce((sum, s) => sum + s.duration, 0)
 
   function toggleService(id: string) {
@@ -208,6 +253,7 @@ export default function AppointmentsPage() {
       client_name: appt.client_name,
       client_phone: appt.client_phone ?? '',
       service_ids: existingSvcIds,
+      deal_id: (appt as unknown as { deal_id?: string }).deal_id ?? '',
       staff_id: appt.staff_id ?? '',
       branch_id: appt.branch_id ?? '',
       appointment_date: appt.appointment_date,
@@ -227,16 +273,22 @@ export default function AppointmentsPage() {
     setSaving(true)
     const supabase = createClient()
 
+    // All service IDs = deal's services + additional individual services
+    const allServiceIds = form.deal_id && selectedDeal
+      ? [...dealServiceIds, ...form.service_ids.filter(id => !dealServiceIds.includes(id))]
+      : form.service_ids
+
     const payload = {
       client_name: form.client_name.trim(),
       client_phone: form.client_phone.trim() || null,
-      service_id: form.service_ids[0] || null,
+      service_id: allServiceIds[0] || null,
       staff_id: form.staff_id || null,
       branch_id: form.branch_id || null,
       appointment_date: form.appointment_date,
       appointment_time: form.appointment_time,
       status: form.status,
       notes: form.notes.trim() || null,
+      deal_id: form.deal_id || null,
       user_id: ownerId,
     }
 
@@ -246,9 +298,9 @@ export default function AppointmentsPage() {
 
       // Refresh junction table
       await supabase.from('appointment_services').delete().eq('appointment_id', editingId)
-      if (form.service_ids.length > 0) {
+      if (allServiceIds.length > 0) {
         await supabase.from('appointment_services').insert(
-          form.service_ids.map(sid => ({ appointment_id: editingId, service_id: sid, user_id: ownerId }))
+          allServiceIds.map(sid => ({ appointment_id: editingId, service_id: sid, user_id: ownerId }))
         )
       }
       toast.success('Appointment updated')
@@ -257,9 +309,9 @@ export default function AppointmentsPage() {
       if (error) { toast.error(error.message); setSaving(false); return }
 
       // Insert junction rows
-      if (form.service_ids.length > 0 && newAppt) {
+      if (allServiceIds.length > 0 && newAppt) {
         await supabase.from('appointment_services').insert(
-          form.service_ids.map(sid => ({ appointment_id: newAppt.id, service_id: sid, user_id: ownerId }))
+          allServiceIds.map(sid => ({ appointment_id: newAppt.id, service_id: sid, user_id: ownerId }))
         )
       }
 
@@ -348,6 +400,7 @@ export default function AppointmentsPage() {
       .from('appointments')
       .update({
         payment_status: 'paid',
+        payment_method: payForm.payment_method,
         discount_amount: parseFloat(payForm.discount) || 0,
         feedback: payForm.feedback.trim() || null,
       })
@@ -369,7 +422,7 @@ export default function AppointmentsPage() {
         })
       }
       setPayDialog({ open: false, appt: null })
-      setPayForm({ discount: '', feedback: '' })
+      setPayForm({ discount: '', payment_method: 'cash', feedback: '' })
       await loadData()
     }
     setPaying(false)
@@ -561,7 +614,7 @@ export default function AppointmentsPage() {
 
                         {canMarkPayment(role) && !isPaid && (
                           <button
-                            onClick={() => { setPayDialog({ open: true, appt }); setPayForm({ discount: '', feedback: '' }) }}
+                            onClick={() => { setPayDialog({ open: true, appt }); setPayForm({ discount: '', payment_method: 'cash', feedback: '' }) }}
                             className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors font-medium"
                           >
                             <CreditCard className="w-3 h-3" />
@@ -676,9 +729,45 @@ export default function AppointmentsPage() {
                 </div>
               </div>
 
+              {/* Deal selection */}
+              {deals.length > 0 && (
+                <div className="space-y-1.5">
+                  <Label>Deal / Package <span className="text-gray-400 font-normal text-xs">(optional)</span></Label>
+                  <Select
+                    value={form.deal_id || undefined}
+                    onValueChange={(v) => {
+                      if (!v || v === 'none') { setForm({ ...form, deal_id: '', service_ids: [] }); return }
+                      const deal = deals.find(d => d.id === v)
+                      const dealSvcIds = deal?.deal_services?.map(ds => ds.services?.id).filter(Boolean) as string[] ?? []
+                      setForm({ ...form, deal_id: v, service_ids: dealSvcIds })
+                    }}
+                  >
+                    <SelectTrigger className="h-9 w-full">
+                      <SelectValue placeholder="Select a deal (optional)">
+                        {form.deal_id ? (deals.find(d => d.id === form.deal_id)?.name ?? undefined) : undefined}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No deal</SelectItem>
+                      {deals.map(d => (
+                        <SelectItem key={d.id} value={d.id}>
+                          {d.name} — PKR {Number(d.price).toLocaleString()}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {form.deal_id && selectedDeal && (
+                    <div className="bg-primary/5 rounded-lg px-3 py-2 text-xs text-primary">
+                      Deal includes: {selectedDeal.deal_services.map(ds => ds.services?.name).filter(Boolean).join(', ')} · PKR {Number(selectedDeal.price).toLocaleString()}
+                      <button type="button" className="ml-2 text-gray-400 hover:text-red-500" onClick={() => setForm({ ...form, deal_id: '', service_ids: [] })}>✕ Remove</button>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Multi-service selection */}
               <div className="space-y-1.5">
-                <Label>Services</Label>
+                <Label>{deals.length > 0 && form.deal_id ? 'Extra Services' : 'Services'}</Label>
                 <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 space-y-2 max-h-48 overflow-y-auto">
                   {services.length === 0 ? (
                     <p className="text-sm text-gray-400 text-center py-2">No services — add some in Services page</p>
@@ -717,11 +806,13 @@ export default function AppointmentsPage() {
               <div className="space-y-1.5">
                 <Label>Staff Member</Label>
                 <Select
-                  value={form.staff_id}
+                  value={form.staff_id || undefined}
                   onValueChange={(v) => setForm({ ...form, staff_id: v ?? '' })}
                 >
                   <SelectTrigger className="h-9 w-full">
-                    <SelectValue placeholder="Assign to staff" />
+                    <SelectValue placeholder="Assign to staff">
+                      {form.staff_id ? (staff.find(s => s.id === form.staff_id)?.name ?? undefined) : undefined}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {staff.length === 0 ? (
@@ -862,6 +953,26 @@ export default function AppointmentsPage() {
                     <p className="text-xs text-gray-400">
                       {format(new Date(payDialog.appt.appointment_date + 'T00:00:00'), 'MMM d, yyyy')} at {payDialog.appt.appointment_time.slice(0, 5)}
                     </p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label>Payment Method</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {paymentMethods.filter(pm => pm.enabled).map(pm => (
+                        <button
+                          key={pm.value}
+                          type="button"
+                          onClick={() => setPayForm({ ...payForm, payment_method: pm.value })}
+                          className={`py-2 px-3 rounded-lg text-sm font-medium border transition-all ${
+                            payForm.payment_method === pm.value
+                              ? 'bg-primary text-white border-primary'
+                              : 'bg-gray-50 text-gray-700 border-gray-200 hover:border-primary/40'
+                          }`}
+                        >
+                          {pm.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   <div className="space-y-1.5">

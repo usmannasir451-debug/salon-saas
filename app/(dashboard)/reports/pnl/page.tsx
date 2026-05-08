@@ -49,6 +49,7 @@ export default function PnLPage() {
   const [salaryExpense, setSalaryExpense] = useState(0)
   const [otherExpenses, setOtherExpenses] = useState<OtherExpenses>(emptyOther)
   const [trendData, setTrendData] = useState<TrendMonth[]>([])
+  const [paymentBreakdown, setPaymentBreakdown] = useState<{ method: string; amount: number }[]>([])
 
   useEffect(() => { loadAll() }, [ownerId, selectedMonth]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -109,6 +110,32 @@ export default function PnLPage() {
     setWalkinDiscounts(wDisc)
     setOtherExpenses(expMap)
     setSalaryExpense(sal)
+
+    // Payment method breakdown for the selected month
+    const mStart = format(selectedMonth, 'yyyy-MM-dd')
+    const mEnd = format(endOfMonth(selectedMonth), 'yyyy-MM-dd')
+    const [pmAppt, pmWalkin] = await Promise.all([
+      supabase.from('appointments').select('payment_method, services(price), status')
+        .eq('user_id', ownerId).gte('appointment_date', mStart).lte('appointment_date', mEnd),
+      supabase.from('walk_ins').select('payment_method, total')
+        .eq('user_id', ownerId).gte('created_at', mStart + 'T00:00:00').lte('created_at', mEnd + 'T23:59:59'),
+    ])
+    const pmMap = new Map<string, number>()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(pmAppt.data ?? []).filter((a: any) => a.status === 'completed').forEach((a: any) => {
+      const m = a.payment_method ?? 'cash'
+      pmMap.set(m, (pmMap.get(m) ?? 0) + Number(a.services?.price ?? 0))
+    })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(pmWalkin.data ?? []).forEach((w: any) => {
+      const m = w.payment_method ?? 'cash'
+      pmMap.set(m, (pmMap.get(m) ?? 0) + Number(w.total ?? 0))
+    })
+    const breakdown = Array.from(pmMap.entries())
+      .map(([method, amount]) => ({ method: method.charAt(0).toUpperCase() + method.slice(1).replace(/_/g, ' '), amount }))
+      .filter(e => e.amount > 0)
+      .sort((a, b) => b.amount - a.amount)
+    setPaymentBreakdown(breakdown)
 
     // 6-month trend
     const months = Array.from({ length: 6 }, (_, i) => subMonths(selectedMonth, 5 - i))
@@ -209,6 +236,22 @@ export default function PnLPage() {
       const isProfit = netProfit >= 0
       doc.setTextColor(isProfit ? 16 : 220, isProfit ? 185 : 38, isProfit ? 129 : 38)
       doc.text(`NET ${isProfit ? 'PROFIT' : 'LOSS'}: ${fmt(Math.abs(netProfit), currency)}  (${profitMargin}% margin)`, 14, y)
+
+      if (paymentBreakdown.length > 0) {
+        y += 14
+        doc.setTextColor(30, 30, 30)
+        doc.setFontSize(13)
+        doc.setFont('helvetica', 'bold')
+        doc.text('REVENUE BY PAYMENT METHOD', 14, y)
+        autoTable(doc, {
+          startY: y + 4,
+          head: [['Payment Method', `Amount (${currency})`]],
+          body: paymentBreakdown.map(p => [p.method, fmt(p.amount, currency)]),
+          theme: 'striped',
+          headStyles: { fillColor: [244, 63, 94] },
+          styles: { fontSize: 10 },
+        })
+      }
 
       doc.save(`SalonPro-PnL-${format(selectedMonth, 'MMMM-yyyy')}.pdf`)
     } finally {
@@ -324,6 +367,33 @@ export default function PnLPage() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Payment Method Breakdown */}
+          {paymentBreakdown.length > 0 && (
+            <Card className="border-gray-100">
+              <CardHeader className="pb-2 border-b border-gray-50">
+                <CardTitle className="text-base text-primary flex items-center gap-2">
+                  <BarChart2 className="w-4 h-4" /> Revenue by Payment Method
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {paymentBreakdown.map(({ method, amount }) => {
+                    const max = paymentBreakdown[0].amount || 1
+                    return (
+                      <div key={method} className="bg-gray-50 rounded-xl p-3">
+                        <p className="text-xs text-gray-500 mb-1">{method}</p>
+                        <p className="text-sm font-bold text-gray-900">{fmt(amount, currency)}</p>
+                        <div className="h-1.5 bg-gray-200 rounded-full mt-2">
+                          <div className="h-full bg-primary rounded-full" style={{ width: `${(amount / max) * 100}%` }} />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* 6-Month Trend */}
           <Card className="border-gray-100">

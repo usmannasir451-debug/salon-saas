@@ -19,12 +19,26 @@ import {
   Image as ImageIcon,
   Percent,
   Gift,
+  CreditCard,
+  Plus,
+  Trash2,
+  ToggleLeft,
+  ToggleRight,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
+
+type PaymentMethodConfig = { value: string; label: string; enabled: boolean }
+
+const DEFAULT_PAYMENT_METHODS: PaymentMethodConfig[] = [
+  { value: 'cash', label: 'Cash', enabled: true },
+  { value: 'card', label: 'Card', enabled: true },
+  { value: 'easypaisa', label: 'EasyPaisa', enabled: true },
+  { value: 'jazzcash', label: 'JazzCash', enabled: true },
+]
 
 const TIMEZONES = [
   'UTC', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
@@ -92,6 +106,8 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [logoPreview, setLogoPreview] = useState('')
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodConfig[]>(DEFAULT_PAYMENT_METHODS)
+  const [newMethodName, setNewMethodName] = useState('')
 
   useEffect(() => {
     if (role !== 'owner') {
@@ -105,7 +121,7 @@ export default function SettingsPage() {
     const supabase = createClient()
     const { data } = await supabase
       .from('profiles')
-      .select('salon_name, salon_address, salon_phone, salon_email, salon_timezone, salon_currency, salon_primary_color, salon_logo_url, max_discount_owner, max_discount_manager, max_discount_cashier, tax_percentage, loyalty_enabled, loyalty_earn_pct, loyalty_expiry_days')
+      .select('salon_name, salon_address, salon_phone, salon_email, salon_timezone, salon_currency, salon_primary_color, salon_logo_url, max_discount_owner, max_discount_manager, max_discount_cashier, tax_percentage, loyalty_enabled, loyalty_earn_pct, loyalty_expiry_days, payment_methods')
       .eq('id', ownerId)
       .single()
 
@@ -128,6 +144,11 @@ export default function SettingsPage() {
         loyalty_expiry_days: data.loyalty_expiry_days != null ? String(data.loyalty_expiry_days) : '',
       })
       setLogoPreview(data.salon_logo_url ?? '')
+      if (data.payment_methods && Array.isArray(data.payment_methods) && data.payment_methods.length > 0) {
+        setPaymentMethods(data.payment_methods as PaymentMethodConfig[])
+      } else {
+        setPaymentMethods(DEFAULT_PAYMENT_METHODS)
+      }
     }
     setLoading(false)
   }
@@ -188,6 +209,7 @@ export default function SettingsPage() {
         loyalty_enabled: form.loyalty_enabled,
         loyalty_earn_pct: parseFloat(form.loyalty_earn_pct) || 10,
         loyalty_expiry_days: form.loyalty_expiry_days ? parseInt(form.loyalty_expiry_days) : null,
+        payment_methods: paymentMethods,
       })
       .eq('id', ownerId)
 
@@ -554,6 +576,89 @@ export default function SettingsPage() {
                 </div>
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* ── Payment Methods ── */}
+        <Card className="border-gray-100">
+          <CardHeader className="pb-3 border-b border-gray-50">
+            <CardTitle className="text-base flex items-center gap-2">
+              <CreditCard className="w-4 h-4 text-primary" />
+              Payment Methods
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-5 space-y-4">
+            <p className="text-xs text-gray-500">Enable or disable payment methods. These will appear in Walk-In and Appointment payment forms.</p>
+
+            <div className="space-y-2">
+              {paymentMethods.map((pm, idx) => (
+                <div key={pm.value} className="flex items-center justify-between py-2 px-3 rounded-lg bg-gray-50 border border-gray-100">
+                  <span className="text-sm font-medium text-gray-800">{pm.label}</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethods(prev => prev.map((m, i) => i === idx ? { ...m, enabled: !m.enabled } : m))}
+                      className="transition-colors"
+                    >
+                      {pm.enabled
+                        ? <ToggleRight className="w-6 h-6 text-primary" />
+                        : <ToggleLeft className="w-6 h-6 text-gray-400" />}
+                    </button>
+                    {!['cash', 'card', 'easypaisa', 'jazzcash'].includes(pm.value) && (
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMethods(prev => prev.filter((_, i) => i !== idx))}
+                        className="text-red-400 hover:text-red-600 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <Input
+                value={newMethodName}
+                onChange={(e) => setNewMethodName(e.target.value)}
+                placeholder="e.g. HBL Machine, SadaPay..."
+                className="h-9 flex-1"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    const trimmed = newMethodName.trim()
+                    if (!trimmed) return
+                    const value = trimmed.toLowerCase().replace(/\s+/g, '_')
+                    if (paymentMethods.some(m => m.value === value || m.label.toLowerCase() === trimmed.toLowerCase())) {
+                      toast.error('Payment method already exists')
+                      return
+                    }
+                    setPaymentMethods(prev => [...prev, { value, label: trimmed, enabled: true }])
+                    setNewMethodName('')
+                  }
+                }}
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="gap-1 border-primary/30 text-primary hover:bg-primary/5"
+                onClick={() => {
+                  const trimmed = newMethodName.trim()
+                  if (!trimmed) return
+                  const value = trimmed.toLowerCase().replace(/\s+/g, '_')
+                  if (paymentMethods.some(m => m.value === value || m.label.toLowerCase() === trimmed.toLowerCase())) {
+                    toast.error('Payment method already exists')
+                    return
+                  }
+                  setPaymentMethods(prev => [...prev, { value, label: trimmed, enabled: true }])
+                  setNewMethodName('')
+                }}
+              >
+                <Plus className="w-3.5 h-3.5" /> Add
+              </Button>
+            </div>
           </CardContent>
         </Card>
 

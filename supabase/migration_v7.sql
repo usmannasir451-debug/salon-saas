@@ -163,12 +163,13 @@ create policy "deal_svc_insert" on public.deal_services
 create policy "deal_svc_delete" on public.deal_services
   for delete using (user_id = get_effective_owner_id());
 
--- Add deal_id to appointments and walk_ins
+-- Add deal_id and loyalty_redeemed to appointments and walk_ins
 alter table public.appointments
   add column if not exists deal_id uuid references public.deals(id) on delete set null;
 
 alter table public.walk_ins
-  add column if not exists deal_id uuid references public.deals(id) on delete set null;
+  add column if not exists deal_id uuid references public.deals(id) on delete set null,
+  add column if not exists loyalty_redeemed numeric(12, 2) not null default 0;
 
 -- ═══════════════════════════════════════════════════════
 -- PART 6: CUSTOM INVENTORY CATEGORIES

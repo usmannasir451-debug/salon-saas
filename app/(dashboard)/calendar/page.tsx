@@ -454,11 +454,15 @@ export default function CalendarPage() {
               <div className="space-y-1.5">
                 <Label>Service</Label>
                 <Select
-                  value={editForm.service_id}
+                  value={editForm.service_id || undefined}
                   onValueChange={(v) => setEditForm((f) => ({ ...f, service_id: v ?? '' }))}
                   disabled={!canEdit(role)}
                 >
-                  <SelectTrigger className="h-9"><SelectValue placeholder="Select service" /></SelectTrigger>
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="Select service">
+                      {editForm.service_id ? (services.find(s => s.id === editForm.service_id)?.name ?? undefined) : undefined}
+                    </SelectValue>
+                  </SelectTrigger>
                   <SelectContent>
                     {services.map((s) => (
                       <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
@@ -470,11 +474,15 @@ export default function CalendarPage() {
               <div className="space-y-1.5">
                 <Label>Staff</Label>
                 <Select
-                  value={editForm.staff_id}
+                  value={editForm.staff_id || undefined}
                   onValueChange={(v) => setEditForm((f) => ({ ...f, staff_id: v ?? '' }))}
                   disabled={!canEdit(role)}
                 >
-                  <SelectTrigger className="h-9"><SelectValue placeholder="Select staff" /></SelectTrigger>
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="Select staff">
+                      {editForm.staff_id ? (staffList.find(s => s.id === editForm.staff_id)?.name ?? undefined) : undefined}
+                    </SelectValue>
+                  </SelectTrigger>
                   <SelectContent>
                     {staffList.map((s) => (
                       <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>

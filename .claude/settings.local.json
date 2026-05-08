@@ -18,7 +18,11 @@
       "Bash(Select-Object Name, Mode)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Tesla Laptops\\\\salon-saas\" -Directory)",
       "Bash(Select-Object Name)",
-      "Bash(grep -E \"\\\\.\\(sql|md|json\\)$\")"
+      "Bash(grep -E \"\\\\.\\(sql|md|json\\)$\")",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Tesla Laptops\\\\salon-saas\\\\src\" -Recurse -Name)",
+      "Bash(Get-ChildItem -Recurse -Directory)",
+      "Bash(Select-Object -First 50)",
+      "Bash(Format-Table FullName)"
     ]
   }
 }
