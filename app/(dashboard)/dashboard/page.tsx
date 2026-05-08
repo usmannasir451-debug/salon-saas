@@ -13,7 +13,7 @@ import {
 import {
   CalendarDays, TrendingUp, Scissors, Users, Clock, Loader2, Sparkles, Download, MessageCircle,
   Building2, CheckCircle2, ReceiptText, Sun, Sunset, Moon, AlertTriangle, Package,
-  TrendingDown, UserCheck, Star, Gift, CreditCard,
+  TrendingDown, UserCheck, Star, Gift, CreditCard, Zap,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'

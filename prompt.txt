@@ -1,7 +1,1 @@
-Fix these two issues in SalonPro:
-
-1. NOTIFICATION DROPDOWN FIX
-The notification bell dropdown is appearing on the left side and getting cut off. Fix it so it opens as a right-aligned dropdown directly below the bell icon, staying fully within the viewport. Use position absolute, right-0, and ensure it never goes off-screen. The dropdown should have a max-height with scroll if many notifications exist.
-
-2. REMOVE WALK-IN BANNER FROM DASHBOARD
-Remove the large "New Walk-in / Quick POS" banner tile that appears at the top of the dashboard content area. The floating "Walk-In" button on the bottom right corner is sufficient and should remain. Only remove the top banner tile, do not touch anything else on the dashboard.
+Fix this runtime error on dashboard: "Zap is not defined". The Zap icon from lucide-react was removed from imports but is still being used somewhere in app/(dashboard)/dashboard/page.tsx. Either add Zap back to the lucide-react imports, or replace it with another appropriate icon that is already imported.
