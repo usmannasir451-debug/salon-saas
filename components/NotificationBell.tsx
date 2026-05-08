@@ -35,9 +35,10 @@ const typeColor: Record<string, string> = {
 
 interface NotificationBellProps {
   ownerId: string
+  side?: 'left' | 'right'
 }
 
-export default function NotificationBell({ ownerId }: NotificationBellProps) {
+export default function NotificationBell({ ownerId, side = 'right' }: NotificationBellProps) {
   const [open, setOpen] = useState(false)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(false)
@@ -109,7 +110,10 @@ export default function NotificationBell({ ownerId }: NotificationBellProps) {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-80 max-w-[min(320px,calc(100vw-1rem))] bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden">
+        <div className={cn(
+          'absolute top-full mt-2 w-80 max-w-[min(320px,calc(100vw-1rem))] bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden',
+          side === 'right' ? 'right-0' : 'left-0'
+        )}>
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
             <h3 className="font-semibold text-gray-900 text-sm">Notifications</h3>

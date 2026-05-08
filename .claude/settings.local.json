@@ -22,7 +22,9 @@
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Tesla Laptops\\\\salon-saas\\\\src\" -Recurse -Name)",
       "Bash(Get-ChildItem -Recurse -Directory)",
       "Bash(Select-Object -First 50)",
-      "Bash(Format-Table FullName)"
+      "Bash(Format-Table FullName)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }

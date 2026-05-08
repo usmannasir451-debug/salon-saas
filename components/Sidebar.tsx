@@ -109,7 +109,7 @@ export default function Sidebar({ salonName, salonLogoUrl, userEmail, role = 'ow
               <p className="text-[10px] text-primary font-medium leading-tight">SalonPro</p>
             </div>
           </Link>
-          {ownerId && <NotificationBell ownerId={ownerId} />}
+          {ownerId && <NotificationBell ownerId={ownerId} side="left" />}
         </div>
       </div>
 

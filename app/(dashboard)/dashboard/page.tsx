@@ -12,8 +12,8 @@ import {
 } from 'recharts'
 import {
   CalendarDays, TrendingUp, Scissors, Users, Clock, Loader2, Sparkles, Download, MessageCircle,
-  Building2, CheckCircle2, ReceiptText, Sun, Sunset, Moon, Zap, AlertTriangle, Package,
-  TrendingDown, UserCheck, Star, Gift, ChevronRight, CreditCard,
+  Building2, CheckCircle2, ReceiptText, Sun, Sunset, Moon, AlertTriangle, Package,
+  TrendingDown, UserCheck, Star, Gift, CreditCard,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -512,20 +512,6 @@ export default function DashboardPage() {
           </Button>
         </div>
       </div>
-
-      {/* ── Quick Walk-In Tile ── */}
-      <Link href="/walkin">
-        <div className="flex items-center gap-4 bg-primary/5 border border-primary/20 rounded-xl px-5 py-3.5 hover:bg-primary/10 transition-all group cursor-pointer">
-          <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm shadow-primary/30 group-hover:scale-105 transition-transform">
-            <Zap className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <p className="font-semibold text-gray-900 text-sm">New Walk-In</p>
-            <p className="text-xs text-gray-500">Quick POS — collect payment instantly</p>
-          </div>
-          <ChevronRight className="w-4 h-4 text-gray-400 ml-auto flex-shrink-0 group-hover:text-primary transition-colors" />
-        </div>
-      </Link>
 
       {/* Low inventory alert */}
       {lowStockItems.length > 0 && (
