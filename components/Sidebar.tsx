@@ -28,10 +28,14 @@ import {
   Package,
   Wallet,
   BarChart2,
+  TrendingUp,
+  Star,
+  Download,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
+import NotificationBell from '@/components/NotificationBell'
 
 const allNavItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -40,6 +44,8 @@ const allNavItems = [
   { href: '/walkin', label: 'Walk-In', icon: Zap },
   { href: '/services', label: 'Services', icon: Scissors },
   { href: '/staff', label: 'Staff', icon: Users },
+  { href: '/staff/performance', label: 'Performance', icon: TrendingUp },
+  { href: '/reviews', label: 'Reviews', icon: Star },
   { href: '/clients', label: 'Clients', icon: UserSearch },
   { href: '/branches', label: 'Branches', icon: Building2 },
   { href: '/team', label: 'Team', icon: UserCog },
@@ -47,6 +53,7 @@ const allNavItems = [
   { href: '/inventory', label: 'Inventory', icon: Package },
   { href: '/payroll', label: 'Payroll', icon: Wallet },
   { href: '/reports/pnl', label: 'P&L Report', icon: BarChart2 },
+  { href: '/export', label: 'Export Data', icon: Download },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
 
@@ -55,9 +62,10 @@ interface SidebarProps {
   salonLogoUrl?: string
   userEmail?: string
   role?: UserRole
+  ownerId?: string
 }
 
-export default function Sidebar({ salonName, salonLogoUrl, userEmail, role = 'owner' }: SidebarProps) {
+export default function Sidebar({ salonName, salonLogoUrl, userEmail, role = 'owner', ownerId }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -130,6 +138,12 @@ export default function Sidebar({ salonName, salonLogoUrl, userEmail, role = 'ow
 
       {/* User section */}
       <div className="px-4 py-4 space-y-3">
+        {ownerId && (
+          <div className="flex items-center justify-between px-1">
+            <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Notifications</p>
+            <NotificationBell ownerId={ownerId} />
+          </div>
+        )}
         <div className="flex items-center gap-3 px-1">
           <div className="w-8 h-8 bg-primary/20 flex items-center justify-center rounded-full flex-shrink-0 overflow-hidden">
             {salonLogoUrl ? (
@@ -190,12 +204,15 @@ export default function Sidebar({ salonName, salonLogoUrl, userEmail, role = 'ow
             {salonName || 'SalonPro'}
           </span>
         </Link>
-        <button
-          className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-          onClick={() => setMobileOpen(true)}
-        >
-          <Menu className="w-5 h-5 text-gray-600" />
-        </button>
+        <div className="flex items-center gap-1">
+          {ownerId && <NotificationBell ownerId={ownerId} />}
+          <button
+            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+            onClick={() => setMobileOpen(true)}
+          >
+            <Menu className="w-5 h-5 text-gray-600" />
+          </button>
+        </div>
       </header>
 
       {/* Mobile Overlay */}

@@ -7,6 +7,8 @@ import { createClient } from '@/lib/supabase/client'
 import { useUserContext } from '@/components/RoleContext'
 import { canCreate, canEdit, canDelete, canMarkPayment } from '@/lib/roles'
 import type { Appointment, Service, StaffMember, AppointmentStatus, Branch } from '@/lib/types'
+import FeedbackModal from '@/components/FeedbackModal'
+import InvoiceModal, { type InvoiceData } from '@/components/InvoiceModal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -42,6 +44,7 @@ import {
   CreditCard,
   MessageSquare,
   Lock,
+  FileText,
 } from 'lucide-react'
 
 type AppointmentRow = Appointment & {
@@ -103,6 +106,14 @@ export default function AppointmentsPage() {
   const [payForm, setPayForm] = useState({ discount: '', feedback: '' })
   const [paying, setPaying] = useState(false)
 
+  // Feedback & Invoice
+  const [feedbackAppt, setFeedbackAppt] = useState<AppointmentRow | null>(null)
+  const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(null)
+  const [salonName, setSalonName] = useState('')
+  const [salonAddress, setSalonAddress] = useState('')
+  const [currency, setCurrency] = useState('PKR')
+  const [taxPercentage, setTaxPercentage] = useState(0)
+
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { loadData() }, [])
 
@@ -122,17 +133,22 @@ export default function AppointmentsPage() {
       apptQuery = apptQuery.eq('staff_id', staffId)
     }
 
-    const [apptRes, serviceRes, staffRes, branchRes] = await Promise.all([
+    const [apptRes, serviceRes, staffRes, branchRes, profileRes] = await Promise.all([
       apptQuery,
       supabase.from('services').select('*').eq('user_id', ownerId).order('name'),
       supabase.from('staff').select('*').eq('user_id', ownerId).order('name'),
       supabase.from('branches').select('*').eq('user_id', ownerId).order('name'),
+      supabase.from('profiles').select('salon_name, salon_address, salon_currency, tax_percentage').eq('id', ownerId).single(),
     ])
 
     setAppointments((apptRes.data as AppointmentRow[]) ?? [])
     setServices(serviceRes.data ?? [])
     setStaff(staffRes.data ?? [])
     setBranches((branchRes.data as Branch[]) ?? [])
+    setSalonName(profileRes.data?.salon_name ?? '')
+    setSalonAddress(profileRes.data?.salon_address ?? '')
+    setCurrency(profileRes.data?.salon_currency ?? 'PKR')
+    setTaxPercentage(profileRes.data?.tax_percentage ?? 0)
 
     // For staff: lock to today
     if (isStaffRole) {
@@ -220,10 +236,32 @@ export default function AppointmentsPage() {
   async function updateStatus(id: string, status: AppointmentStatus) {
     const supabase = createClient()
     const { error } = await supabase.from('appointments').update({ status }).eq('id', id)
-    if (error) { toast.error(error.message) } else {
-      toast.success(`Marked as ${status}`)
-      await loadData()
+    if (error) { toast.error(error.message); return }
+    toast.success(`Marked as ${status}`)
+
+    // Create notification and audit log for payment
+    if (status === 'completed') {
+      const appt = appointments.find((a) => a.id === id)
+      await Promise.all([
+        supabase.from('notifications').insert({
+          user_id: ownerId,
+          type: 'payment_received',
+          title: 'Appointment Completed',
+          message: `${appt?.client_name ?? 'Client'} appointment marked as completed`,
+          link: '/appointments',
+        }),
+        supabase.from('audit_log').insert({
+          user_id: ownerId,
+          actor_role: role,
+          action: 'complete_appointment',
+          entity_type: 'appointment',
+          entity_id: id,
+          details: { client: appt?.client_name, status },
+        }),
+      ])
+      if (appt?.staff_id) setFeedbackAppt(appt)
     }
+    await loadData()
   }
 
   async function handleMarkPaid(e: React.FormEvent) {
@@ -504,6 +542,33 @@ export default function AppointmentsPage() {
                             className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-primary transition-colors"
                           >
                             <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+
+                        {/* Invoice button */}
+                        {appt.status === 'completed' && (
+                          <button
+                            onClick={() => setInvoiceData({
+                              id: appt.id,
+                              invoiceType: 'appointment',
+                              salonName,
+                              salonAddress,
+                              clientName: appt.client_name,
+                              clientPhone: appt.client_phone ?? undefined,
+                              staffName: appt.staff?.name ?? undefined,
+                              serviceName: appt.services?.name ?? undefined,
+                              date: appt.appointment_date,
+                              time: appt.appointment_time,
+                              subtotal: appt.services?.price ?? 0,
+                              discountAmount: appt.discount_amount ?? 0,
+                              taxPercentage,
+                              total: Math.max(0, (appt.services?.price ?? 0) - (appt.discount_amount ?? 0)),
+                              currency,
+                            })}
+                            className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-600 transition-colors"
+                            title="Invoice"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
                           </button>
                         )}
 
@@ -813,6 +878,24 @@ export default function AppointmentsPage() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Feedback Modal */}
+      <FeedbackModal
+        open={!!feedbackAppt}
+        onClose={() => setFeedbackAppt(null)}
+        ownerId={ownerId}
+        staffId={feedbackAppt?.staff_id ?? null}
+        staffName={feedbackAppt?.staff?.name ?? 'Staff'}
+        clientName={feedbackAppt?.client_name ?? ''}
+        appointmentId={feedbackAppt?.id}
+      />
+
+      {/* Invoice Modal */}
+      <InvoiceModal
+        open={!!invoiceData}
+        onClose={() => setInvoiceData(null)}
+        data={invoiceData}
+      />
     </div>
   )
 }

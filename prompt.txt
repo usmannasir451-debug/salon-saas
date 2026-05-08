@@ -1,46 +1,47 @@
-You are an expert SaaS developer building "SalonPro" - a world-class white-label salon management platform. This is an existing Next.js + Supabase project. Continue building these features:
+You are an expert SaaS developer building "SalonPro" - a world-class white-label salon management platform. This is an existing Next.js + Supabase project. Continue building these final features:
 
-PART 8 - EXPENSE MANAGEMENT (/expenses)
-- Add expense: category, description, amount, date, paid by, notes
-- Categories: Staff Refreshments, Salon Materials, Inventory, Utilities, Rent, Marketing, Miscellaneous
-- Recurring expense option
-- Monthly expense summary by category with chart
-- Edit and delete expenses
+PART 13 - STAFF PERFORMANCE (/staff/performance)
+- Table: name, total appointments, walk-ins, revenue, avg rating, total reviews
+- Detailed staff profile with monthly trend charts
+- Performance badges: Top Performer, Most Booked, Highest Rated
+- Commission earned this month
 
-PART 9 - INVENTORY MANAGEMENT (/inventory)
-- Add products: name, category, quantity, unit, reorder level, cost price, supplier
-- Categories: Hair Products, Skin Products, Tools, Equipment, Consumables
-- Low stock alert when quantity below reorder level
-- Low stock notification on dashboard
-- Inventory valuation: total cost of current stock
-- Adjust stock manually with reason
+PART 14 - FEEDBACK & REVIEWS
+- After appointment or walk-in marked Done, feedback modal appears for cashier
+- Star rating 1-5 for staff, optional comment
+- Staff profile shows avg rating and all reviews
+- Dashboard shows overall salon avg rating
+- Owner sees all reviews at /reviews
 
-PART 10 - SALARY & PAYROLL (/payroll)
-- Staff salary setup: fixed monthly, commission percentage on revenue, or both
-- Monthly payroll: staff name, fixed salary, revenue generated, commission earned, total payable
-- Mark salary as paid with date and method
-- Salary history per staff
-- Salaries count as expense in P&L
+PART 15 - CLIENT MANAGEMENT (/clients)
+- Client profiles: visit history, total spend, favorite service, last visit, avg bill
+- Auto segments: VIP, Regular, New, Inactive
+- Birthday field with dashboard reminder
+- WhatsApp quick message button
 
-PART 11 - PROFIT & LOSS REPORT (/reports/pnl)
-- Month selector
-- INCOME: appointment revenue, walk-in revenue, gross revenue, less discounts, net revenue
-- EXPENSES: salaries, commissions, materials, refreshments, utilities, rent, marketing, other, total expenses
-- NET PROFIT = Net Revenue minus Total Expenses
-- 6 month trend chart: revenue vs expenses vs profit
-- Export P&L as PDF with salon logo
+PART 16 - ONBOARDING WIZARD
+- 4 step setup for new salons: salon name and logo, add first service, add first staff, invite team member
+- Progress bar, skippable
 
-PART 12 - ENHANCED DASHBOARD KPIs
-- Today: revenue, appointments, walk-ins, avg bill
-- This month: revenue, expenses, net profit, clients served
-- Revenue change percentage vs last month
-- Top 5 services by revenue
-- Top 5 staff by revenue
-- New vs returning clients
-- Busiest hours chart
-- Busiest days chart
-- Low inventory alerts
-- Today appointment timeline
+PART 17 - INVOICE GENERATION
+- Professional invoice per appointment or walk-in
+- Includes: salon logo, name, address, client, services, staff, date, subtotal, discount, tax, total
+- Tax percentage configurable in settings
+- Download as PDF
+
+PART 18 - NOTIFICATIONS
+- Bell icon in header with unread count
+- Types: new appointment, payment received, new review, low inventory, staff birthday
+- Mark as read
+
+PART 19 - AUDIT LOG (/settings/audit)
+- Track: who booked, who applied discount, who deleted, who changed settings
+- Owner only access
+- Filter by date and user
+
+PART 20 - DATA EXPORT
+- Export clients, appointments, expenses, payroll as CSV
+- Date range selector
 
 TECHNICAL REQUIREMENTS FOR THIS SESSION:
 - Generate complete SQL migration at the end for ALL new tables and columns

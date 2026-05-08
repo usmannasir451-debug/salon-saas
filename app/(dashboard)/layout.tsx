@@ -43,6 +43,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           salonLogoUrl={profile?.salon_logo_url ?? undefined}
           userEmail={user.email}
           role={role}
+          ownerId={ownerId}
         />
         <div className="lg:pl-60">
           <main className="pt-16 lg:pt-0 min-h-screen">

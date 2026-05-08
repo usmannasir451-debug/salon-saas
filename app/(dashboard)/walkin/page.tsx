@@ -7,6 +7,8 @@ import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { useUserContext } from '@/components/RoleContext'
 import type { DiscountType, DiscountReason, PaymentMethod, WalkIn, Service, StaffMember } from '@/lib/types'
+import FeedbackModal from '@/components/FeedbackModal'
+import InvoiceModal, { type InvoiceData } from '@/components/InvoiceModal'
 import {
   Zap,
   Plus,
@@ -16,6 +18,7 @@ import {
   Printer,
   CheckCircle2,
   Clock,
+  FileText,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -142,10 +145,14 @@ export default function WalkInPage() {
   const [staffList, setStaffList] = useState<Pick<StaffMember, 'id' | 'name'>[]>([])
   const [currency, setCurrency] = useState('USD')
   const [salonName, setSalonName] = useState('')
+  const [salonAddress, setSalonAddress] = useState('')
+  const [taxPercentage, setTaxPercentage] = useState(0)
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [receiptWalkIn, setReceiptWalkIn] = useState<WalkIn | null>(null)
+  const [feedbackWalkIn, setFeedbackWalkIn] = useState<WalkIn | null>(null)
+  const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(null)
   const [form, setForm] = useState(emptyForm)
 
   useEffect(() => {
@@ -167,13 +174,15 @@ export default function WalkInPage() {
         .limit(50),
       supabase.from('services').select('id, name, price, duration').eq('user_id', ownerId).order('name'),
       supabase.from('staff').select('id, name').eq('user_id', ownerId).order('name'),
-      supabase.from('profiles').select('salon_currency, salon_name').eq('id', ownerId).single(),
+      supabase.from('profiles').select('salon_currency, salon_name, salon_address, tax_percentage').eq('id', ownerId).single(),
     ])
     setWalkIns((walkRes.data as unknown as WalkIn[]) ?? [])
     setServices((svcRes.data ?? []) as Pick<Service, 'id' | 'name' | 'price' | 'duration'>[])
     setStaffList((staffRes.data ?? []) as Pick<StaffMember, 'id' | 'name'>[])
-    setCurrency(profileRes.data?.salon_currency ?? 'USD')
+    setCurrency(profileRes.data?.salon_currency ?? 'PKR')
     setSalonName(profileRes.data?.salon_name ?? '')
+    setSalonAddress(profileRes.data?.salon_address ?? '')
+    setTaxPercentage(profileRes.data?.tax_percentage ?? 0)
     setLoading(false)
   }
 
@@ -229,10 +238,38 @@ export default function WalkInPage() {
       return
     }
 
+    const walkinData = data as unknown as WalkIn
     toast.success('Walk-in recorded!')
+
+    // Create notifications
+    const supabaseNotify = createClient()
+    const svc = services.find((s) => s.id === form.service_id)
+    await Promise.all([
+      supabaseNotify.from('notifications').insert({
+        user_id: ownerId,
+        type: 'payment_received',
+        title: 'Payment Received',
+        message: `${form.client_name || 'Walk-in client'} paid ${formatCurrency(total, currency)} for ${svc?.name ?? 'service'}`,
+        link: '/walkin',
+      }),
+      // Log audit
+      supabaseNotify.from('audit_log').insert({
+        user_id: ownerId,
+        actor_user_id: (await supabaseNotify.auth.getUser()).data.user?.id,
+        actor_email: (await supabaseNotify.auth.getUser()).data.user?.email,
+        actor_role: role,
+        action: 'payment_walkin',
+        entity_type: 'walk_in',
+        entity_id: walkinData.id,
+        details: { client: form.client_name, amount: total, payment: form.payment_method },
+      }),
+    ])
+
     setForm(emptyForm)
     setShowForm(false)
-    setReceiptWalkIn(data as unknown as WalkIn)
+    setReceiptWalkIn(walkinData)
+    // Show feedback modal if staff was assigned
+    if (walkinData.staff_id) setFeedbackWalkIn(walkinData)
     await loadData()
     setSubmitting(false)
   }
@@ -549,6 +586,29 @@ export default function WalkInPage() {
                     >
                       <Receipt className="w-3.5 h-3.5" />
                     </button>
+                    <button
+                      onClick={() => setInvoiceData({
+                        id: w.id,
+                        invoiceType: 'walkin',
+                        salonName,
+                        salonAddress,
+                        clientName: w.client_name ?? undefined,
+                        clientPhone: w.client_phone ?? undefined,
+                        staffName: w.staff?.name ?? undefined,
+                        serviceName: w.services?.name ?? undefined,
+                        date: w.created_at.slice(0, 10),
+                        subtotal: w.subtotal,
+                        discountAmount: w.discount_amount,
+                        taxPercentage,
+                        total: w.total,
+                        paymentMethod: w.payment_method,
+                        currency,
+                      })}
+                      className="p-1.5 rounded-lg hover:bg-white text-gray-400 hover:text-blue-600 transition-colors"
+                      title="Invoice"
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 </div>
               ))}
@@ -556,6 +616,24 @@ export default function WalkInPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Feedback Modal */}
+      <FeedbackModal
+        open={!!feedbackWalkIn}
+        onClose={() => setFeedbackWalkIn(null)}
+        ownerId={ownerId}
+        staffId={feedbackWalkIn?.staff_id ?? null}
+        staffName={feedbackWalkIn?.staff?.name ?? 'Staff'}
+        clientName={feedbackWalkIn?.client_name ?? ''}
+        walkInId={feedbackWalkIn?.id}
+      />
+
+      {/* Invoice Modal */}
+      <InvoiceModal
+        open={!!invoiceData}
+        onClose={() => setInvoiceData(null)}
+        data={invoiceData}
+      />
     </div>
   )
 }

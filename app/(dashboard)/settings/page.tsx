@@ -57,6 +57,7 @@ type FormState = {
   max_discount_owner: string
   max_discount_manager: string
   max_discount_cashier: string
+  tax_percentage: string
 }
 
 const defaultForm: FormState = {
@@ -71,6 +72,7 @@ const defaultForm: FormState = {
   max_discount_owner: '100',
   max_discount_manager: '30',
   max_discount_cashier: '15',
+  tax_percentage: '0',
 }
 
 export default function SettingsPage() {
@@ -96,7 +98,7 @@ export default function SettingsPage() {
     const supabase = createClient()
     const { data } = await supabase
       .from('profiles')
-      .select('salon_name, salon_address, salon_phone, salon_email, salon_timezone, salon_currency, salon_primary_color, salon_logo_url, max_discount_owner, max_discount_manager, max_discount_cashier')
+      .select('salon_name, salon_address, salon_phone, salon_email, salon_timezone, salon_currency, salon_primary_color, salon_logo_url, max_discount_owner, max_discount_manager, max_discount_cashier, tax_percentage')
       .eq('id', ownerId)
       .single()
 
@@ -113,6 +115,7 @@ export default function SettingsPage() {
         max_discount_owner: String(data.max_discount_owner ?? 100),
         max_discount_manager: String(data.max_discount_manager ?? 30),
         max_discount_cashier: String(data.max_discount_cashier ?? 15),
+        tax_percentage: String(data.tax_percentage ?? 0),
       })
       setLogoPreview(data.salon_logo_url ?? '')
     }
@@ -171,6 +174,7 @@ export default function SettingsPage() {
         max_discount_owner: parseInt(form.max_discount_owner) || 100,
         max_discount_manager: parseInt(form.max_discount_manager) || 30,
         max_discount_cashier: parseInt(form.max_discount_cashier) || 15,
+        tax_percentage: parseFloat(form.tax_percentage) || 0,
       })
       .eq('id', ownerId)
 
@@ -433,6 +437,52 @@ export default function SettingsPage() {
                 </div>
               ))}
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Tax percentage */}
+        <Card>
+          <CardHeader className="pb-1">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Percent className="w-4 h-4 text-primary" />
+              Tax Settings
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-5 space-y-4">
+            <p className="text-xs text-gray-500">Set the tax percentage applied to invoices. Set to 0 to disable tax.</p>
+            <div className="max-w-xs">
+              <Label htmlFor="tax_percentage">Tax Rate (%)</Label>
+              <div className="relative mt-1.5">
+                <Input
+                  id="tax_percentage"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.5"
+                  value={form.tax_percentage}
+                  onChange={(e) => set('tax_percentage', e.target.value)}
+                  className="h-10 pr-8"
+                  placeholder="0"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Audit Log link */}
+        <Card>
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="font-medium text-gray-900 text-sm">Audit Log</p>
+              <p className="text-xs text-gray-500 mt-0.5">View all actions taken by team members</p>
+            </div>
+            <a
+              href="/settings/audit"
+              className="text-sm font-medium text-primary hover:underline"
+            >
+              View Audit Log →
+            </a>
           </CardContent>
         </Card>
 
