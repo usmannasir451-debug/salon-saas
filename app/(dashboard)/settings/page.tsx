@@ -182,6 +182,13 @@ export default function SettingsPage() {
       toast.error(error.message)
     } else {
       toast.success('Settings saved!')
+      void supabase.from('audit_log').insert({
+        user_id: ownerId,
+        actor_role: role,
+        action: 'update_settings',
+        entity_type: 'settings',
+        details: { salon_name: form.salon_name.trim(), tax_percentage: form.tax_percentage },
+      })
       router.refresh()
     }
     setSaving(false)

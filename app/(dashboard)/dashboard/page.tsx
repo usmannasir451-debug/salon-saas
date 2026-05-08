@@ -13,7 +13,7 @@ import {
 import {
   CalendarDays, TrendingUp, Scissors, Users, Clock, Loader2, Sparkles, Download, MessageCircle,
   Building2, CheckCircle2, ReceiptText, Sun, Sunset, Moon, Zap, AlertTriangle, Package,
-  TrendingDown, UserCheck,
+  TrendingDown, UserCheck, Star, Gift,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -104,6 +104,9 @@ export default function DashboardPage() {
   const [activeFilter, setActiveFilter] = useState<'today' | 'week' | 'month'>('month')
   const [activeBranch, setActiveBranch] = useState('all')
   const [pdfLoading, setPdfLoading] = useState(false)
+  const [avgRating, setAvgRating] = useState(0)
+  const [totalReviews, setTotalReviews] = useState(0)
+  const [birthdayClients, setBirthdayClients] = useState<{ name: string; phone: string | null }[]>([])
 
   useEffect(() => {
     if (!['owner', 'regional_manager', 'manager'].includes(role)) {
@@ -126,7 +129,7 @@ export default function DashboardPage() {
     const sevenDaysAgo = format(subDays(new Date(), 6), 'yyyy-MM-dd')
     const queryStart = monthStart < sevenDaysAgo ? monthStart : sevenDaysAgo
 
-    const [profileRes, apptRes, walkInRes, branchRes, expenseRes, lastMonthApptRes, lastMonthWalkinRes, inventoryRes] = await Promise.all([
+    const [profileRes, apptRes, walkInRes, branchRes, expenseRes, lastMonthApptRes, lastMonthWalkinRes, inventoryRes, reviewRes, clientBdayRes, staffBdayRes] = await Promise.all([
       supabase.from('profiles').select('salon_name, salon_currency').eq('id', ownerId).single(),
       supabase.from('appointments')
         .select('id, client_name, client_phone, service_id, staff_id, branch_id, appointment_date, appointment_time, status, notes, services(id, name, price), staff(id, name)')
@@ -151,6 +154,9 @@ export default function DashboardPage() {
       supabase.from('inventory_items')
         .select('id, name, quantity, reorder_level, unit')
         .eq('user_id', ownerId),
+      supabase.from('reviews').select('rating').eq('user_id', ownerId),
+      supabase.from('clients').select('name, phone, birthday').eq('user_id', ownerId).not('birthday', 'is', null),
+      supabase.from('staff').select('id, name, birthday').eq('user_id', ownerId).not('birthday', 'is', null),
     ])
 
     setSalonName(profileRes.data?.salon_name ?? '')
@@ -178,7 +184,60 @@ export default function DashboardPage() {
     const low = (inventoryRes.data ?? []).filter((i: any) => Number(i.quantity) <= Number(i.reorder_level))
     setLowStockItems(low as LowStockItem[])
 
-    void todayStr // suppress lint
+    // Avg rating
+    const reviews = (reviewRes.data ?? []) as { rating: number }[]
+    const totalRev = reviews.length
+    const avgRat = totalRev > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / totalRev : 0
+    setAvgRating(avgRat)
+    setTotalReviews(totalRev)
+
+    // Birthday clients this month
+    const currentMonth = new Date().getMonth()
+    const bClients = ((clientBdayRes.data ?? []) as { name: string; phone: string | null; birthday: string }[])
+      .filter((c) => c.birthday && new Date(c.birthday + 'T00:00:00').getMonth() === currentMonth)
+    setBirthdayClients(bClients)
+
+    // Staff birthday notifications (fire once per day)
+    const staffWithBirthday = ((staffBdayRes.data ?? []) as { id: string; name: string; birthday: string }[])
+      .filter((s) => s.birthday && format(new Date(s.birthday + 'T00:00:00'), 'MM-dd') === format(new Date(), 'MM-dd'))
+    if (staffWithBirthday.length > 0) {
+      const { count: bdayCount } = await supabase
+        .from('notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', ownerId)
+        .eq('type', 'staff_birthday')
+        .gte('created_at', todayStr + 'T00:00:00')
+      if (!bdayCount) {
+        void Promise.all(staffWithBirthday.map((s) =>
+          supabase.from('notifications').insert({
+            user_id: ownerId,
+            type: 'staff_birthday',
+            title: 'Staff Birthday Today! 🎂',
+            message: `${s.name}'s birthday is today. Wish them well!`,
+            link: '/staff',
+          })
+        ))
+      }
+    }
+
+    // Low inventory notification (fire once per day)
+    if (low.length > 0) {
+      const { count: invCount } = await supabase
+        .from('notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', ownerId)
+        .eq('type', 'low_inventory')
+        .gte('created_at', todayStr + 'T00:00:00')
+      if (!invCount) {
+        void supabase.from('notifications').insert({
+          user_id: ownerId,
+          type: 'low_inventory',
+          title: 'Low Inventory Alert',
+          message: `${low.length} item(s) running low: ${(low as LowStockItem[]).slice(0, 2).map((i) => i.name).join(', ')}`,
+          link: '/inventory',
+        })
+      }
+    }
 
     setLoading(false)
   }
@@ -456,6 +515,43 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* Birthday reminder */}
+      {birthdayClients.length > 0 && (
+        <div className="bg-pink-50 border border-pink-200 rounded-xl p-3 flex items-start gap-3">
+          <Gift className="w-4 h-4 text-pink-500 flex-shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-pink-700 mb-1">
+              {birthdayClients.length} client{birthdayClients.length !== 1 ? 's' : ''} with birthday this month
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {birthdayClients.slice(0, 5).map((c) => (
+                <div key={c.name} className="flex items-center gap-1.5 bg-white border border-pink-200 rounded-lg px-2 py-1">
+                  <span className="text-xs font-medium text-gray-800">{c.name}</span>
+                  {c.phone && (
+                    <a
+                      href={`https://wa.me/${c.phone.replace(/\D/g, '').replace(/^0/, '92')}?text=${encodeURIComponent(`Happy Birthday ${c.name}! 🎂🌸`)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-green-600 hover:text-green-700"
+                    >
+                      <MessageCircle className="w-3 h-3" />
+                    </a>
+                  )}
+                </div>
+              ))}
+              {birthdayClients.length > 5 && (
+                <span className="text-xs text-pink-600 self-center">+{birthdayClients.length - 5} more</span>
+              )}
+            </div>
+          </div>
+          <Link href="/clients">
+            <Button size="sm" variant="outline" className="border-pink-300 text-pink-700 hover:bg-pink-100 gap-1 flex-shrink-0 text-xs h-7">
+              <Users className="w-3 h-3" /> View All
+            </Button>
+          </Link>
+        </div>
+      )}
+
       {/* Filters */}
       <div className="flex items-center gap-2 flex-wrap">
         {(['today', 'week', 'month'] as const).map(f => (
@@ -486,7 +582,7 @@ export default function DashboardPage() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         {/* Revenue */}
         <Card className="border-gray-100 hover:shadow-md transition-shadow">
           <CardContent className="pt-5 pb-4">
@@ -534,6 +630,22 @@ export default function DashboardPage() {
             </div>
             <p className="text-xl font-bold text-gray-900 mb-0.5 leading-tight">{formatCurrency(stats.avgBill, currency)}</p>
             <p className="text-xs text-gray-500">Avg Bill</p>
+          </CardContent>
+        </Card>
+        {/* Salon Rating */}
+        <Card className="border-gray-100 hover:shadow-md transition-shadow">
+          <CardContent className="pt-5 pb-4">
+            <div className="w-10 h-10 rounded-xl bg-yellow-50 flex items-center justify-center mb-3">
+              <Star className="w-5 h-5 text-yellow-500" />
+            </div>
+            <div className="flex items-baseline gap-1">
+              <p className="text-xl font-bold text-gray-900 leading-tight">
+                {avgRating > 0 ? avgRating.toFixed(1) : '—'}
+              </p>
+              {avgRating > 0 && <span className="text-yellow-400 text-sm">★</span>}
+            </div>
+            <p className="text-xs text-gray-500">Avg Rating</p>
+            {totalReviews > 0 && <p className="text-[10px] text-gray-400 mt-0.5">{totalReviews} review{totalReviews !== 1 ? 's' : ''}</p>}
           </CardContent>
         </Card>
       </div>

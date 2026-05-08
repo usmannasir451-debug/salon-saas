@@ -213,9 +213,26 @@ export default function AppointmentsPage() {
       if (error) { toast.error(error.message); setSaving(false); return }
       toast.success('Appointment updated')
     } else {
-      const { error } = await supabase.from('appointments').insert(payload)
+      const { data: newAppt, error } = await supabase.from('appointments').insert(payload).select('id').single()
       if (error) { toast.error(error.message); setSaving(false); return }
       toast.success('Appointment booked')
+      void Promise.all([
+        supabase.from('notifications').insert({
+          user_id: ownerId,
+          type: 'new_appointment',
+          title: 'New Appointment Booked',
+          message: `${form.client_name.trim()} — ${form.appointment_date} at ${form.appointment_time.slice(0, 5)}`,
+          link: '/appointments',
+        }),
+        supabase.from('audit_log').insert({
+          user_id: ownerId,
+          actor_role: role,
+          action: 'create_appointment',
+          entity_type: 'appointment',
+          entity_id: newAppt?.id ?? null,
+          details: { client: form.client_name.trim(), date: form.appointment_date, time: form.appointment_time },
+        }),
+      ])
     }
 
     setDialogOpen(false)
@@ -227,8 +244,19 @@ export default function AppointmentsPage() {
     if (!confirm('Delete this appointment?')) return
     setDeleting(id)
     const supabase = createClient()
+    const apptToDelete = appointments.find((a) => a.id === id)
     const { error } = await supabase.from('appointments').delete().eq('id', id)
-    if (error) { toast.error(error.message) } else { toast.success('Appointment deleted') }
+    if (error) { toast.error(error.message) } else {
+      toast.success('Appointment deleted')
+      void supabase.from('audit_log').insert({
+        user_id: ownerId,
+        actor_role: role,
+        action: 'delete_appointment',
+        entity_type: 'appointment',
+        entity_id: id,
+        details: { client: apptToDelete?.client_name ?? null },
+      })
+    }
     await loadData()
     setDeleting(null)
   }
@@ -282,6 +310,17 @@ export default function AppointmentsPage() {
       toast.error(error.message)
     } else {
       toast.success('Payment recorded')
+      const discountVal = parseFloat(payForm.discount) || 0
+      if (discountVal > 0) {
+        void supabase.from('audit_log').insert({
+          user_id: ownerId,
+          actor_role: role,
+          action: 'discount_applied',
+          entity_type: 'appointment',
+          entity_id: payDialog.appt!.id,
+          details: { client: payDialog.appt!.client_name, discount_amount: discountVal },
+        })
+      }
       setPayDialog({ open: false, appt: null })
       setPayForm({ discount: '', feedback: '' })
       await loadData()
