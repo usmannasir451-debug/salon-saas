@@ -572,7 +572,7 @@ export default function WalkInPage() {
             {/* Staff */}
             <div className="space-y-1.5">
               <Label>Staff <span className="text-gray-400 font-normal text-xs">(optional)</span></Label>
-              <Select value={form.staff_id || undefined} onValueChange={(v) => setForm(f => ({ ...f, staff_id: v ?? '' }))}>
+              <Select value={form.staff_id} onValueChange={(v) => setForm(f => ({ ...f, staff_id: v ?? '' }))}>
                 <SelectTrigger className="h-10">
                   <SelectValue placeholder="Select staff member">
                     {form.staff_id ? (staffList.find(s => s.id === form.staff_id)?.name ?? undefined) : undefined}
@@ -590,7 +590,7 @@ export default function WalkInPage() {
             <div className="rounded-xl bg-gray-50 border border-gray-100 p-4 space-y-3">
               <p className="text-sm font-semibold text-gray-700">Discount <span className="text-xs font-normal text-gray-400">(optional)</span></p>
               <div className="grid grid-cols-2 gap-3">
-                <Select value={form.discount_type || undefined} onValueChange={(v) => setForm(f => ({ ...f, discount_type: (v ?? 'percentage') as DiscountType }))}>
+                <Select value={form.discount_type} onValueChange={(v) => setForm(f => ({ ...f, discount_type: (v ?? 'percentage') as DiscountType }))}>
                   <SelectTrigger className="h-9">
                     <SelectValue>
                       {form.discount_type === 'fixed' ? 'Fixed (PKR)' : 'Percentage (%)'}

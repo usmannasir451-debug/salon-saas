@@ -454,7 +454,7 @@ export default function CalendarPage() {
               <div className="space-y-1.5">
                 <Label>Service</Label>
                 <Select
-                  value={editForm.service_id || undefined}
+                  value={editForm.service_id}
                   onValueChange={(v) => setEditForm((f) => ({ ...f, service_id: v ?? '' }))}
                   disabled={!canEdit(role)}
                 >
@@ -474,7 +474,7 @@ export default function CalendarPage() {
               <div className="space-y-1.5">
                 <Label>Staff</Label>
                 <Select
-                  value={editForm.staff_id || undefined}
+                  value={editForm.staff_id}
                   onValueChange={(v) => setEditForm((f) => ({ ...f, staff_id: v ?? '' }))}
                   disabled={!canEdit(role)}
                 >

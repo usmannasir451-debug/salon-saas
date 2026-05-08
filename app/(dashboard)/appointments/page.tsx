@@ -734,7 +734,7 @@ export default function AppointmentsPage() {
                 <div className="space-y-1.5">
                   <Label>Deal / Package <span className="text-gray-400 font-normal text-xs">(optional)</span></Label>
                   <Select
-                    value={form.deal_id || undefined}
+                    value={form.deal_id}
                     onValueChange={(v) => {
                       if (!v || v === 'none') { setForm({ ...form, deal_id: '', service_ids: [] }); return }
                       const deal = deals.find(d => d.id === v)
@@ -806,7 +806,7 @@ export default function AppointmentsPage() {
               <div className="space-y-1.5">
                 <Label>Staff Member</Label>
                 <Select
-                  value={form.staff_id || undefined}
+                  value={form.staff_id}
                   onValueChange={(v) => setForm({ ...form, staff_id: v ?? '' })}
                 >
                   <SelectTrigger className="h-9 w-full">
