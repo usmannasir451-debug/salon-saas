@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Sidebar from '@/components/Sidebar'
+import FloatingWalkIn from '@/components/FloatingWalkIn'
 import { RoleProvider, type UserCtx } from '@/components/RoleContext'
 import type { UserRole } from '@/lib/types'
 
@@ -53,6 +54,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
             Powered by SalonPro
           </footer>
         </div>
+        {/* Floating walk-in button on all pages */}
+        <FloatingWalkIn role={role} />
       </RoleProvider>
     </div>
   )

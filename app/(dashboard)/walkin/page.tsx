@@ -10,47 +10,26 @@ import type { DiscountType, DiscountReason, PaymentMethod, WalkIn, Service, Staf
 import FeedbackModal from '@/components/FeedbackModal'
 import InvoiceModal, { type InvoiceData } from '@/components/InvoiceModal'
 import {
-  Zap,
-  Plus,
-  Loader2,
-  Receipt,
-  X,
-  Printer,
-  CheckCircle2,
-  Clock,
-  FileText,
+  Zap, Plus, Loader2, Receipt, X, Printer, CheckCircle2, Clock, FileText,
+  Banknote, CreditCard, Smartphone, Wallet, User, Phone, Search, Star,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
-// ─── Helpers ───────────────────────────────────────────────────────────────────
-
-function formatCurrency(n: number, currency = 'USD') {
+function formatCurrency(n: number, currency = 'PKR') {
   return `${currency} ${Math.round(n).toLocaleString()}`
 }
 
-const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
-  { value: 'cash', label: 'Cash' },
-  { value: 'card', label: 'Card' },
-  { value: 'jazzcash', label: 'JazzCash' },
-  { value: 'easypaisa', label: 'EasyPaisa' },
+const PAYMENT_BUTTONS: { value: PaymentMethod; label: string; icon: React.ElementType; color: string }[] = [
+  { value: 'cash', label: 'Cash', icon: Banknote, color: 'bg-green-500 hover:bg-green-600' },
+  { value: 'card', label: 'Card', icon: CreditCard, color: 'bg-blue-500 hover:bg-blue-600' },
+  { value: 'jazzcash', label: 'JazzCash', icon: Smartphone, color: 'bg-red-500 hover:bg-red-600' },
+  { value: 'easypaisa', label: 'EasyPaisa', icon: Wallet, color: 'bg-emerald-600 hover:bg-emerald-700' },
 ]
 
 const DISCOUNT_REASONS: { value: DiscountReason; label: string }[] = [
@@ -61,21 +40,30 @@ const DISCOUNT_REASONS: { value: DiscountReason; label: string }[] = [
   { value: 'other', label: 'Other' },
 ]
 
+type ServiceItem = Pick<Service, 'id' | 'name' | 'price' | 'duration'>
+type StaffItem = Pick<StaffMember, 'id' | 'name'>
+
+type ClientProfile = {
+  name: string
+  loyalty_balance: number
+}
+
 const emptyForm = {
   client_name: '',
   client_phone: '',
-  service_id: '',
+  service_ids: [] as string[],
   staff_id: '',
   payment_method: 'cash' as PaymentMethod,
   discount_type: 'percentage' as DiscountType,
   discount_value: '',
   discount_reason: '' as DiscountReason | '',
+  loyalty_redeem: '',
   notes: '',
 }
 
-// ─── Receipt Component ──────────────────────────────────────────────────────────
-
-function ReceiptView({ walkin, currency, salonName }: { walkin: WalkIn; currency: string; salonName: string }) {
+function ReceiptView({ walkin, currency, salonName, serviceNames }: {
+  walkin: WalkIn; currency: string; salonName: string; serviceNames: string[]
+}) {
   return (
     <div id="walkin-receipt" className="bg-white rounded-xl border border-gray-200 p-6 font-mono text-sm max-w-xs mx-auto">
       <div className="text-center mb-4">
@@ -91,10 +79,10 @@ function ReceiptView({ walkin, currency, salonName }: { walkin: WalkIn; currency
             <span className="font-medium">{walkin.client_name}</span>
           </div>
         )}
-        {walkin.services && (
+        {serviceNames.length > 0 && (
           <div className="flex justify-between">
-            <span className="text-gray-500">Service</span>
-            <span className="font-medium">{walkin.services.name}</span>
+            <span className="text-gray-500">Services</span>
+            <span className="font-medium text-right max-w-[150px]">{serviceNames.join(', ')}</span>
           </div>
         )}
         {walkin.staff && (
@@ -116,8 +104,14 @@ function ReceiptView({ walkin, currency, salonName }: { walkin: WalkIn; currency
         </div>
         {walkin.discount_amount > 0 && (
           <div className="flex justify-between text-green-600">
-            <span>Discount ({walkin.discount_type === 'percentage' ? `${walkin.discount_value}%` : formatCurrency(walkin.discount_value, currency)})</span>
+            <span>Discount</span>
             <span>-{formatCurrency(walkin.discount_amount, currency)}</span>
+          </div>
+        )}
+        {(walkin.loyalty_redeemed ?? 0) > 0 && (
+          <div className="flex justify-between text-purple-600">
+            <span>Loyalty Redeemed</span>
+            <span>-{formatCurrency(walkin.loyalty_redeemed ?? 0, currency)}</span>
           </div>
         )}
         <div className="flex justify-between font-bold text-base border-t border-gray-200 pt-1 mt-1">
@@ -134,26 +128,31 @@ function ReceiptView({ walkin, currency, salonName }: { walkin: WalkIn; currency
   )
 }
 
-// ─── Main Component ────────────────────────────────────────────────────────────
-
 export default function WalkInPage() {
   const { role, ownerId } = useUserContext()
   const router = useRouter()
 
   const [walkIns, setWalkIns] = useState<WalkIn[]>([])
-  const [services, setServices] = useState<Pick<Service, 'id' | 'name' | 'price' | 'duration'>[]>([])
-  const [staffList, setStaffList] = useState<Pick<StaffMember, 'id' | 'name'>[]>([])
-  const [currency, setCurrency] = useState('USD')
+  const [services, setServices] = useState<ServiceItem[]>([])
+  const [staffList, setStaffList] = useState<StaffItem[]>([])
+  const [currency, setCurrency] = useState('PKR')
   const [salonName, setSalonName] = useState('')
   const [salonAddress, setSalonAddress] = useState('')
   const [taxPercentage, setTaxPercentage] = useState(0)
+  const [loyaltyEnabled, setLoyaltyEnabled] = useState(false)
+  const [loyaltyEarnPct, setLoyaltyEarnPct] = useState(10)
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [receiptWalkIn, setReceiptWalkIn] = useState<WalkIn | null>(null)
+  const [receiptServiceNames, setReceiptServiceNames] = useState<string[]>([])
   const [feedbackWalkIn, setFeedbackWalkIn] = useState<WalkIn | null>(null)
   const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(null)
   const [form, setForm] = useState(emptyForm)
+
+  // Client lookup by phone
+  const [clientProfile, setClientProfile] = useState<ClientProfile | null>(null)
+  const [lookingUp, setLookingUp] = useState(false)
 
   useEffect(() => {
     if (!['owner', 'regional_manager', 'manager', 'receptionist', 'cashier'].includes(role)) {
@@ -168,31 +167,58 @@ export default function WalkInPage() {
     const [walkRes, svcRes, staffRes, profileRes] = await Promise.all([
       supabase
         .from('walk_ins')
-        .select('*, services(id, name, price, duration), staff(id, name)')
+        .select('*, services(id, name, price, duration), staff(id, name), walk_in_services(services(id, name, price, duration))')
         .eq('user_id', ownerId)
         .order('created_at', { ascending: false })
         .limit(50),
       supabase.from('services').select('id, name, price, duration').eq('user_id', ownerId).order('name'),
-      supabase.from('staff').select('id, name').eq('user_id', ownerId).order('name'),
-      supabase.from('profiles').select('salon_currency, salon_name, salon_address, tax_percentage').eq('id', ownerId).single(),
+      supabase.from('staff').select('id, name').eq('user_id', ownerId).eq('is_active', true).order('name'),
+      supabase.from('profiles').select('salon_currency, salon_name, salon_address, tax_percentage, loyalty_enabled, loyalty_earn_pct').eq('id', ownerId).single(),
     ])
     setWalkIns((walkRes.data as unknown as WalkIn[]) ?? [])
-    setServices((svcRes.data ?? []) as Pick<Service, 'id' | 'name' | 'price' | 'duration'>[])
-    setStaffList((staffRes.data ?? []) as Pick<StaffMember, 'id' | 'name'>[])
+    setServices((svcRes.data ?? []) as ServiceItem[])
+    setStaffList((staffRes.data ?? []) as StaffItem[])
     setCurrency(profileRes.data?.salon_currency ?? 'PKR')
     setSalonName(profileRes.data?.salon_name ?? '')
     setSalonAddress(profileRes.data?.salon_address ?? '')
     setTaxPercentage(profileRes.data?.tax_percentage ?? 0)
+    setLoyaltyEnabled(profileRes.data?.loyalty_enabled ?? false)
+    setLoyaltyEarnPct(profileRes.data?.loyalty_earn_pct ?? 10)
     setLoading(false)
   }
 
-  // Discount calculation
-  const selectedService = useMemo(
-    () => services.find((s) => s.id === form.service_id),
-    [services, form.service_id]
+  async function lookupClient(phone: string) {
+    if (!phone || phone.length < 7) { setClientProfile(null); return }
+    setLookingUp(true)
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('clients')
+      .select('name, loyalty_balance')
+      .eq('user_id', ownerId)
+      .eq('phone', phone)
+      .single()
+    setClientProfile(data ? { name: data.name, loyalty_balance: data.loyalty_balance ?? 0 } : null)
+    if (data && !form.client_name) {
+      setForm(f => ({ ...f, client_name: data.name }))
+    }
+    setLookingUp(false)
+  }
+
+  function toggleService(id: string) {
+    setForm(f => ({
+      ...f,
+      service_ids: f.service_ids.includes(id)
+        ? f.service_ids.filter(sid => sid !== id)
+        : [...f.service_ids, id],
+    }))
+  }
+
+  const selectedServices = useMemo(
+    () => services.filter(s => form.service_ids.includes(s.id)),
+    [services, form.service_ids]
   )
 
-  const subtotal = useMemo(() => Number(selectedService?.price ?? 0), [selectedService])
+  const subtotal = useMemo(() => selectedServices.reduce((s, svc) => s + Number(svc.price), 0), [selectedServices])
 
   const discountAmount = useMemo(() => {
     const val = parseFloat(form.discount_value) || 0
@@ -200,12 +226,22 @@ export default function WalkInPage() {
     return Math.min(val, subtotal)
   }, [subtotal, form.discount_type, form.discount_value])
 
-  const total = Math.max(subtotal - discountAmount, 0)
+  const loyaltyRedeemAmount = useMemo(() => {
+    if (!loyaltyEnabled || !clientProfile) return 0
+    const redeem = parseFloat(form.loyalty_redeem) || 0
+    return Math.min(redeem, clientProfile.loyalty_balance, subtotal - discountAmount)
+  }, [loyaltyEnabled, clientProfile, form.loyalty_redeem, subtotal, discountAmount])
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!form.service_id) {
-      toast.error('Please select a service')
+  const total = Math.max(subtotal - discountAmount - loyaltyRedeemAmount, 0)
+
+  const loyaltyEarned = useMemo(() => {
+    if (!loyaltyEnabled) return 0
+    return Math.round((total * loyaltyEarnPct) / 100)
+  }, [loyaltyEnabled, total, loyaltyEarnPct])
+
+  async function handleSubmit(method: PaymentMethod) {
+    if (form.service_ids.length === 0) {
+      toast.error('Please select at least one service')
       return
     }
     setSubmitting(true)
@@ -217,14 +253,15 @@ export default function WalkInPage() {
         user_id: ownerId,
         client_name: form.client_name.trim() || null,
         client_phone: form.client_phone.trim() || null,
-        service_id: form.service_id,
+        service_id: form.service_ids[0] || null,
         staff_id: form.staff_id || null,
-        payment_method: form.payment_method,
+        payment_method: method,
         subtotal,
         discount_type: form.discount_value ? form.discount_type : null,
         discount_value: parseFloat(form.discount_value) || 0,
         discount_amount: discountAmount,
         discount_reason: form.discount_reason || null,
+        loyalty_redeemed: loyaltyRedeemAmount,
         total,
         payment_status: 'paid',
         notes: form.notes.trim() || null,
@@ -239,36 +276,85 @@ export default function WalkInPage() {
     }
 
     const walkinData = data as unknown as WalkIn
+
+    // Insert junction rows for multi-service
+    if (form.service_ids.length > 0) {
+      await supabase.from('walk_in_services').insert(
+        form.service_ids.map(sid => ({ walk_in_id: walkinData.id, service_id: sid, user_id: ownerId }))
+      )
+    }
+
+    // Loyalty: update client balance and log transaction
+    if (loyaltyEnabled && form.client_phone.trim()) {
+      const phone = form.client_phone.trim()
+      // Upsert client record
+      await supabase.from('clients').upsert(
+        { user_id: ownerId, phone, name: form.client_name.trim() || phone },
+        { onConflict: 'user_id,phone' }
+      )
+
+      const loyaltyUpdates: Promise<unknown>[] = []
+
+      if (loyaltyRedeemAmount > 0) {
+        loyaltyUpdates.push(
+          supabase.rpc('decrement_loyalty', { p_user_id: ownerId, p_phone: phone, p_amount: loyaltyRedeemAmount })
+            .then(() => supabase.from('loyalty_transactions').insert({
+              user_id: ownerId,
+              client_phone: phone,
+              client_name: form.client_name.trim() || null,
+              transaction_type: 'redeemed',
+              amount: loyaltyRedeemAmount,
+              reference_id: walkinData.id,
+              reference_type: 'walk_in',
+            }))
+        )
+      }
+
+      if (loyaltyEarned > 0) {
+        loyaltyUpdates.push(
+          supabase.from('clients').update({ loyalty_balance: (clientProfile?.loyalty_balance ?? 0) - loyaltyRedeemAmount + loyaltyEarned })
+            .eq('user_id', ownerId).eq('phone', phone)
+            .then(() => supabase.from('loyalty_transactions').insert({
+              user_id: ownerId,
+              client_phone: phone,
+              client_name: form.client_name.trim() || null,
+              transaction_type: 'earned',
+              amount: loyaltyEarned,
+              reference_id: walkinData.id,
+              reference_type: 'walk_in',
+            }))
+        )
+      }
+
+      await Promise.all(loyaltyUpdates)
+    }
+
     toast.success('Walk-in recorded!')
 
-    // Create notifications
-    const supabaseNotify = createClient()
-    const svc = services.find((s) => s.id === form.service_id)
-    await Promise.all([
-      supabaseNotify.from('notifications').insert({
+    void Promise.all([
+      supabase.from('notifications').insert({
         user_id: ownerId,
         type: 'payment_received',
         title: 'Payment Received',
-        message: `${form.client_name || 'Walk-in client'} paid ${formatCurrency(total, currency)} for ${svc?.name ?? 'service'}`,
+        message: `${form.client_name || 'Walk-in client'} paid ${formatCurrency(total, currency)} via ${method}`,
         link: '/walkin',
       }),
-      // Log audit
-      supabaseNotify.from('audit_log').insert({
+      supabase.from('audit_log').insert({
         user_id: ownerId,
-        actor_user_id: (await supabaseNotify.auth.getUser()).data.user?.id,
-        actor_email: (await supabaseNotify.auth.getUser()).data.user?.email,
         actor_role: role,
         action: 'payment_walkin',
         entity_type: 'walk_in',
         entity_id: walkinData.id,
-        details: { client: form.client_name, amount: total, payment: form.payment_method },
+        details: { client: form.client_name, amount: total, payment: method },
       }),
     ])
 
+    const svcNames = selectedServices.map(s => s.name)
+    setReceiptServiceNames(svcNames)
     setForm(emptyForm)
+    setClientProfile(null)
     setShowForm(false)
     setReceiptWalkIn(walkinData)
-    // Show feedback modal if staff was assigned
     if (walkinData.staff_id) setFeedbackWalkIn(walkinData)
     await loadData()
     setSubmitting(false)
@@ -282,6 +368,11 @@ export default function WalkInPage() {
     )
   }
 
+  const todayStr = format(new Date(), 'yyyy-MM-dd')
+  const todayWalkIns = walkIns.filter((w) => w.created_at.startsWith(todayStr))
+  const todayRevenue = todayWalkIns.reduce((s, w) => s + Number(w.total), 0)
+  const todayDiscounts = todayWalkIns.reduce((s, w) => s + Number(w.discount_amount), 0)
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-6">
       {/* Header */}
@@ -291,76 +382,105 @@ export default function WalkInPage() {
             <Zap className="w-6 h-6 text-primary" />
             Walk-Ins
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5">Quick walk-in service recording</p>
+          <p className="text-sm text-gray-500 mt-0.5">Quick POS — tap to select services, choose payment</p>
         </div>
-        <Button
-          onClick={() => setShowForm(true)}
-          className="bg-primary hover:bg-primary/90 gap-2"
-        >
+        <Button onClick={() => setShowForm(true)} className="bg-primary hover:bg-primary/90 gap-2 h-11 px-5">
           <Plus className="w-4 h-4" />
           New Walk-In
         </Button>
       </div>
 
-      {/* ── Walk-In Form Dialog ── */}
-      <Dialog open={showForm} onOpenChange={(o) => { if (!o) setShowForm(false) }}>
-        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+      {/* Walk-In Form Dialog */}
+      <Dialog open={showForm} onOpenChange={(o) => { if (!o) { setShowForm(false); setClientProfile(null) } }}>
+        <DialogContent className="sm:max-w-2xl max-h-[95vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Zap className="w-4 h-4 text-primary" />
-              New Walk-In
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <Zap className="w-5 h-5 text-primary" />
+              New Walk-In — POS
             </DialogTitle>
           </DialogHeader>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Client info */}
+          <div className="space-y-5">
+            {/* Client info row */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>Client Name <span className="text-gray-400 font-normal">(optional)</span></Label>
-                <Input
-                  value={form.client_name}
-                  onChange={(e) => setForm((f) => ({ ...f, client_name: e.target.value }))}
-                  placeholder="Guest"
-                  className="h-9"
-                />
+                <Label className="flex items-center gap-1"><Phone className="w-3.5 h-3.5" /> Phone</Label>
+                <div className="relative">
+                  <Input
+                    value={form.client_phone}
+                    onChange={(e) => {
+                      setForm(f => ({ ...f, client_phone: e.target.value }))
+                      lookupClient(e.target.value)
+                    }}
+                    placeholder="03001234567"
+                    className="h-10 pr-8"
+                  />
+                  {lookingUp && <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-gray-400" />}
+                </div>
+                {clientProfile && (
+                  <div className="flex items-center gap-2 bg-purple-50 border border-purple-200 rounded-lg px-2.5 py-1.5">
+                    <Star className="w-3.5 h-3.5 text-purple-500" />
+                    <span className="text-xs text-purple-700 font-medium">{clientProfile.name} · Loyalty: PKR {clientProfile.loyalty_balance.toLocaleString()}</span>
+                  </div>
+                )}
               </div>
               <div className="space-y-1.5">
-                <Label>Phone <span className="text-gray-400 font-normal">(optional)</span></Label>
+                <Label className="flex items-center gap-1"><User className="w-3.5 h-3.5" /> Client Name</Label>
                 <Input
-                  value={form.client_phone}
-                  onChange={(e) => setForm((f) => ({ ...f, client_phone: e.target.value }))}
-                  placeholder="+1 555..."
-                  className="h-9"
+                  value={form.client_name}
+                  onChange={(e) => setForm(f => ({ ...f, client_name: e.target.value }))}
+                  placeholder="Guest"
+                  className="h-10"
                 />
               </div>
             </div>
 
-            {/* Service */}
-            <div className="space-y-1.5">
-              <Label>Service *</Label>
-              <Select
-                value={form.service_id}
-                onValueChange={(v) => setForm((f) => ({ ...f, service_id: v ?? '' }))}
-              >
-                <SelectTrigger className="h-9"><SelectValue placeholder="Select service" /></SelectTrigger>
-                <SelectContent>
-                  {services.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.name} — {formatCurrency(s.price, currency)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            {/* Services grid */}
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold">Select Services *</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-64 overflow-y-auto">
+                {services.map((s) => {
+                  const selected = form.service_ids.includes(s.id)
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => toggleService(s.id)}
+                      className={`flex flex-col items-start p-3 rounded-xl text-left transition-all ${
+                        selected
+                          ? 'bg-primary text-white shadow-md ring-2 ring-primary/30'
+                          : 'bg-gray-50 border border-gray-200 hover:border-primary/40 hover:bg-primary/5'
+                      }`}
+                    >
+                      <span className="font-semibold text-sm truncate w-full">{s.name}</span>
+                      <span className={`text-xs mt-1 ${selected ? 'text-white/80' : 'text-gray-500'}`}>{s.duration} min</span>
+                      <span className={`text-sm font-bold mt-1 ${selected ? 'text-white' : 'text-primary'}`}>
+                        PKR {Number(s.price).toLocaleString()}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+              {form.service_ids.length > 0 && (
+                <div className="flex items-center justify-between bg-primary/5 rounded-xl px-4 py-2.5">
+                  <div className="flex flex-wrap gap-1">
+                    {selectedServices.map(s => (
+                      <span key={s.id} className="bg-primary/15 text-primary text-xs rounded-full px-2.5 py-0.5 font-medium">{s.name}</span>
+                    ))}
+                  </div>
+                  <div className="text-right flex-shrink-0 ml-2">
+                    <p className="text-xs text-gray-500">{selectedServices.reduce((s, svc) => s + svc.duration, 0)} min</p>
+                    <p className="font-bold text-primary">PKR {subtotal.toLocaleString()}</p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Staff */}
             <div className="space-y-1.5">
-              <Label>Staff <span className="text-gray-400 font-normal">(optional)</span></Label>
-              <Select
-                value={form.staff_id}
-                onValueChange={(v) => setForm((f) => ({ ...f, staff_id: v ?? '' }))}
-              >
-                <SelectTrigger className="h-9"><SelectValue placeholder="Select staff member" /></SelectTrigger>
+              <Label>Staff <span className="text-gray-400 font-normal text-xs">(optional)</span></Label>
+              <Select value={form.staff_id} onValueChange={(v) => setForm(f => ({ ...f, staff_id: v ?? '' }))}>
+                <SelectTrigger className="h-10"><SelectValue placeholder="Select staff member" /></SelectTrigger>
                 <SelectContent>
                   {staffList.map((s) => (
                     <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
@@ -369,71 +489,64 @@ export default function WalkInPage() {
               </Select>
             </div>
 
-            {/* Payment method */}
-            <div className="space-y-1.5">
-              <Label>Payment Method</Label>
-              <Select
-                value={form.payment_method}
-                onValueChange={(v) => setForm((f) => ({ ...f, payment_method: (v ?? 'cash') as PaymentMethod }))}
-              >
-                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {PAYMENT_METHODS.map((p) => (
-                    <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
             {/* Discount */}
             <div className="rounded-xl bg-gray-50 border border-gray-100 p-4 space-y-3">
-              <p className="text-sm font-semibold text-gray-700">Discount (optional)</p>
+              <p className="text-sm font-semibold text-gray-700">Discount <span className="text-xs font-normal text-gray-400">(optional)</span></p>
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label>Type</Label>
-                  <Select
-                    value={form.discount_type}
-                    onValueChange={(v) => setForm((f) => ({ ...f, discount_type: (v ?? 'percentage') as DiscountType }))}
-                  >
-                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="percentage">Percentage (%)</SelectItem>
-                      <SelectItem value="fixed">Fixed Amount</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Value</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    max={form.discount_type === 'percentage' ? '100' : undefined}
-                    value={form.discount_value}
-                    onChange={(e) => setForm((f) => ({ ...f, discount_value: e.target.value }))}
-                    placeholder={form.discount_type === 'percentage' ? '0%' : '0.00'}
-                    className="h-9"
-                  />
-                </div>
+                <Select value={form.discount_type} onValueChange={(v) => setForm(f => ({ ...f, discount_type: (v ?? 'percentage') as DiscountType }))}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="percentage">Percentage (%)</SelectItem>
+                    <SelectItem value="fixed">Fixed Amount</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input
+                  type="number" min="0"
+                  max={form.discount_type === 'percentage' ? '100' : undefined}
+                  value={form.discount_value}
+                  onChange={(e) => setForm(f => ({ ...f, discount_value: e.target.value }))}
+                  placeholder={form.discount_type === 'percentage' ? '0%' : '0.00'}
+                  className="h-9"
+                />
               </div>
               {form.discount_value && (
-                <div className="space-y-1.5">
-                  <Label>Discount Reason</Label>
-                  <Select
-                    value={form.discount_reason}
-                    onValueChange={(v) => setForm((f) => ({ ...f, discount_reason: (v ?? '') as DiscountReason | '' }))}
-                  >
-                    <SelectTrigger className="h-9"><SelectValue placeholder="Select reason" /></SelectTrigger>
-                    <SelectContent>
-                      {DISCOUNT_REASONS.map((r) => (
-                        <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <Select value={form.discount_reason} onValueChange={(v) => setForm(f => ({ ...f, discount_reason: (v ?? '') as DiscountReason | '' }))}>
+                  <SelectTrigger className="h-9"><SelectValue placeholder="Discount reason" /></SelectTrigger>
+                  <SelectContent>
+                    {DISCOUNT_REASONS.map(r => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               )}
             </div>
 
-            {/* Bill summary */}
+            {/* Loyalty redemption */}
+            {loyaltyEnabled && clientProfile && clientProfile.loyalty_balance > 0 && (
+              <div className="rounded-xl bg-purple-50 border border-purple-200 p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-purple-800">Loyalty Points</p>
+                  <span className="text-sm font-bold text-purple-700">Balance: PKR {clientProfile.loyalty_balance.toLocaleString()}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number" min="0" max={clientProfile.loyalty_balance}
+                    value={form.loyalty_redeem}
+                    onChange={(e) => setForm(f => ({ ...f, loyalty_redeem: e.target.value }))}
+                    placeholder="Amount to redeem"
+                    className="h-9 flex-1"
+                  />
+                  <Button type="button" size="sm" variant="outline"
+                    onClick={() => setForm(f => ({ ...f, loyalty_redeem: String(Math.min(clientProfile.loyalty_balance, subtotal - discountAmount)) }))}
+                    className="border-purple-300 text-purple-700 hover:bg-purple-100 text-xs">
+                    Max
+                  </Button>
+                </div>
+                {loyaltyRedeemAmount > 0 && (
+                  <p className="text-xs text-purple-600">Redeeming PKR {loyaltyRedeemAmount.toLocaleString()} from loyalty points</p>
+                )}
+              </div>
+            )}
+
+            {/* Bill Summary — always visible */}
             <div className="rounded-xl bg-primary/5 border border-primary/20 p-4 space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Subtotal</span>
@@ -445,37 +558,61 @@ export default function WalkInPage() {
                   <span>-{formatCurrency(discountAmount, currency)}</span>
                 </div>
               )}
-              <div className="flex justify-between font-bold text-base border-t border-primary/20 pt-2 mt-1">
-                <span className="text-gray-900">Total Payable</span>
+              {loyaltyRedeemAmount > 0 && (
+                <div className="flex justify-between text-sm text-purple-600">
+                  <span>Loyalty Redeemed</span>
+                  <span>-{formatCurrency(loyaltyRedeemAmount, currency)}</span>
+                </div>
+              )}
+              <div className="flex justify-between font-bold text-xl border-t border-primary/20 pt-2 mt-1">
+                <span className="text-gray-900">Total</span>
                 <span className="text-primary">{formatCurrency(total, currency)}</span>
+              </div>
+              {loyaltyEnabled && loyaltyEarned > 0 && (
+                <p className="text-xs text-purple-600 text-right">+PKR {loyaltyEarned.toLocaleString()} loyalty earned</p>
+              )}
+            </div>
+
+            {/* ONE-CLICK PAYMENT BUTTONS */}
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold">Pay & Complete</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {PAYMENT_BUTTONS.map(({ value, label, icon: Icon, color }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    disabled={submitting || form.service_ids.length === 0}
+                    onClick={() => handleSubmit(value)}
+                    className={`flex flex-col items-center justify-center gap-2 py-4 px-3 rounded-xl text-white font-semibold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed ${color} shadow-sm`}
+                  >
+                    {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Icon className="w-5 h-5" />}
+                    <span>{label}</span>
+                  </button>
+                ))}
               </div>
             </div>
 
             {/* Notes */}
             <div className="space-y-1.5">
-              <Label>Notes <span className="text-gray-400 font-normal">(optional)</span></Label>
+              <Label>Notes <span className="text-gray-400 font-normal text-xs">(optional)</span></Label>
               <Input
                 value={form.notes}
-                onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                onChange={(e) => setForm(f => ({ ...f, notes: e.target.value }))}
                 placeholder="Any special notes..."
                 className="h-9"
               />
             </div>
 
-            <DialogFooter>
-              <Button type="button" variant="outline" size="sm" onClick={() => setShowForm(false)}>
+            <div className="flex justify-end">
+              <Button type="button" variant="outline" onClick={() => { setShowForm(false); setClientProfile(null) }}>
                 <X className="w-4 h-4 mr-1" /> Cancel
               </Button>
-              <Button type="submit" size="sm" disabled={submitting} className="bg-primary hover:bg-primary/90 gap-2">
-                {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                {submitting ? 'Processing...' : `Mark Paid — ${formatCurrency(total, currency)}`}
-              </Button>
-            </DialogFooter>
-          </form>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
-      {/* ── Receipt Dialog ── */}
+      {/* Receipt Dialog */}
       <Dialog open={!!receiptWalkIn} onOpenChange={(o) => { if (!o) setReceiptWalkIn(null) }}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
@@ -485,48 +622,39 @@ export default function WalkInPage() {
             </DialogTitle>
           </DialogHeader>
           {receiptWalkIn && (
-            <ReceiptView walkin={receiptWalkIn} currency={currency} salonName={salonName} />
+            <ReceiptView walkin={receiptWalkIn} currency={currency} salonName={salonName} serviceNames={receiptServiceNames} />
           )}
           <DialogFooter>
             <Button variant="outline" size="sm" onClick={() => window.print()} className="gap-2">
-              <Printer className="w-4 h-4" />
-              Print
+              <Printer className="w-4 h-4" /> Print
             </Button>
-            <Button size="sm" className="bg-primary hover:bg-primary/90" onClick={() => setReceiptWalkIn(null)}>
-              Done
-            </Button>
+            <Button size="sm" className="bg-primary hover:bg-primary/90" onClick={() => setReceiptWalkIn(null)}>Done</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* ── Today's Walk-In Stats ── */}
-      {(() => {
-        const todayStr = format(new Date(), 'yyyy-MM-dd')
-        const todayWalkIns = walkIns.filter((w) => w.created_at.startsWith(todayStr))
-        const todayRevenue = todayWalkIns.reduce((s, w) => s + Number(w.total), 0)
-        const todayDiscounts = todayWalkIns.reduce((s, w) => s + Number(w.discount_amount), 0)
-        return todayWalkIns.length > 0 ? (
-          <div className="grid grid-cols-3 gap-4">
-            {[
-              { label: "Today's Walk-Ins", value: todayWalkIns.length, color: 'text-primary', bg: 'bg-primary/10' },
-              { label: 'Revenue', value: formatCurrency(todayRevenue, currency), color: 'text-green-600', bg: 'bg-green-50' },
-              { label: 'Discounts', value: formatCurrency(todayDiscounts, currency), color: 'text-orange-600', bg: 'bg-orange-50' },
-            ].map((s) => (
-              <Card key={s.label} className="border-gray-100">
-                <CardContent className="pt-4 pb-3">
-                  <div className={`w-8 h-8 rounded-lg ${s.bg} flex items-center justify-center mb-2`}>
-                    <Zap className={`w-4 h-4 ${s.color}`} />
-                  </div>
-                  <p className={`text-lg font-bold ${s.color}`}>{s.value}</p>
-                  <p className="text-xs text-gray-500">{s.label}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : null
-      })()}
+      {/* Today's Stats */}
+      {todayWalkIns.length > 0 && (
+        <div className="grid grid-cols-3 gap-4">
+          {[
+            { label: "Today's Walk-Ins", value: todayWalkIns.length, color: 'text-primary', bg: 'bg-primary/10' },
+            { label: 'Revenue', value: formatCurrency(todayRevenue, currency), color: 'text-green-600', bg: 'bg-green-50' },
+            { label: 'Discounts', value: formatCurrency(todayDiscounts, currency), color: 'text-orange-600', bg: 'bg-orange-50' },
+          ].map((s) => (
+            <Card key={s.label} className="border-gray-100">
+              <CardContent className="pt-4 pb-3">
+                <div className={`w-8 h-8 rounded-lg ${s.bg} flex items-center justify-center mb-2`}>
+                  <Zap className={`w-4 h-4 ${s.color}`} />
+                </div>
+                <p className={`text-lg font-bold ${s.color}`}>{s.value}</p>
+                <p className="text-xs text-gray-500">{s.label}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
-      {/* ── Walk-Ins List ── */}
+      {/* Walk-Ins List */}
       <Card className="border-gray-100">
         <CardHeader className="pb-3 border-b border-gray-50">
           <div className="flex items-center justify-between">
@@ -543,81 +671,71 @@ export default function WalkInPage() {
             </div>
           ) : (
             <div className="space-y-2">
-              {walkIns.map((w) => (
-                <div key={w.id} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 hover:bg-gray-100/80 transition-colors">
-                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-                    <Zap className="w-4 h-4 text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-semibold text-gray-900">{w.client_name || 'Guest'}</p>
-                      {w.services && (
-                        <>
-                          <span className="text-gray-300">·</span>
-                          <p className="text-sm text-gray-600 truncate">{w.services.name}</p>
-                        </>
-                      )}
+              {walkIns.map((w) => {
+                const svcList = (w.walk_in_services && w.walk_in_services.length > 0)
+                  ? w.walk_in_services.map(ws => ws.services?.name).filter(Boolean)
+                  : w.services ? [w.services.name] : []
+                return (
+                  <div key={w.id} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 hover:bg-gray-100/80 transition-colors">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <Zap className="w-4 h-4 text-primary" />
                     </div>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <Clock className="w-3 h-3 text-gray-400" />
-                      <span className="text-xs text-gray-400">
-                        {format(new Date(w.created_at), 'MMM d, h:mm a')}
-                      </span>
-                      {w.staff && (
-                        <>
-                          <span className="text-gray-300">·</span>
-                          <span className="text-xs text-gray-400">{w.staff.name}</span>
-                        </>
-                      )}
-                      <span className="text-gray-300">·</span>
-                      <span className="text-xs text-gray-500 capitalize">{w.payment_method}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-semibold text-gray-900">{w.client_name || 'Guest'}</p>
+                        {svcList.length > 0 && (
+                          <>
+                            <span className="text-gray-300">·</span>
+                            <p className="text-sm text-gray-600 truncate">{svcList.join(', ')}</p>
+                          </>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <Clock className="w-3 h-3 text-gray-400" />
+                        <span className="text-xs text-gray-400">{format(new Date(w.created_at), 'MMM d, h:mm a')}</span>
+                        {w.staff && <><span className="text-gray-300">·</span><span className="text-xs text-gray-400">{w.staff.name}</span></>}
+                        <span className="text-gray-300">·</span>
+                        <span className="text-xs text-gray-500 capitalize">{w.payment_method}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {w.discount_amount > 0 && <span className="text-xs text-green-600">-{formatCurrency(w.discount_amount, currency)}</span>}
+                      <span className="font-bold text-sm text-primary">{formatCurrency(w.total, currency)}</span>
+                      <Badge className="text-xs bg-green-50 text-green-700 border-green-200">Paid</Badge>
+                      <button onClick={() => { setReceiptServiceNames(svcList as string[]); setReceiptWalkIn(w) }}
+                        className="p-1.5 rounded-lg hover:bg-white text-gray-400 hover:text-primary transition-colors" title="Receipt">
+                        <Receipt className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => setInvoiceData({
+                          id: w.id,
+                          invoiceType: 'walkin',
+                          salonName,
+                          salonAddress,
+                          clientName: w.client_name ?? undefined,
+                          clientPhone: w.client_phone ?? undefined,
+                          staffName: w.staff?.name ?? undefined,
+                          serviceName: svcList.join(', ') || undefined,
+                          date: w.created_at.slice(0, 10),
+                          subtotal: w.subtotal,
+                          discountAmount: w.discount_amount,
+                          taxPercentage,
+                          total: w.total,
+                          paymentMethod: w.payment_method,
+                          currency,
+                        })}
+                        className="p-1.5 rounded-lg hover:bg-white text-gray-400 hover:text-blue-600 transition-colors" title="Invoice">
+                        <FileText className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {w.discount_amount > 0 && (
-                      <span className="text-xs text-green-600">-{formatCurrency(w.discount_amount, currency)}</span>
-                    )}
-                    <span className="font-bold text-sm text-primary">{formatCurrency(w.total, currency)}</span>
-                    <Badge className="text-xs bg-green-50 text-green-700 border-green-200">Paid</Badge>
-                    <button
-                      onClick={() => setReceiptWalkIn(w)}
-                      className="p-1.5 rounded-lg hover:bg-white text-gray-400 hover:text-primary transition-colors"
-                      title="View receipt"
-                    >
-                      <Receipt className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => setInvoiceData({
-                        id: w.id,
-                        invoiceType: 'walkin',
-                        salonName,
-                        salonAddress,
-                        clientName: w.client_name ?? undefined,
-                        clientPhone: w.client_phone ?? undefined,
-                        staffName: w.staff?.name ?? undefined,
-                        serviceName: w.services?.name ?? undefined,
-                        date: w.created_at.slice(0, 10),
-                        subtotal: w.subtotal,
-                        discountAmount: w.discount_amount,
-                        taxPercentage,
-                        total: w.total,
-                        paymentMethod: w.payment_method,
-                        currency,
-                      })}
-                      className="p-1.5 rounded-lg hover:bg-white text-gray-400 hover:text-blue-600 transition-colors"
-                      title="Invoice"
-                    >
-                      <FileText className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Feedback Modal */}
       <FeedbackModal
         open={!!feedbackWalkIn}
         onClose={() => setFeedbackWalkIn(null)}
@@ -628,12 +746,7 @@ export default function WalkInPage() {
         walkInId={feedbackWalkIn?.id}
       />
 
-      {/* Invoice Modal */}
-      <InvoiceModal
-        open={!!invoiceData}
-        onClose={() => setInvoiceData(null)}
-        data={invoiceData}
-      />
+      <InvoiceModal open={!!invoiceData} onClose={() => setInvoiceData(null)} data={invoiceData} />
     </div>
   )
 }

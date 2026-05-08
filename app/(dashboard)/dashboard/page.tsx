@@ -483,12 +483,6 @@ export default function DashboardPage() {
           <p className="text-gray-500 text-sm">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Link href="/walkin">
-            <Button variant="outline" className="gap-2 border-primary/30 text-primary hover:bg-primary/5">
-              <Zap className="w-4 h-4" />
-              <span className="hidden sm:inline">New Walk-In</span>
-            </Button>
-          </Link>
           <Button onClick={downloadPDF} disabled={pdfLoading} variant="outline"
             className="gap-2 border-primary/30 text-primary hover:bg-primary/5 flex-shrink-0">
             {pdfLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
@@ -497,6 +491,27 @@ export default function DashboardPage() {
           </Button>
         </div>
       </div>
+
+      {/* ── PROMINENT WALK-IN BANNER ── */}
+      <Link href="/walkin">
+        <div className="relative overflow-hidden bg-gradient-to-r from-primary to-rose-400 rounded-2xl p-5 sm:p-6 flex items-center gap-5 shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all group cursor-pointer">
+          <div className="w-14 h-14 sm:w-16 sm:h-16 bg-white/20 rounded-2xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+            <Zap className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-lg sm:text-xl font-bold text-white">New Walk-In</h2>
+            <p className="text-white/80 text-sm mt-0.5">Quick POS — select services, collect payment instantly</p>
+            <div className="flex gap-2 mt-2">
+              {['Cash', 'Card', 'JazzCash', 'EasyPaisa'].map(m => (
+                <span key={m} className="bg-white/20 text-white text-xs rounded-full px-2.5 py-0.5 font-medium">{m}</span>
+              ))}
+            </div>
+          </div>
+          <div className="hidden sm:flex text-white/60 group-hover:text-white transition-colors flex-shrink-0">
+            <CheckCircle2 className="w-6 h-6" />
+          </div>
+        </div>
+      </Link>
 
       {/* Low inventory alert */}
       {lowStockItems.length > 0 && (

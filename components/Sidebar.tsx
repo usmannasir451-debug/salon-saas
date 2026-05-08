@@ -87,27 +87,30 @@ export default function Sidebar({ salonName, salonLogoUrl, userEmail, role = 'ow
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
-      {/* Brand / Logo */}
-      <div className="px-4 py-5 border-b border-gray-100">
-        <Link
-          href={navItems[0]?.href ?? '/appointments'}
-          className="flex items-center gap-2.5 group"
-          onClick={() => setMobileOpen(false)}
-        >
-          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center shadow-sm shadow-primary/30 flex-shrink-0 overflow-hidden">
-            {salonLogoUrl ? (
-              <Image src={salonLogoUrl} alt="Salon logo" width={32} height={32} className="object-cover w-full h-full" unoptimized />
-            ) : (
-              <Scissors className="w-4 h-4 text-white" />
-            )}
-          </div>
-          <div className="overflow-hidden">
-            <p className="font-bold text-sm text-gray-900 leading-tight truncate">
-              {salonName || 'My Salon'}
-            </p>
-            <p className="text-[10px] text-primary font-medium leading-tight">SalonPro</p>
-          </div>
-        </Link>
+      {/* Brand / Logo + Notification Bell */}
+      <div className="px-4 py-4 border-b border-gray-100">
+        <div className="flex items-center justify-between">
+          <Link
+            href={navItems[0]?.href ?? '/appointments'}
+            className="flex items-center gap-2.5 group"
+            onClick={() => setMobileOpen(false)}
+          >
+            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center shadow-sm shadow-primary/30 flex-shrink-0 overflow-hidden">
+              {salonLogoUrl ? (
+                <Image src={salonLogoUrl} alt="Salon logo" width={32} height={32} className="object-cover w-full h-full" unoptimized />
+              ) : (
+                <Scissors className="w-4 h-4 text-white" />
+              )}
+            </div>
+            <div className="overflow-hidden">
+              <p className="font-bold text-sm text-gray-900 leading-tight truncate">
+                {salonName || 'My Salon'}
+              </p>
+              <p className="text-[10px] text-primary font-medium leading-tight">SalonPro</p>
+            </div>
+          </Link>
+          {ownerId && <NotificationBell ownerId={ownerId} />}
+        </div>
       </div>
 
       {/* Navigation */}
@@ -138,12 +141,7 @@ export default function Sidebar({ salonName, salonLogoUrl, userEmail, role = 'ow
 
       {/* User section */}
       <div className="px-4 py-4 space-y-3">
-        {ownerId && (
-          <div className="flex items-center justify-between px-1">
-            <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Notifications</p>
-            <NotificationBell ownerId={ownerId} />
-          </div>
-        )}
+        {/* Notifications row removed from here — bell is in top header */}
         <div className="flex items-center gap-3 px-1">
           <div className="w-8 h-8 bg-primary/20 flex items-center justify-center rounded-full flex-shrink-0 overflow-hidden">
             {salonLogoUrl ? (

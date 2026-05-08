@@ -5,7 +5,7 @@ import { format } from 'date-fns'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { useUserContext } from '@/components/RoleContext'
-import type { InventoryItem, InventoryCategory, StockAdjustment } from '@/lib/types'
+import type { InventoryItem, StockAdjustment } from '@/lib/types'
 import {
   Package, Plus, Pencil, Trash2, Loader2, AlertTriangle, ArrowUpDown, CheckCircle2,
 } from 'lucide-react'
@@ -18,7 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
-const INVENTORY_CATEGORIES: { value: InventoryCategory; label: string }[] = [
+const PRESET_CATEGORIES: { value: string; label: string }[] = [
   { value: 'hair_products', label: 'Hair Products' },
   { value: 'skin_products', label: 'Skin Products' },
   { value: 'tools', label: 'Tools' },
@@ -32,11 +32,9 @@ function formatCurrency(n: number, currency = 'USD') {
   return `${currency} ${Math.round(n).toLocaleString()}`
 }
 
-const catMap = Object.fromEntries(INVENTORY_CATEGORIES.map(c => [c.value, c.label]))
-
 const emptyItemForm = {
   name: '',
-  category: '' as InventoryCategory | '',
+  category: '',
   quantity: '',
   unit: 'pcs',
   reorder_level: '',
@@ -50,6 +48,7 @@ export default function InventoryPage() {
   const { ownerId } = useUserContext()
 
   const [items, setItems] = useState<InventoryItem[]>([])
+  const [customCategories, setCustomCategories] = useState<string[]>([])
   const [currency, setCurrency] = useState('USD')
   const [loading, setLoading] = useState(true)
   const [deleting, setDeleting] = useState<string | null>(null)
@@ -58,6 +57,8 @@ export default function InventoryPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [itemForm, setItemForm] = useState(emptyItemForm)
   const [saving, setSaving] = useState(false)
+  const [showCustomCatInput, setShowCustomCatInput] = useState(false)
+  const [newCustomCat, setNewCustomCat] = useState('')
 
   const [adjDialogOpen, setAdjDialogOpen] = useState(false)
   const [adjItem, setAdjItem] = useState<InventoryItem | null>(null)
@@ -68,16 +69,26 @@ export default function InventoryPage() {
 
   useEffect(() => { loadAll() }, [ownerId]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Build category label map from presets + custom
+  const allCategories = useMemo(() => [
+    ...PRESET_CATEGORIES,
+    ...customCategories.map(c => ({ value: c, label: c })),
+  ], [customCategories])
+
+  const catMap = useMemo(() => Object.fromEntries(allCategories.map(c => [c.value, c.label])), [allCategories])
+
   async function loadAll() {
     setLoading(true)
     const supabase = createClient()
-    const [profileRes, itemsRes, adjRes] = await Promise.all([
+    const [profileRes, itemsRes, adjRes, customCatRes] = await Promise.all([
       supabase.from('profiles').select('salon_currency').eq('id', ownerId).single(),
       supabase.from('inventory_items').select('*').eq('user_id', ownerId).order('name'),
       supabase.from('stock_adjustments').select('*').eq('user_id', ownerId)
         .order('created_at', { ascending: false }).limit(100),
+      supabase.from('custom_inventory_categories').select('name').eq('user_id', ownerId).order('name'),
     ])
     setCurrency(profileRes.data?.salon_currency ?? 'USD')
+    setCustomCategories((customCatRes.data ?? []).map((c: { name: string }) => c.name))
     setItems((itemsRes.data as InventoryItem[]) ?? [])
     setAdjustments((adjRes.data as StockAdjustment[]) ?? [])
     setLoading(false)
@@ -86,6 +97,8 @@ export default function InventoryPage() {
   function openCreate() {
     setEditingId(null)
     setItemForm(emptyItemForm)
+    setShowCustomCatInput(false)
+    setNewCustomCat('')
     setItemDialogOpen(true)
   }
 
@@ -100,7 +113,23 @@ export default function InventoryPage() {
       cost_price: String(item.cost_price),
       supplier: item.supplier ?? '',
     })
+    setShowCustomCatInput(false)
+    setNewCustomCat('')
     setItemDialogOpen(true)
+  }
+
+  async function handleAddCustomCategory() {
+    if (!newCustomCat.trim()) return
+    const cat = newCustomCat.trim()
+    const supabase = createClient()
+    const { error } = await supabase.from('custom_inventory_categories').insert({ user_id: ownerId, name: cat })
+    if (error && !error.message.includes('duplicate')) {
+      toast.error(error.message); return
+    }
+    setCustomCategories(prev => prev.includes(cat) ? prev : [...prev, cat].sort())
+    setItemForm(f => ({ ...f, category: cat }))
+    setShowCustomCatInput(false)
+    setNewCustomCat('')
   }
 
   async function handleItemSave(e: React.FormEvent) {
@@ -114,7 +143,7 @@ export default function InventoryPage() {
     const payload = {
       user_id: ownerId,
       name: itemForm.name.trim(),
-      category: itemForm.category as InventoryCategory,
+      category: itemForm.category,
       quantity: parseFloat(itemForm.quantity),
       unit: itemForm.unit,
       reorder_level: parseFloat(itemForm.reorder_level || '0'),
@@ -369,14 +398,33 @@ export default function InventoryPage() {
             </div>
             <div className="space-y-1.5">
               <Label>Category *</Label>
-              <Select value={itemForm.category} onValueChange={v => setItemForm(f => ({ ...f, category: v as InventoryCategory }))}>
-                <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
-                <SelectContent>
-                  {INVENTORY_CATEGORIES.map(c => (
-                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {showCustomCatInput ? (
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="e.g. Nail Products"
+                    value={newCustomCat}
+                    onChange={e => setNewCustomCat(e.target.value)}
+                    className="h-9 flex-1"
+                    autoFocus
+                    onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddCustomCategory())}
+                  />
+                  <Button type="button" size="sm" onClick={handleAddCustomCategory} className="bg-primary hover:bg-primary/90">Add</Button>
+                  <Button type="button" size="sm" variant="outline" onClick={() => setShowCustomCatInput(false)}>Cancel</Button>
+                </div>
+              ) : (
+                <Select value={itemForm.category} onValueChange={v => {
+                  if (v === '__custom__') { setShowCustomCatInput(true) }
+                  else setItemForm(f => ({ ...f, category: v }))
+                }}>
+                  <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                  <SelectContent>
+                    {allCategories.map(c => (
+                      <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                    ))}
+                    <SelectItem value="__custom__" className="text-primary font-medium">+ Add Custom Category</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">

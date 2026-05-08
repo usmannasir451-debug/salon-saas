@@ -19,6 +19,14 @@ export type StaffMember = {
   name: string
   phone: string
   linked_user_id?: string | null
+  joining_date?: string | null
+  gender?: 'male' | 'female' | 'other' | null
+  designation?: string | null
+  emergency_contact_name?: string | null
+  emergency_contact_phone?: string | null
+  cnic?: string | null
+  basic_salary?: number | null
+  is_active: boolean
   created_at: string
 }
 
@@ -32,6 +40,7 @@ export type Appointment = {
   service_id: string
   staff_id: string
   branch_id?: string
+  deal_id?: string | null
   appointment_date: string
   appointment_time: string
   status: AppointmentStatus
@@ -44,6 +53,7 @@ export type Appointment = {
   created_at: string
   services?: Service
   staff?: StaffMember
+  appointment_services?: { services: Service }[]
 }
 
 export type Profile = {
@@ -61,6 +71,10 @@ export type Profile = {
   max_discount_owner?: number
   max_discount_manager?: number
   max_discount_cashier?: number
+  tax_percentage?: number
+  loyalty_enabled?: boolean
+  loyalty_earn_pct?: number
+  loyalty_expiry_days?: number | null
   created_at: string
 }
 
@@ -94,18 +108,21 @@ export type WalkIn = {
   service_id?: string
   staff_id?: string
   branch_id?: string
+  deal_id?: string | null
   payment_method: PaymentMethod
   subtotal: number
   discount_type?: DiscountType
   discount_value: number
   discount_amount: number
   discount_reason?: DiscountReason
+  loyalty_redeemed?: number
   total: number
   payment_status: 'unpaid' | 'paid'
   notes?: string
   created_at: string
   services?: Service
   staff?: StaffMember
+  walk_in_services?: { services: Service }[]
 }
 
 export type ExpenseCategory =
@@ -130,18 +147,11 @@ export type Expense = {
   created_at: string
 }
 
-export type InventoryCategory =
-  | 'hair_products'
-  | 'skin_products'
-  | 'tools'
-  | 'equipment'
-  | 'consumables'
-
 export type InventoryItem = {
   id: string
   user_id: string
   name: string
-  category: InventoryCategory
+  category: string
   quantity: number
   unit: string
   reorder_level: number
@@ -182,10 +192,44 @@ export type PayrollEntry = {
   revenue_generated: number
   commission_earned: number
   total_payable: number
+  prorata_pct?: number | null
+  prorata_detail?: string | null
   is_paid: boolean
   paid_date?: string
   paid_method?: string
   notes?: string
   created_at: string
   staff?: StaffMember
+}
+
+export type Deal = {
+  id: string
+  user_id: string
+  name: string
+  description?: string | null
+  price: number
+  validity_days?: number | null
+  is_active: boolean
+  created_at: string
+  deal_services?: { services: Service }[]
+}
+
+export type LoyaltyTransaction = {
+  id: string
+  user_id: string
+  client_phone: string
+  client_name?: string | null
+  transaction_type: 'earned' | 'redeemed'
+  amount: number
+  reference_id?: string | null
+  reference_type?: 'appointment' | 'walk_in' | null
+  notes?: string | null
+  created_at: string
+}
+
+export type CustomInventoryCategory = {
+  id: string
+  user_id: string
+  name: string
+  created_at: string
 }

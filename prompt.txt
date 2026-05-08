@@ -1,51 +1,78 @@
-You are an expert SaaS developer building "SalonPro" - a world-class white-label salon management platform. This is an existing Next.js + Supabase project. Continue building these final features:
+You are an expert SaaS developer working on "SalonPro". Fix and improve the following issues in the existing codebase:
 
-PART 13 - STAFF PERFORMANCE (/staff/performance)
-- Table: name, total appointments, walk-ins, revenue, avg rating, total reviews
-- Detailed staff profile with monthly trend charts
-- Performance badges: Top Performer, Most Booked, Highest Rated
-- Commission earned this month
+PART 1 - MULTIPLE SERVICES SELECTION
+- In appointments booking form: replace single service dropdown with multi-select component where user can select multiple services for one appointment
+- In walk-in form: same multi-select for services
+- When multiple services selected: auto-calculate total price (sum of all selected services) and total duration (sum of all durations)
+- Display selected services as clean tags/badges showing service name and price, not codes or IDs
+- In appointments list and calendar view: show all service names properly, not codes
 
-PART 14 - FEEDBACK & REVIEWS
-- After appointment or walk-in marked Done, feedback modal appears for cashier
-- Star rating 1-5 for staff, optional comment
-- Staff profile shows avg rating and all reviews
-- Dashboard shows overall salon avg rating
-- Owner sees all reviews at /reviews
+PART 2 - FIX SERVICE AND STAFF DISPLAY BUG
+- When selecting service in appointment form, it currently shows a code/ID after selection instead of the service name - fix this so it always shows the human-readable name
+- Same fix for Staff Member field - show staff name not ID/code after selection
+- Check all dropdowns and selects throughout the app and ensure they display proper names everywhere
 
-PART 15 - CLIENT MANAGEMENT (/clients)
-- Client profiles: visit history, total spend, favorite service, last visit, avg bill
-- Auto segments: VIP, Regular, New, Inactive
-- Birthday field with dashboard reminder
-- WhatsApp quick message button
+PART 3 - WALK-IN PROMINENCE & USER EXPERIENCE
+- Move "New Walk-in" button to appear immediately after the dashboard header as a large prominent banner or card - it should be the second thing visible on dashboard after the header
+- Style the walk-in button as a large eye-catching card with an icon, not just a small button
+- Walk-in page (/walkin) should be more user friendly: large clear form, big service selection, instant total calculation visible at all times, one-click payment buttons for Cash/Card/JazzCash/Easypaisa
+- Add a floating "New Walk-in" quick action button on every page for fast access
+- Walk-in should feel like a POS (point of sale) terminal - fast and easy
 
-PART 16 - ONBOARDING WIZARD
-- 4 step setup for new salons: salon name and logo, add first service, add first staff, invite team member
-- Progress bar, skippable
+PART 4 - DEALS & PACKAGES SYSTEM
+- Add a Deals/Packages section inside the Services page (/services) as a second tab called "Deals"
+- Create deal: name, description, included services (multi-select from existing services), deal price (can be less than sum of individual services), validity in days
+- Examples: "Groom Package - Haircut + Beard Trim + Cleansing = Rs. 1500 instead of Rs. 1800"
+- When booking appointment or walk-in: add option to select a Deal instead of individual services
+- Deal selection shows all included services and the deal price
+- Deal appears in reports as its component services for analytics
 
-PART 17 - INVOICE GENERATION
-- Professional invoice per appointment or walk-in
-- Includes: salon logo, name, address, client, services, staff, date, subtotal, discount, tax, total
-- Tax percentage configurable in settings
-- Download as PDF
+PART 5 - STAFF SECTION IMPROVEMENTS
+- Add extra fields when adding/editing staff: date of joining, gender (Male/Female/Other), designation/title, emergency contact name, emergency contact phone, CNIC number, basic salary (for payroll auto-fill)
+- On staff card/tile: replace "Active" static badge with a toggle - clicking it opens edit modal with Active/Inactive option
+- Staff status Active/Inactive should be editable from both the staff card and the edit modal
+- Inactive staff should appear greyed out in the list and should not appear in appointment/walk-in dropdowns
 
-PART 18 - NOTIFICATIONS
-- Bell icon in header with unread count
-- Types: new appointment, payment received, new review, low inventory, staff birthday
-- Mark as read
+PART 6 - CLIENT PHONE AS UNIQUE IDENTIFIER + LOYALTY SYSTEM
+- Make phone number the unique identifier for clients - if same phone number entered again, load existing client profile automatically
+- When typing phone number in appointment or walk-in form: auto-lookup client and show their name and loyalty points instantly
+- LOYALTY SYSTEM:
+  - Add loyalty settings in /settings: enable/disable loyalty toggle, loyalty earn percentage (e.g. 10% of bill value earned as points in PKR)
+  - When client completes a service: automatically calculate and add loyalty points to their account (e.g. bill Rs. 5000, earn Rs. 500 loyalty)
+  - At checkout (appointment payment or walk-in): show loyalty points balance for the client
+  - Add "Redeem Loyalty Points" field at checkout - client can choose how much to redeem (partial or full)
+  - Loyalty redemption acts as a discount - deducted from total
+  - Loyalty points history per client: earned, redeemed, balance
+  - Show loyalty balance on client profile page
+  - Loyalty points never expire unless owner sets expiry in settings
 
-PART 19 - AUDIT LOG (/settings/audit)
-- Track: who booked, who applied discount, who deleted, who changed settings
-- Owner only access
-- Filter by date and user
+PART 7 - INVENTORY CATEGORY IMPROVEMENT
+- In inventory, replace fixed category dropdown with a combination: show existing preset categories (Hair Products, Skin Products, Tools, Equipment, Consumables) PLUS an "Add Custom Category" option at bottom of dropdown
+- When "Add Custom Category" selected: show a text input field where user can type their own category name
+- Custom categories saved and reusable for future items
+- All custom categories appear in the dropdown alongside preset ones
 
-PART 20 - DATA EXPORT
-- Export clients, appointments, expenses, payroll as CSV
-- Date range selector
+PART 8 - PAYROLL PRO-RATA BASED ON JOINING DATE
+- Connect staff date of joining to payroll calculation
+- When generating monthly payroll: if staff member joined mid-month, automatically calculate pro-rated salary
+- Example: joined on 15th of a 30-day month = 50% of monthly salary
+- Show pro-rata calculation details in payroll: "Joined: 15 Jan, Days worked: 16/31, Pro-rata: 51.6%"
+- For staff who joined before the payroll month: calculate full salary as normal
+- First month joining always pro-rated, all subsequent months full salary
 
-TECHNICAL REQUIREMENTS FOR THIS SESSION:
-- Generate complete SQL migration at the end for ALL new tables and columns
-- RLS policies on every new table
+PART 9 - NOTIFICATION BELL REPOSITIONING
+- Remove notification from its current position
+- Add a notification bell icon in the top header bar, positioned near the top-right area next to the existing Monthly Report and New Walk-in buttons
+- Bell icon should show unread count badge (red dot with number)
+- Clicking the bell opens a dropdown panel (not a new page) showing recent notifications
+- Dropdown should appear inline below the bell icon
+- Notifications in dropdown: mark as read on click, "Mark all read" button at top
+- Keep notification dropdown clean and compact
+
+TECHNICAL REQUIREMENTS:
+- Generate complete SQL migration for all new tables and columns (loyalty_transactions, deals, deal_services, custom_inventory_categories)
+- RLS policies on all new tables
 - Mobile responsive throughout
-- Pink/rose theme with shadcn/ui components
-- Recharts for all charts
+- Maintain existing pink/rose theme with shadcn/ui
+- Phone number uniqueness enforced at database level with unique constraint on clients table
+- All fixes must not break existing functionality

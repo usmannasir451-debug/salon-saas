@@ -18,6 +18,7 @@ import {
   Palette,
   Image as ImageIcon,
   Percent,
+  Gift,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -58,6 +59,9 @@ type FormState = {
   max_discount_manager: string
   max_discount_cashier: string
   tax_percentage: string
+  loyalty_enabled: boolean
+  loyalty_earn_pct: string
+  loyalty_expiry_days: string
 }
 
 const defaultForm: FormState = {
@@ -73,6 +77,9 @@ const defaultForm: FormState = {
   max_discount_manager: '30',
   max_discount_cashier: '15',
   tax_percentage: '0',
+  loyalty_enabled: false,
+  loyalty_earn_pct: '10',
+  loyalty_expiry_days: '',
 }
 
 export default function SettingsPage() {
@@ -98,7 +105,7 @@ export default function SettingsPage() {
     const supabase = createClient()
     const { data } = await supabase
       .from('profiles')
-      .select('salon_name, salon_address, salon_phone, salon_email, salon_timezone, salon_currency, salon_primary_color, salon_logo_url, max_discount_owner, max_discount_manager, max_discount_cashier, tax_percentage')
+      .select('salon_name, salon_address, salon_phone, salon_email, salon_timezone, salon_currency, salon_primary_color, salon_logo_url, max_discount_owner, max_discount_manager, max_discount_cashier, tax_percentage, loyalty_enabled, loyalty_earn_pct, loyalty_expiry_days')
       .eq('id', ownerId)
       .single()
 
@@ -116,6 +123,9 @@ export default function SettingsPage() {
         max_discount_manager: String(data.max_discount_manager ?? 30),
         max_discount_cashier: String(data.max_discount_cashier ?? 15),
         tax_percentage: String(data.tax_percentage ?? 0),
+        loyalty_enabled: data.loyalty_enabled ?? false,
+        loyalty_earn_pct: String(data.loyalty_earn_pct ?? 10),
+        loyalty_expiry_days: data.loyalty_expiry_days != null ? String(data.loyalty_expiry_days) : '',
       })
       setLogoPreview(data.salon_logo_url ?? '')
     }
@@ -175,6 +185,9 @@ export default function SettingsPage() {
         max_discount_manager: parseInt(form.max_discount_manager) || 30,
         max_discount_cashier: parseInt(form.max_discount_cashier) || 15,
         tax_percentage: parseFloat(form.tax_percentage) || 0,
+        loyalty_enabled: form.loyalty_enabled,
+        loyalty_earn_pct: parseFloat(form.loyalty_earn_pct) || 10,
+        loyalty_expiry_days: form.loyalty_expiry_days ? parseInt(form.loyalty_expiry_days) : null,
       })
       .eq('id', ownerId)
 
@@ -194,7 +207,7 @@ export default function SettingsPage() {
     setSaving(false)
   }
 
-  function set(key: keyof FormState, value: string) {
+  function set(key: keyof FormState, value: string | boolean) {
     setForm((f) => ({ ...f, [key]: value }))
   }
 
@@ -474,6 +487,73 @@ export default function SettingsPage() {
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* ── Loyalty System ── */}
+        <Card className="border-gray-100">
+          <CardHeader className="pb-3 border-b border-gray-50">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Gift className="w-4 h-4 text-primary" />
+              Loyalty System
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-5 space-y-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-900">Enable Loyalty Points</p>
+                <p className="text-xs text-gray-500 mt-0.5">Clients earn points as a percentage of each bill</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => set('loyalty_enabled', !form.loyalty_enabled)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                  form.loyalty_enabled ? 'bg-primary' : 'bg-gray-200'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                    form.loyalty_enabled ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {form.loyalty_enabled && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                <div className="space-y-1.5">
+                  <Label htmlFor="loyalty_earn_pct">Earn Rate (%)</Label>
+                  <p className="text-xs text-gray-500">% of bill value credited as loyalty points (in currency)</p>
+                  <div className="relative">
+                    <Input
+                      id="loyalty_earn_pct"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.5"
+                      value={form.loyalty_earn_pct}
+                      onChange={(e) => set('loyalty_earn_pct', e.target.value)}
+                      className="h-10 pr-8"
+                      placeholder="10"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="loyalty_expiry_days">Points Expiry (days)</Label>
+                  <p className="text-xs text-gray-500">Leave blank for points that never expire</p>
+                  <Input
+                    id="loyalty_expiry_days"
+                    type="number"
+                    min="1"
+                    value={form.loyalty_expiry_days}
+                    onChange={(e) => set('loyalty_expiry_days', e.target.value)}
+                    className="h-10"
+                    placeholder="e.g. 365 (or leave blank)"
+                  />
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 

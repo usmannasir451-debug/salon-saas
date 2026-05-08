@@ -134,6 +134,7 @@ export default function PayrollPage() {
     const monthStart = format(selectedMonth, 'yyyy-MM-dd')
     const monthEnd = format(endOfMonth(selectedMonth), 'yyyy-MM-dd')
     const monthStr = format(selectedMonth, 'yyyy-MM-01')
+    const totalDays = endOfMonth(selectedMonth).getDate()
 
     // Revenue per staff from appointments + walk-ins
     const [apptRes, walkinRes] = await Promise.all([
@@ -160,11 +161,33 @@ export default function PayrollPage() {
       if (w.staff_id) revenueMap[w.staff_id] = (revenueMap[w.staff_id] ?? 0) + Number(w.total ?? 0)
     })
 
+    // Build staff joining date map
+    const staffMap = Object.fromEntries(staffList.map(s => [s.id, s]))
+
     const entries = salaries.map(sal => {
       const revenue = revenueMap[sal.staff_id] ?? 0
-      const fixed = ['fixed', 'both'].includes(sal.salary_type) ? Number(sal.fixed_amount) : 0
+      const fixedBase = ['fixed', 'both'].includes(sal.salary_type) ? Number(sal.fixed_amount) : 0
       const commission = ['commission', 'both'].includes(sal.salary_type)
         ? Math.round((revenue * Number(sal.commission_pct)) / 100) : 0
+
+      // Pro-rata calculation for first month of joining
+      let prorataPct: number | null = null
+      let prorataDetail: string | null = null
+      const staffMember = staffMap[sal.staff_id]
+      if (staffMember?.joining_date) {
+        const joiningDate = parseISO(staffMember.joining_date)
+        const isJoinedThisMonth =
+          joiningDate.getFullYear() === selectedMonth.getFullYear() &&
+          joiningDate.getMonth() === selectedMonth.getMonth()
+        if (isJoinedThisMonth) {
+          const joiningDay = joiningDate.getDate()
+          const daysWorked = totalDays - joiningDay + 1
+          prorataPct = Math.round((daysWorked / totalDays) * 1000) / 10
+          prorataDetail = `Joined: ${format(joiningDate, 'dd MMM')}, Days worked: ${daysWorked}/${totalDays}, Pro-rata: ${prorataPct}%`
+        }
+      }
+
+      const fixed = prorataPct != null ? Math.round(fixedBase * prorataPct / 100) : fixedBase
       return {
         user_id: ownerId,
         staff_id: sal.staff_id,
@@ -173,6 +196,8 @@ export default function PayrollPage() {
         revenue_generated: revenue,
         commission_earned: commission,
         total_payable: fixed + commission,
+        prorata_pct: prorataPct,
+        prorata_detail: prorataDetail,
         is_paid: false,
       }
     })
@@ -336,6 +361,9 @@ export default function PayrollPage() {
                           {Number(entry.fixed_salary) > 0 && <span>Fixed: {formatCurrency(Number(entry.fixed_salary), currency)}</span>}
                           {Number(entry.revenue_generated) > 0 && <span>Revenue: {formatCurrency(Number(entry.revenue_generated), currency)}</span>}
                           {Number(entry.commission_earned) > 0 && <span>Commission: {formatCurrency(Number(entry.commission_earned), currency)}</span>}
+                          {entry.prorata_detail && (
+                            <span className="text-orange-500 font-medium">{entry.prorata_detail}</span>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">

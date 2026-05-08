@@ -15,7 +15,10 @@
       "Bash(npx next *)",
       "Bash(Format-Table -AutoSize)",
       "PowerShell(New-Item *)",
-      "Bash(Select-Object Name, Mode)"
+      "Bash(Select-Object Name, Mode)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Tesla Laptops\\\\salon-saas\" -Directory)",
+      "Bash(Select-Object Name)",
+      "Bash(grep -E \"\\\\.\\(sql|md|json\\)$\")"
     ]
   }
 }
