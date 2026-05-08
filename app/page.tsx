@@ -12,13 +12,12 @@ import {
   BarChart3,
   Smartphone,
   Shield,
-  CheckCircle,
   Star,
   Menu,
   X,
   Sparkles,
   TrendingUp,
-  Zap,
+  LogIn,
 } from 'lucide-react'
 
 const features = [
@@ -54,54 +53,6 @@ const features = [
   },
 ]
 
-const plans = [
-  {
-    name: 'Starter',
-    price: '$29',
-    period: '/month',
-    desc: 'Perfect for small salons just getting started.',
-    features: [
-      'Up to 1 staff member',
-      '50 appointments/month',
-      'Service catalog',
-      'Basic dashboard',
-      'Email support',
-    ],
-    popular: false,
-    cta: 'Start Free Trial',
-  },
-  {
-    name: 'Professional',
-    price: '$59',
-    period: '/month',
-    desc: 'Ideal for growing salons with multiple staff.',
-    features: [
-      'Up to 10 staff members',
-      'Unlimited appointments',
-      'Calendar & walk-in module',
-      'Revenue analytics & reports',
-      'Priority support',
-    ],
-    popular: true,
-    cta: 'Start Free Trial',
-  },
-  {
-    name: 'Business',
-    price: '$99',
-    period: '/month',
-    desc: 'For established salons and spa chains.',
-    features: [
-      'Unlimited staff',
-      'Unlimited appointments',
-      'Multi-branch support',
-      'White-label branding',
-      '24/7 dedicated support',
-    ],
-    popular: false,
-    cta: 'Contact Sales',
-  },
-]
-
 const stats = [
   { value: '2,500+', label: 'Salons' },
   { value: '500K+', label: 'Appointments' },
@@ -127,12 +78,8 @@ export default function LandingPage() {
 
             <div className="hidden md:flex items-center gap-8">
               <a href="#features" className="text-sm text-gray-600 hover:text-primary transition-colors">Features</a>
-              <a href="#pricing" className="text-sm text-gray-600 hover:text-primary transition-colors">Pricing</a>
               <Link href="/login">
-                <Button variant="ghost" size="sm">Log In</Button>
-              </Link>
-              <Link href="/signup">
-                <Button size="sm" className="bg-primary hover:bg-primary/90">Get Started Free</Button>
+                <Button size="sm" className="bg-primary hover:bg-primary/90">Log In</Button>
               </Link>
             </div>
 
@@ -148,12 +95,8 @@ export default function LandingPage() {
         {mobileMenuOpen && (
           <div className="md:hidden border-t border-gray-100 bg-white px-4 py-4 space-y-3">
             <a href="#features" className="block text-sm text-gray-600 py-2" onClick={() => setMobileMenuOpen(false)}>Features</a>
-            <a href="#pricing" className="block text-sm text-gray-600 py-2" onClick={() => setMobileMenuOpen(false)}>Pricing</a>
             <Link href="/login" className="block">
-              <Button variant="outline" className="w-full">Log In</Button>
-            </Link>
-            <Link href="/signup" className="block">
-              <Button className="w-full bg-primary hover:bg-primary/90">Get Started Free</Button>
+              <Button className="w-full bg-primary hover:bg-primary/90">Log In</Button>
             </Link>
           </div>
         )}
@@ -182,10 +125,10 @@ export default function LandingPage() {
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
-              <Link href="/signup">
+              <Link href="/login">
                 <Button size="lg" className="bg-primary hover:bg-primary/90 text-white px-8 h-12 text-base shadow-lg shadow-primary/25">
-                  Start Free Trial
-                  <Sparkles className="w-4 h-4 ml-2" />
+                  <LogIn className="w-4 h-4 mr-2" />
+                  Log In to Dashboard
                 </Button>
               </Link>
               <a href="#features">
@@ -307,7 +250,7 @@ export default function LandingPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {[
-              { step: '01', icon: Sparkles, title: 'Sign Up Free', desc: 'Create your account in 2 minutes with your salon name and email.' },
+              { step: '01', icon: Sparkles, title: 'Get Your Account', desc: 'Contact SalonPro to set up your dedicated salon account with your name and branding.' },
               { step: '02', icon: Scissors, title: 'Add Services & Staff', desc: 'Set up your service menu with prices and add your team members.' },
               { step: '03', icon: TrendingUp, title: 'Manage & Grow', desc: 'Book appointments, accept walk-ins, track revenue, and grow your business.' },
             ].map((step) => (
@@ -328,60 +271,8 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Pricing */}
-      <section id="pricing" className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <Badge className="mb-4 bg-primary/10 text-primary border-primary/20">Pricing</Badge>
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Simple, Transparent Pricing</h2>
-            <p className="text-gray-500 text-sm">14-day free trial on all plans. No credit card required.</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-            {plans.map((plan) => (
-              <div
-                key={plan.name}
-                className={`relative rounded-2xl p-6 flex flex-col ${
-                  plan.popular
-                    ? 'bg-primary text-white shadow-2xl shadow-primary/30 scale-105'
-                    : 'bg-white border border-gray-200 shadow-sm'
-                }`}
-              >
-                {plan.popular && (
-                  <div className="absolute -top-4 left-0 right-0 flex justify-center">
-                    <Badge className="bg-gray-900 text-white border-0 shadow-lg">
-                      <Star className="w-3 h-3 mr-1" /> Most Popular
-                    </Badge>
-                  </div>
-                )}
-                <div className="mb-6">
-                  <h3 className={`text-xl font-bold mb-4 ${plan.popular ? 'text-white' : 'text-gray-900'}`}>{plan.name}</h3>
-                  <div className="flex items-baseline gap-1">
-                    <span className={`text-4xl font-bold ${plan.popular ? 'text-white' : 'text-gray-900'}`}>{plan.price}</span>
-                    <span className={`text-sm ${plan.popular ? 'text-pink-100' : 'text-gray-500'}`}>{plan.period}</span>
-                  </div>
-                  <p className={`text-sm mt-2 ${plan.popular ? 'text-pink-100' : 'text-gray-500'}`}>{plan.desc}</p>
-                </div>
-                <ul className="space-y-3 mb-6 flex-1">
-                  {plan.features.map((f) => (
-                    <li key={f} className="flex items-center gap-2">
-                      <CheckCircle className={`w-4 h-4 flex-shrink-0 ${plan.popular ? 'text-pink-100' : 'text-primary'}`} />
-                      <span className={`text-sm ${plan.popular ? 'text-pink-50' : 'text-gray-600'}`}>{f}</span>
-                    </li>
-                  ))}
-                </ul>
-                <Link href="/signup">
-                  <Button className={`w-full ${plan.popular ? 'bg-white text-primary hover:bg-pink-50' : 'bg-primary text-white hover:bg-primary/90'}`}>
-                    {plan.cta}
-                  </Button>
-                </Link>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* Testimonials */}
-      <section className="py-20 bg-gray-50">
+      <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">Trusted by Salon Owners</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -410,30 +301,21 @@ export default function LandingPage() {
       {/* CTA */}
       <section className="py-20 bg-primary">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/20 mb-6">
-            <Zap className="w-8 h-8 text-white" />
-          </div>
-          <h2 className="text-3xl md:text-4xl font-bold text-white mb-3">Ready to Transform Your Salon?</h2>
-          <p className="text-pink-100 mb-8">Join thousands of salon owners worldwide. 14-day free trial, no credit card required.</p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/signup">
-              <Button size="lg" className="bg-white text-primary hover:bg-pink-50 px-8 h-12 text-base font-semibold shadow-lg">
-                Start Free Trial Today
-              </Button>
-            </Link>
-            <Link href="/login">
-              <Button size="lg" variant="outline" className="border-white/50 text-white hover:bg-white/10 px-8 h-12 text-base">
-                Log In to Your Account
-              </Button>
-            </Link>
-          </div>
+          <h2 className="text-3xl md:text-4xl font-bold text-white mb-3">Ready to Get Started?</h2>
+          <p className="text-pink-100 mb-8">Log in to your SalonPro account and manage your salon from anywhere.</p>
+          <Link href="/login">
+            <Button size="lg" className="bg-white text-primary hover:bg-pink-50 px-8 h-12 text-base font-semibold shadow-lg">
+              <LogIn className="w-4 h-4 mr-2" />
+              Log In to Your Account
+            </Button>
+          </Link>
         </div>
       </section>
 
       {/* Footer */}
       <footer className="bg-gray-900 text-gray-400 py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
             <div className="col-span-1 md:col-span-2">
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
@@ -444,18 +326,9 @@ export default function LandingPage() {
               <p className="text-sm mb-2">World-class salon management software for modern businesses.</p>
             </div>
             <div>
-              <h4 className="text-white font-semibold mb-3 text-sm">Product</h4>
-              <ul className="space-y-2 text-sm">
-                <li><a href="#features" className="hover:text-white transition-colors">Features</a></li>
-                <li><a href="#pricing" className="hover:text-white transition-colors">Pricing</a></li>
-                <li><Link href="/signup" className="hover:text-white transition-colors">Free Trial</Link></li>
-              </ul>
-            </div>
-            <div>
               <h4 className="text-white font-semibold mb-3 text-sm">Account</h4>
               <ul className="space-y-2 text-sm">
                 <li><Link href="/login" className="hover:text-white transition-colors">Log In</Link></li>
-                <li><Link href="/signup" className="hover:text-white transition-colors">Sign Up</Link></li>
                 <li><Link href="/reset-password" className="hover:text-white transition-colors">Reset Password</Link></li>
               </ul>
             </div>

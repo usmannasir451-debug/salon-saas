@@ -31,7 +31,11 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl
   const authRoutes = ['/login', '/signup', '/reset-password']
-  const protectedRoutes = ['/dashboard', '/appointments', '/calendar', '/walkin', '/services', '/staff', '/clients', '/branches', '/team', '/settings', '/expenses', '/inventory', '/payroll', '/reports', '/reviews', '/export', '/onboarding']
+  const protectedRoutes = [
+    '/dashboard', '/appointments', '/calendar', '/walkin', '/services', '/staff',
+    '/clients', '/branches', '/team', '/settings', '/expenses', '/inventory',
+    '/payroll', '/reports', '/reviews', '/export', '/onboarding', '/suspended', '/admin',
+  ]
 
   const isAuthRoute = authRoutes.some((r) => pathname.startsWith(r))
   const isProtectedRoute = protectedRoutes.some((r) => pathname.startsWith(r))
@@ -42,6 +46,25 @@ export async function middleware(request: NextRequest) {
 
   if (user && isAuthRoute) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
+  }
+
+  if (user && pathname.startsWith('/admin')) {
+    if (user.email !== process.env.NEXT_PUBLIC_ADMIN_EMAIL) {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+    return supabaseResponse
+  }
+
+  if (user && isProtectedRoute && !pathname.startsWith('/suspended')) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('subscription_status')
+      .eq('id', user.id)
+      .single()
+
+    if (profile?.subscription_status === 'suspended') {
+      return NextResponse.redirect(new URL('/suspended', request.url))
+    }
   }
 
   return supabaseResponse

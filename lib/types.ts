@@ -75,6 +75,7 @@ export type Profile = {
   loyalty_enabled?: boolean
   loyalty_earn_pct?: number
   loyalty_expiry_days?: number | null
+  subscription_status?: 'active' | 'suspended'
   created_at: string
 }
 

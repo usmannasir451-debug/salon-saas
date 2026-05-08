@@ -1,1 +1,32 @@
-Fix this runtime error on dashboard: "Zap is not defined". The Zap icon from lucide-react was removed from imports but is still being used somewhere in app/(dashboard)/dashboard/page.tsx. Either add Zap back to the lucide-react imports, or replace it with another appropriate icon that is already imported.
+Make these changes to SalonPro:
+
+1. REMOVE PUBLIC SIGNUP & TRIAL
+- Remove the signup/register page and all "Sign Up Free", "Start Free Trial", "14-day free trial" buttons and text from the landing page and everywhere in the app
+- Remove any trial-related banners, countdowns, or messages
+- The only way to get an account is through the admin panel
+- Landing page should only have a "Login" button - no signup option
+- Login page should only have email/password fields - remove "Don't have an account? Sign up" link
+- Remove any pricing section that implies self-signup
+
+2. SUBSCRIPTION STATUS
+- Add subscription_status column to profiles table: 'active' or 'suspended' (default 'active')
+- If subscription_status is 'suspended': after login redirect to /suspended page
+- /suspended page shows: "Your account has been suspended. Please contact SalonPro support." with WhatsApp button linking to wa.me/92XXXXXXXXX (I will fill in the number)
+- No way to bypass suspended page
+
+3. ADMIN PANEL (/admin)
+- Only accessible if logged-in user email matches NEXT_PUBLIC_ADMIN_EMAIL environment variable
+- If not admin: redirect to /dashboard
+- Show list of all salons: salon name, owner email, status, date joined
+- Toggle button to Activate or Suspend any salon instantly
+- "Create New Salon Account" button that:
+  - Takes: salon name, owner email, temporary password
+  - Creates user in Supabase Auth using service role key
+  - Creates their profile with salon_name and status active
+  - Shows the credentials on screen to copy and send to client
+- Search bar to find salon by name or email
+
+4. ENVIRONMENT VARIABLE
+- Admin panel protected by NEXT_PUBLIC_ADMIN_EMAIL environment variable
+
+Generate SQL migration for subscription_status column.
