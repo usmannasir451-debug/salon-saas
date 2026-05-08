@@ -414,7 +414,7 @@ export default function InventoryPage() {
               ) : (
                 <Select value={itemForm.category} onValueChange={v => {
                   if (v === '__custom__') { setShowCustomCatInput(true) }
-                  else setItemForm(f => ({ ...f, category: v }))
+                  else setItemForm(f => ({ ...f, category: v ?? '' }))
                 }}>
                   <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
                   <SelectContent>
