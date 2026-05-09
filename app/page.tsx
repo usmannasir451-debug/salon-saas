@@ -1,197 +1,306 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import {
-  Scissors,
-  Calendar,
-  Users,
-  BarChart3,
-  Smartphone,
-  Shield,
-  Star,
-  Menu,
-  X,
-  Sparkles,
-  TrendingUp,
-  LogIn,
-} from 'lucide-react'
-
-const features = [
-  {
-    icon: Calendar,
-    title: 'Appointment Management',
-    desc: 'Easily book, reschedule, and manage all client appointments in one place.',
-  },
-  {
-    icon: Users,
-    title: 'Staff Management',
-    desc: 'Add and manage your salon staff with their contact details and schedules.',
-  },
-  {
-    icon: Scissors,
-    title: 'Service Catalog',
-    desc: 'List all your services with prices and durations.',
-  },
-  {
-    icon: BarChart3,
-    title: 'Revenue Tracking',
-    desc: 'Track your daily and monthly revenue with a real-time dashboard.',
-  },
-  {
-    icon: Smartphone,
-    title: 'Mobile Friendly',
-    desc: 'Fully responsive — works perfectly on phones, tablets, and desktops.',
-  },
-  {
-    icon: Shield,
-    title: 'Secure & Reliable',
-    desc: 'Your data is safe with enterprise-grade security powered by Supabase.',
-  },
-]
-
-const stats = [
-  { value: '2,500+', label: 'Salons' },
-  { value: '500K+', label: 'Appointments' },
-  { value: '10K+', label: 'Staff Managed' },
-  { value: '98%', label: 'Satisfaction' },
-]
+import { Scissors, Star, Check, Calendar, Zap, Package, BarChart3, Gift, Users } from 'lucide-react'
 
 export default function LandingPage() {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 20)
+    window.addEventListener('scroll', onScroll)
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) entry.target.classList.add('sf-visible')
+        })
+      },
+      { threshold: 0.1 }
+    )
+    document.querySelectorAll('.sf-reveal').forEach((el) => observer.observe(el))
+    return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
+    const counters = document.querySelectorAll<HTMLElement>('[data-sf-count]')
+    const counterObserver = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            const el = entry.target as HTMLElement
+            const target = parseInt(el.dataset.sfCount ?? '0')
+            const suffix = el.dataset.sfSuffix ?? ''
+            let count = 0
+            const step = Math.max(1, Math.ceil(target / 50))
+            const timer = setInterval(() => {
+              count = Math.min(count + step, target)
+              el.textContent = count.toLocaleString() + suffix
+              if (count >= target) clearInterval(timer)
+            }, 20)
+            counterObserver.unobserve(el)
+          }
+        })
+      },
+      { threshold: 0.5 }
+    )
+    counters.forEach((el) => counterObserver.observe(el))
+    return () => counterObserver.disconnect()
+  }, [])
+
+  useEffect(() => {
+    const cards = document.querySelectorAll<HTMLElement>('.sf-tilt')
+    const onMove = (e: Event) => {
+      const me = e as MouseEvent
+      const card = me.currentTarget as HTMLElement
+      const rect = card.getBoundingClientRect()
+      const rx = ((me.clientY - rect.top) / rect.height - 0.5) * -12
+      const ry = ((me.clientX - rect.left) / rect.width - 0.5) * 12
+      card.style.transform = `perspective(900px) rotateX(${rx}deg) rotateY(${ry}deg) translateZ(8px)`
+    }
+    const onLeave = (e: Event) => {
+      ;(e.currentTarget as HTMLElement).style.transform =
+        'perspective(900px) rotateX(0deg) rotateY(0deg) translateZ(0px)'
+    }
+    cards.forEach((c) => {
+      c.addEventListener('mousemove', onMove)
+      c.addEventListener('mouseleave', onLeave)
+    })
+    return () => {
+      cards.forEach((c) => {
+        c.removeEventListener('mousemove', onMove)
+        c.removeEventListener('mouseleave', onLeave)
+      })
+    }
+  }, [])
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-100 shadow-sm">
+    <div style={{ background: '#0a0f1e', minHeight: '100vh', color: '#fff' }}>
+      <style>{`
+        @keyframes sf-float {
+          0%,100% { transform: perspective(1200px) rotateY(-12deg) rotateX(4deg) translateY(0px); }
+          50%      { transform: perspective(1200px) rotateY(-12deg) rotateX(4deg) translateY(-20px); }
+        }
+        @keyframes sf-pulse-glow {
+          0%,100% { box-shadow: 0 0 20px rgba(244,63,94,0.4), 0 4px 24px rgba(244,63,94,0.3); }
+          50%      { box-shadow: 0 0 40px rgba(244,63,94,0.8), 0 4px 36px rgba(244,63,94,0.5); }
+        }
+        .sf-reveal {
+          opacity: 0;
+          transform: translateY(36px);
+          transition: opacity 0.65s ease, transform 0.65s ease;
+        }
+        .sf-reveal.sf-visible { opacity: 1; transform: translateY(0); }
+        .sf-d1 { transition-delay: 0.1s; }
+        .sf-d2 { transition-delay: 0.2s; }
+        .sf-d3 { transition-delay: 0.3s; }
+        .sf-glass {
+          background: rgba(255,255,255,0.05);
+          backdrop-filter: blur(12px);
+          border: 1px solid rgba(255,255,255,0.08);
+        }
+        .sf-grad-text {
+          background: linear-gradient(135deg, #f43f5e 0%, #a855f7 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+        }
+        .sf-mockup { animation: sf-float 3s ease-in-out infinite; }
+        .sf-cta-btn { animation: sf-pulse-glow 3s ease-in-out infinite; }
+        .sf-tilt { transition: transform 0.12s ease; }
+        .sf-grid-bg {
+          background-image:
+            linear-gradient(rgba(244,63,94,0.04) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(244,63,94,0.04) 1px, transparent 1px);
+          background-size: 48px 48px;
+        }
+        .sf-nav-blur {
+          background: rgba(10,15,30,0.88);
+          backdrop-filter: blur(20px);
+          border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        .sf-pricing-pop {
+          position: relative;
+          background: rgba(244,63,94,0.06);
+          border-radius: 16px;
+        }
+        .sf-pricing-pop::before {
+          content: '';
+          position: absolute;
+          inset: -1px;
+          border-radius: 17px;
+          background: linear-gradient(135deg, #f43f5e, #a855f7);
+          z-index: -1;
+        }
+        @media (max-width: 768px) {
+          .sf-mockup { animation: none; }
+          .sf-tilt { transform: none !important; }
+        }
+      `}</style>
+
+      {/* ── NAVBAR ── */}
+      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'sf-nav-blur' : ''}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 bg-rose-500 rounded-lg flex items-center justify-center shadow-lg shadow-rose-500/30">
                 <Scissors className="w-4 h-4 text-white" />
               </div>
-              <span className="font-bold text-lg text-gray-900">SalonPro</span>
+              <span className="font-bold text-lg text-white tracking-tight">Snipforce</span>
             </div>
 
             <div className="hidden md:flex items-center gap-8">
-              <a href="#features" className="text-sm text-gray-600 hover:text-primary transition-colors">Features</a>
+              <a href="#features" className="text-sm text-gray-400 hover:text-white transition-colors">Features</a>
+              <a href="#pricing" className="text-sm text-gray-400 hover:text-white transition-colors">Pricing</a>
+              <a href="#about" className="text-sm text-gray-400 hover:text-white transition-colors">About</a>
               <Link href="/login">
-                <Button size="sm" className="bg-primary hover:bg-primary/90">Log In</Button>
+                <button className="px-5 py-2 text-sm bg-rose-500 hover:bg-rose-600 text-white rounded-lg font-medium transition-colors shadow-lg shadow-rose-500/25">
+                  Login
+                </button>
               </Link>
             </div>
 
             <button
-              className="md:hidden p-2 rounded-lg hover:bg-gray-100"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              onClick={() => setMobileOpen(!mobileOpen)}
+              className="md:hidden p-2 text-gray-400 hover:text-white transition-colors"
+              aria-label="Toggle menu"
             >
-              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              <div style={{ width: 20, height: 2, background: 'currentColor', marginBottom: 5, borderRadius: 2 }} />
+              <div style={{ width: 20, height: 2, background: 'currentColor', marginBottom: 5, borderRadius: 2 }} />
+              <div style={{ width: 20, height: 2, background: 'currentColor', borderRadius: 2 }} />
             </button>
           </div>
         </div>
 
-        {mobileMenuOpen && (
-          <div className="md:hidden border-t border-gray-100 bg-white px-4 py-4 space-y-3">
-            <a href="#features" className="block text-sm text-gray-600 py-2" onClick={() => setMobileMenuOpen(false)}>Features</a>
+        {mobileOpen && (
+          <div style={{ background: 'rgba(10,15,30,0.97)', borderTop: '1px solid rgba(255,255,255,0.06)' }} className="md:hidden px-4 py-4 space-y-3">
+            <a href="#features" className="block text-sm text-gray-300 py-2" onClick={() => setMobileOpen(false)}>Features</a>
+            <a href="#pricing" className="block text-sm text-gray-300 py-2" onClick={() => setMobileOpen(false)}>Pricing</a>
+            <a href="#about" className="block text-sm text-gray-300 py-2" onClick={() => setMobileOpen(false)}>About</a>
             <Link href="/login" className="block">
-              <Button className="w-full bg-primary hover:bg-primary/90">Log In</Button>
+              <button className="w-full py-2.5 bg-rose-500 text-white rounded-lg text-sm font-medium">Login</button>
             </Link>
           </div>
         )}
       </nav>
 
-      {/* Hero Section */}
-      <section className="pt-24 pb-16 md:pt-32 md:pb-24 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-pink-50 via-white to-rose-50" />
-        <div className="absolute top-20 right-0 w-72 h-72 bg-primary/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 left-0 w-96 h-96 bg-pink-200/30 rounded-full blur-3xl" />
+      {/* ── HERO ── */}
+      <section className="relative min-h-screen flex items-center pt-16 overflow-hidden sf-grid-bg">
+        <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] rounded-full" style={{ background: 'radial-gradient(circle, rgba(244,63,94,0.18) 0%, transparent 70%)', pointerEvents: 'none' }} />
+        <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] rounded-full" style={{ background: 'radial-gradient(circle, rgba(168,85,247,0.15) 0%, transparent 70%)', pointerEvents: 'none' }} />
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-4xl mx-auto">
-            <Badge className="mb-6 bg-primary/10 text-primary border-primary/20 hover:bg-primary/10">
-              <Sparkles className="w-3 h-3 mr-1" />
-              World-Class Salon Management
-            </Badge>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 w-full">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
 
-            <h1 className="text-4xl md:text-6xl font-bold text-gray-900 leading-tight mb-6">
-              Manage Your Salon{' '}
-              <span className="text-primary">Smarter</span>
-            </h1>
+            {/* Left */}
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full sf-glass text-xs text-rose-400 mb-6">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse" />
+                All-in-one Salon Management Platform
+              </div>
 
-            <p className="text-lg text-gray-600 mb-10 max-w-2xl mx-auto">
-              Complete salon management software for modern businesses. Track appointments, manage staff, catalog services, accept walk-ins, and grow your revenue — all in one beautiful dashboard.
-            </p>
+              <h1 className="text-5xl lg:text-[3.6rem] font-bold leading-[1.1] mb-6">
+                Run Your Salon.{' '}
+                <span className="sf-grad-text">Not Your Spreadsheets.</span>
+              </h1>
 
-            <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
-              <Link href="/login">
-                <Button size="lg" className="bg-primary hover:bg-primary/90 text-white px-8 h-12 text-base shadow-lg shadow-primary/25">
-                  <LogIn className="w-4 h-4 mr-2" />
-                  Log In to Dashboard
-                </Button>
-              </Link>
-              <a href="#features">
-                <Button variant="outline" size="lg" className="px-8 h-12 text-base border-gray-300">
-                  See Features
-                </Button>
-              </a>
+              <p className="text-lg text-gray-400 mb-8 leading-relaxed max-w-lg">
+                Snipforce is the all-in-one platform for modern salons and spas — appointments, staff, inventory, and financials in one place.
+              </p>
+
+              <div className="flex flex-wrap gap-4">
+                <a href="https://wa.me/923171116067" target="_blank" rel="noopener noreferrer">
+                  <button className="sf-cta-btn px-8 py-4 rounded-xl font-semibold text-base text-white" style={{ background: 'linear-gradient(135deg, #f43f5e, #db2777)' }}>
+                    Request a Demo
+                  </button>
+                </a>
+                <a href="#features">
+                  <button className="sf-glass px-8 py-4 rounded-xl font-semibold text-base text-white hover:bg-white/10 transition-colors">
+                    See Features
+                  </button>
+                </a>
+              </div>
+
+              {/* Stats */}
+              <div className="grid grid-cols-3 gap-6 mt-12 pt-8" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                {[
+                  { count: 500, suffix: '+', label: 'Salons' },
+                  { count: 98, suffix: '%', label: 'Satisfaction' },
+                  { count: 30, suffix: '+', label: 'Countries' },
+                ].map((s) => (
+                  <div key={s.label}>
+                    <p className="text-3xl font-bold text-white">
+                      <span data-sf-count={s.count} data-sf-suffix={s.suffix}>{s.count}{s.suffix}</span>
+                    </p>
+                    <p className="text-sm text-gray-500 mt-0.5">{s.label}</p>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            {/* Dashboard Preview */}
-            <div className="relative mx-auto max-w-5xl">
-              <div className="rounded-2xl border border-gray-200 shadow-2xl shadow-gray-300/50 overflow-hidden bg-gray-50">
-                <div className="h-8 bg-gray-100 border-b border-gray-200 flex items-center px-4 gap-2">
-                  <div className="w-3 h-3 rounded-full bg-red-400" />
-                  <div className="w-3 h-3 rounded-full bg-yellow-400" />
-                  <div className="w-3 h-3 rounded-full bg-green-400" />
-                  <div className="flex-1 mx-4">
-                    <div className="bg-white rounded-md mx-auto border border-gray-200 flex items-center justify-center w-48 h-4">
-                      <span className="text-[9px] text-gray-400">app.salonpro.com/dashboard</span>
+            {/* Right — 3D floating mockup */}
+            <div className="hidden lg:block">
+              <div className="sf-mockup">
+                <div style={{ borderRadius: 16, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 0 60px rgba(244,63,94,0.15), 0 40px 80px rgba(0,0,0,0.6)', background: 'rgba(255,255,255,0.02)' }}>
+                  {/* Browser chrome */}
+                  <div style={{ background: 'rgba(255,255,255,0.04)', padding: '10px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#ff5f57' }} />
+                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#febc2e' }} />
+                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#28c840' }} />
+                    <div style={{ flex: 1, margin: '0 12px', background: 'rgba(255,255,255,0.04)', borderRadius: 6, padding: '3px 10px', fontSize: 10, color: '#555', textAlign: 'center' }}>
+                      app.snipforce.com/dashboard
                     </div>
                   </div>
-                </div>
-                <div className="flex min-h-64 bg-white">
-                  <div className="w-44 border-r border-gray-100 bg-white p-4 space-y-1 hidden sm:block">
-                    <div className="flex items-center gap-2 mb-4">
-                      <div className="w-6 h-6 bg-primary rounded flex items-center justify-center">
-                        <Scissors className="w-3 h-3 text-white" />
+                  {/* App UI */}
+                  <div style={{ display: 'flex', minHeight: 290 }}>
+                    {/* Sidebar */}
+                    <div style={{ width: 156, borderRight: '1px solid rgba(255,255,255,0.04)', padding: 14, flexShrink: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 14 }}>
+                        <div style={{ width: 22, height: 22, background: '#f43f5e', borderRadius: 5, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Scissors style={{ width: 11, height: 11, color: '#fff' }} />
+                        </div>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>Snipforce</span>
                       </div>
-                      <span className="text-xs font-bold text-gray-800">SalonPro</span>
-                    </div>
-                    {['Dashboard', 'Appointments', 'Calendar', 'Walk-In'].map((item, i) => (
-                      <div key={item} className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-xs ${i === 0 ? 'bg-primary/10 text-primary font-medium' : 'text-gray-500'}`}>
-                        <div className={`w-1.5 h-1.5 rounded-full ${i === 0 ? 'bg-primary' : 'bg-gray-300'}`} />
-                        {item}
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex-1 p-5">
-                    <div className="mb-4">
-                      <div className="bg-gray-900 rounded mb-2" style={{ height: '14px', width: '120px' }} />
-                      <div className="bg-gray-200 rounded" style={{ height: '10px', width: '160px' }} />
-                    </div>
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-                      {[
-                        { label: "Today's Appts", value: '14', bg: 'bg-primary/10', text: 'text-primary' },
-                        { label: 'Revenue', value: '$2,840', bg: 'bg-green-50', text: 'text-green-600' },
-                        { label: 'Services', value: '12', bg: 'bg-blue-50', text: 'text-blue-600' },
-                        { label: 'Staff', value: '8', bg: 'bg-purple-50', text: 'text-purple-600' },
-                      ].map((s) => (
-                        <div key={s.label} className={`rounded-lg p-3 ${s.bg}`}>
-                          <p className="text-[10px] text-gray-500 mb-1">{s.label}</p>
-                          <p className={`text-sm font-bold ${s.text}`}>{s.value}</p>
+                      {['Dashboard', 'Appointments', 'Calendar', 'Walk-In', 'Staff'].map((item, i) => (
+                        <div key={item} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '5px 7px', borderRadius: 5, marginBottom: 2, background: i === 0 ? 'rgba(244,63,94,0.15)' : 'transparent' }}>
+                          <div style={{ width: 5, height: 5, borderRadius: '50%', background: i === 0 ? '#f43f5e' : '#333', flexShrink: 0 }} />
+                          <span style={{ fontSize: 9.5, color: i === 0 ? '#f43f5e' : '#555' }}>{item}</span>
                         </div>
                       ))}
                     </div>
-                    <div className="bg-gray-50 rounded-lg p-3 space-y-2">
-                      {['Emma Johnson — Hair Cut — 10:00 AM', 'Sara Williams — Facial — 11:30 AM', 'Alex Chen — Manicure — 2:00 PM'].map((appt) => (
-                        <div key={appt} className="flex items-center gap-2 bg-white rounded p-2 border border-gray-100">
-                          <div className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
-                          <span className="text-[10px] text-gray-600 truncate">{appt}</span>
-                          <span className="ml-auto text-[9px] px-1.5 py-0.5 bg-green-50 text-green-600 rounded-full flex-shrink-0 whitespace-nowrap">Confirmed</span>
-                        </div>
-                      ))}
+                    {/* Main content */}
+                    <div style={{ flex: 1, padding: 18 }}>
+                      <div style={{ marginBottom: 14 }}>
+                        <div style={{ height: 13, width: 110, background: '#fff', borderRadius: 3, marginBottom: 5 }} />
+                        <div style={{ height: 9, width: 150, background: '#1e2740', borderRadius: 3 }} />
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 14 }}>
+                        {[
+                          { label: "Appts", value: '14', bg: 'rgba(244,63,94,0.12)', c: '#f43f5e' },
+                          { label: 'Revenue', value: '$2,840', bg: 'rgba(34,197,94,0.12)', c: '#22c55e' },
+                          { label: 'Services', value: '12', bg: 'rgba(59,130,246,0.12)', c: '#3b82f6' },
+                          { label: 'Staff', value: '8', bg: 'rgba(168,85,247,0.12)', c: '#a855f7' },
+                        ].map((s) => (
+                          <div key={s.label} style={{ background: s.bg, borderRadius: 7, padding: 9 }}>
+                            <p style={{ fontSize: 8, color: '#555', marginBottom: 3 }}>{s.label}</p>
+                            <p style={{ fontSize: 11, fontWeight: 700, color: s.c }}>{s.value}</p>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: 7, padding: 10, border: '1px solid rgba(255,255,255,0.04)' }}>
+                        {['Emma J. — Hair Cut — 10:00 AM', 'Sara W. — Facial — 11:30 AM', 'Alex C. — Manicure — 2:00 PM'].map((a) => (
+                          <div key={a} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '5px 7px', borderRadius: 5, marginBottom: 3, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+                            <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#f43f5e', flexShrink: 0 }} />
+                            <span style={{ fontSize: 8.5, color: '#666', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a}</span>
+                            <span style={{ fontSize: 7.5, padding: '1px 5px', background: 'rgba(34,197,94,0.12)', color: '#22c55e', borderRadius: 20, flexShrink: 0 }}>Confirmed</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -201,141 +310,195 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Stats */}
-      <section className="py-12 bg-primary">
+      {/* ── FEATURES ── */}
+      <section id="features" className="py-24" style={{ background: 'rgba(255,255,255,0.015)' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            {stats.map((stat) => (
-              <div key={stat.label} className="text-center">
-                <p className="text-3xl md:text-4xl font-bold text-white mb-1">{stat.value}</p>
-                <p className="text-sm text-pink-100">{stat.label}</p>
-              </div>
-            ))}
+          <div className="text-center mb-16 sf-reveal">
+            <p className="text-rose-400 font-semibold text-sm uppercase tracking-widest mb-3">Features</p>
+            <h2 className="text-4xl md:text-5xl font-bold mb-4">Everything your salon needs</h2>
+            <p className="text-gray-400 text-lg max-w-2xl mx-auto">A complete platform to run your salon efficiently from day one.</p>
           </div>
-        </div>
-      </section>
-
-      {/* Features */}
-      <section id="features" className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <Badge className="mb-4 bg-primary/10 text-primary border-primary/20">Features</Badge>
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Everything Your Salon Needs</h2>
-            <p className="text-gray-500">A complete platform to run your salon efficiently</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {features.map((feature) => (
-              <Card key={feature.title} className="group hover:shadow-lg hover:-translate-y-1 transition-all duration-200 border-gray-100">
-                <CardHeader>
-                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-2 group-hover:bg-primary/20 transition-colors">
-                    <feature.icon className="w-6 h-6 text-primary" />
-                  </div>
-                  <CardTitle className="text-gray-900">{feature.title}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-gray-600">{feature.desc}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* How It Works */}
-      <section className="py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">How It Works</h2>
-            <p className="text-gray-500">Get up and running in minutes</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {[
-              { step: '01', icon: Sparkles, title: 'Get Your Account', desc: 'Contact SalonPro to set up your dedicated salon account with your name and branding.' },
-              { step: '02', icon: Scissors, title: 'Add Services & Staff', desc: 'Set up your service menu with prices and add your team members.' },
-              { step: '03', icon: TrendingUp, title: 'Manage & Grow', desc: 'Book appointments, accept walk-ins, track revenue, and grow your business.' },
-            ].map((step) => (
-              <div key={step.step} className="text-center">
-                <div className="relative inline-block mb-6">
-                  <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/25">
-                    <step.icon className="w-8 h-8 text-white" />
-                  </div>
-                  <span className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-gray-900 text-white text-xs font-bold flex items-center justify-center">
-                    {step.step}
-                  </span>
+              { Icon: Calendar, title: 'Smart Appointments', desc: 'Calendar-based booking with staff scheduling and client history', color: '#f43f5e' },
+              { Icon: Zap, title: 'Walk-In POS', desc: 'Instant walk-in processing with one-click payments and receipts', color: '#a855f7' },
+              { Icon: Package, title: 'Inventory Control', desc: 'Track products, get low-stock alerts, manage suppliers', color: '#3b82f6' },
+              { Icon: BarChart3, title: 'Financial Reports', desc: 'Real-time P&L, expense tracking, payroll and salary management', color: '#22c55e' },
+              { Icon: Gift, title: 'Client Loyalty', desc: 'Built-in loyalty points system to retain and reward your best clients', color: '#f59e0b' },
+              { Icon: Users, title: 'Team Management', desc: 'Staff profiles, performance tracking, commission and payroll', color: '#ec4899' },
+            ].map(({ Icon, title, desc, color }, idx) => (
+              <div
+                key={title}
+                className={`sf-glass sf-tilt rounded-2xl p-6 sf-reveal sf-d${(idx % 3) + 1} cursor-default`}
+              >
+                <div style={{ width: 48, height: 48, background: `${color}20`, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                  <Icon style={{ width: 24, height: 24, color }} />
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">{step.title}</h3>
-                <p className="text-gray-600 text-sm">{step.desc}</p>
+                <h3 className="text-lg font-semibold text-white mb-2">{title}</h3>
+                <p className="text-gray-400 text-sm leading-relaxed">{desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Testimonials */}
-      <section className="py-20 bg-white">
+      {/* ── HOW IT WORKS ── */}
+      <section className="py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">Trusted by Salon Owners</h2>
+          <div className="text-center mb-16 sf-reveal">
+            <p className="text-rose-400 font-semibold text-sm uppercase tracking-widest mb-3">Process</p>
+            <h2 className="text-4xl md:text-5xl font-bold">How it works</h2>
+          </div>
+          <div className="relative grid grid-cols-1 md:grid-cols-3 gap-10 md:gap-8">
+            {/* Connecting line (desktop) */}
+            <div className="hidden md:block absolute top-9 left-[22%] right-[22%] h-px" style={{ background: 'linear-gradient(90deg, #f43f5e, #a855f7, #f43f5e)', opacity: 0.25 }} />
+            {[
+              { step: '01', title: 'We set up your account', desc: 'We configure Snipforce for your salon — branding, staff, services, all ready to go.', color: '#f43f5e' },
+              { step: '02', title: 'Your team gets access', desc: 'Assign roles to your staff instantly. Receptionists, managers, and stylists all get the right permissions.', color: '#a855f7' },
+              { step: '03', title: 'Watch your business grow', desc: 'Real-time insights, happy clients, and a team that runs like clockwork.', color: '#f43f5e' },
+            ].map(({ step, title, desc, color }, idx) => (
+              <div key={step} className={`text-center sf-reveal sf-d${idx + 1}`}>
+                <div className="inline-flex items-center justify-center mb-6" style={{ width: 72, height: 72, borderRadius: '50%', background: `${color}15`, border: `2px solid ${color}35` }}>
+                  <span style={{ fontSize: 22, fontWeight: 800, color }}>{step}</span>
+                </div>
+                <h3 className="text-xl font-bold text-white mb-3">{title}</h3>
+                <p className="text-gray-400 text-sm leading-relaxed max-w-xs mx-auto">{desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── TESTIMONIALS ── */}
+      <section id="about" className="py-24" style={{ background: 'rgba(255,255,255,0.015)' }}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16 sf-reveal">
+            <p className="text-rose-400 font-semibold text-sm uppercase tracking-widest mb-3">Testimonials</p>
+            <h2 className="text-4xl md:text-5xl font-bold">Loved by salon owners</h2>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[
-              { name: 'Emma Clarke', salon: 'Bloom Beauty Studio, London', quote: 'SalonPro completely transformed how we manage appointments. No more double bookings and our staff love it!', stars: 5 },
-              { name: 'Sarah Williams', salon: 'Luxe Hair & Spa, New York', quote: 'The walk-in module and calendar view are game-changers. We can see the whole day at a glance.', stars: 5 },
-              { name: 'Nadia Hassan', salon: 'Serenity Spa, Dubai', quote: 'The white-label branding makes our salon stand out. Clients see our logo and brand colors everywhere.', stars: 5 },
-            ].map((t) => (
-              <Card key={t.name} className="border-gray-100">
-                <CardContent className="pt-6">
-                  <div className="flex gap-0.5 mb-3">
-                    {Array.from({ length: t.stars }).map((_, i) => (
-                      <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                    ))}
-                  </div>
-                  <p className="text-gray-700 text-sm mb-4 italic">&quot;{t.quote}&quot;</p>
-                  <p className="font-semibold text-gray-900 text-sm">{t.name}</p>
-                  <p className="text-xs text-gray-500">{t.salon}</p>
-                </CardContent>
-              </Card>
+              { name: 'Emma Clarke', salon: 'Bloom Beauty Studio, London', quote: 'Snipforce completely transformed how we manage appointments. No more double bookings and our staff absolutely love it!', stars: 5 },
+              { name: 'Sarah Williams', salon: 'Luxe Hair & Spa, New York', quote: 'The walk-in module and calendar view are game-changers. We can see the whole day at a glance and serve clients faster than ever.', stars: 5 },
+              { name: 'Nadia Hassan', salon: 'Serenity Spa, Dubai', quote: 'The white-label branding makes our salon stand out. Clients see our logo and brand colors everywhere — it feels truly professional.', stars: 5 },
+            ].map(({ name, salon, quote, stars }, idx) => (
+              <div key={name} className={`sf-glass rounded-2xl p-6 sf-reveal sf-d${idx + 1}`}>
+                <div className="flex gap-0.5 mb-4">
+                  {Array.from({ length: stars }).map((_, i) => (
+                    <Star key={i} style={{ width: 15, height: 15, fill: '#fbbf24', color: '#fbbf24' }} />
+                  ))}
+                </div>
+                <p className="text-gray-300 text-sm mb-5 italic leading-relaxed">&quot;{quote}&quot;</p>
+                <p className="font-semibold text-white text-sm">{name}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{salon}</p>
+              </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="py-20 bg-primary">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold text-white mb-3">Ready to Get Started?</h2>
-          <p className="text-pink-100 mb-8">Log in to your SalonPro account and manage your salon from anywhere.</p>
-          <Link href="/login">
-            <Button size="lg" className="bg-white text-primary hover:bg-pink-50 px-8 h-12 text-base font-semibold shadow-lg">
-              <LogIn className="w-4 h-4 mr-2" />
-              Log In to Your Account
-            </Button>
-          </Link>
+      {/* ── PRICING ── */}
+      <section id="pricing" className="py-24">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16 sf-reveal">
+            <p className="text-rose-400 font-semibold text-sm uppercase tracking-widest mb-3">Pricing</p>
+            <h2 className="text-4xl md:text-5xl font-bold">Simple, transparent pricing</h2>
+            <p className="text-gray-400 mt-4">Contact us to get started — we will set everything up for you.</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+            {[
+              {
+                name: 'Starter', price: '$29', period: '/month', highlight: false,
+                features: ['1 location', 'Up to 5 staff', 'Appointments & walk-ins', 'Basic reports', 'Email support'],
+              },
+              {
+                name: 'Growth', price: '$59', period: '/month', highlight: true,
+                features: ['3 locations', 'Up to 15 staff', 'Everything in Starter', 'Advanced analytics', 'Loyalty program', 'Priority support'],
+              },
+              {
+                name: 'Enterprise', price: '$99', period: '/month', highlight: false,
+                features: ['Unlimited locations', 'Unlimited staff', 'Everything in Growth', 'Custom branding', 'API access', 'Dedicated support'],
+              },
+            ].map(({ name, price, period, highlight, features }, idx) => (
+              <div
+                key={name}
+                className={`sf-reveal sf-d${idx + 1} rounded-2xl p-6 relative ${highlight ? 'sf-pricing-pop' : 'sf-glass'}`}
+                style={{ zIndex: 0 }}
+              >
+                {highlight && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-xs font-semibold text-white whitespace-nowrap" style={{ background: 'linear-gradient(135deg, #f43f5e, #a855f7)' }}>
+                    Most Popular
+                  </div>
+                )}
+                <h3 className="text-xl font-bold text-white mb-1">{name}</h3>
+                <div className="flex items-baseline gap-1 mb-5">
+                  <span className="text-4xl font-bold sf-grad-text">{price}</span>
+                  <span className="text-gray-400 text-sm">{period}</span>
+                </div>
+                <ul className="space-y-3 mb-6">
+                  {features.map((f) => (
+                    <li key={f} className="flex items-center gap-2 text-sm text-gray-300">
+                      <Check style={{ width: 15, height: 15, color: '#f43f5e', flexShrink: 0 }} />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                <a href="https://wa.me/923171116067" target="_blank" rel="noopener noreferrer">
+                  <button
+                    className="w-full py-3 rounded-xl text-sm font-semibold transition-all hover:opacity-90"
+                    style={highlight ? { background: 'linear-gradient(135deg, #f43f5e, #a855f7)', color: '#fff' } : { background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}
+                  >
+                    Contact us to get started
+                  </button>
+                </a>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="bg-gray-900 text-gray-400 py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
-            <div className="col-span-1 md:col-span-2">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+      {/* ── FOOTER ── */}
+      <footer style={{ background: 'rgba(0,0,0,0.45)', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+            <div className="md:col-span-2">
+              <div className="flex items-center gap-2.5 mb-4">
+                <div className="w-8 h-8 bg-rose-500 rounded-lg flex items-center justify-center shadow-lg shadow-rose-500/25">
                   <Scissors className="w-4 h-4 text-white" />
                 </div>
-                <span className="font-bold text-white">SalonPro</span>
+                <span className="font-bold text-white text-lg">Snipforce</span>
               </div>
-              <p className="text-sm mb-2">World-class salon management software for modern businesses.</p>
+              <p className="text-sm text-gray-500 max-w-xs leading-relaxed">
+                The all-in-one platform for modern salons and spas. Appointments, staff, inventory, and financials in one place.
+              </p>
             </div>
             <div>
-              <h4 className="text-white font-semibold mb-3 text-sm">Account</h4>
-              <ul className="space-y-2 text-sm">
-                <li><Link href="/login" className="hover:text-white transition-colors">Log In</Link></li>
-                <li><Link href="/reset-password" className="hover:text-white transition-colors">Reset Password</Link></li>
+              <h4 className="text-white font-semibold text-sm mb-4">Product</h4>
+              <ul className="space-y-2.5">
+                <li><a href="#features" className="text-sm text-gray-500 hover:text-white transition-colors">Features</a></li>
+                <li><a href="#pricing" className="text-sm text-gray-500 hover:text-white transition-colors">Pricing</a></li>
+                <li><Link href="/login" className="text-sm text-gray-500 hover:text-white transition-colors">Login</Link></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="text-white font-semibold text-sm mb-4">Contact</h4>
+              <ul className="space-y-2.5">
+                <li>
+                  <a href="https://wa.me/923171116067" target="_blank" rel="noopener noreferrer" className="text-sm text-gray-500 hover:text-white transition-colors">
+                    WhatsApp Support
+                  </a>
+                </li>
+                <li>
+                  <Link href="/login" className="text-sm text-gray-500 hover:text-white transition-colors">
+                    Client Login
+                  </Link>
+                </li>
               </ul>
             </div>
           </div>
-          <div className="border-t border-gray-800 pt-6 flex flex-col md:flex-row items-center justify-between gap-2">
-            <p className="text-xs">© 2024 SalonPro. All rights reserved.</p>
-            <p className="text-xs text-gray-600">Powered by SalonPro</p>
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 24 }} className="flex flex-col md:flex-row items-center justify-between gap-2">
+            <p className="text-xs text-gray-600">© 2026 Snipforce. All rights reserved.</p>
+            <p className="text-xs text-gray-600">Powered by Snipforce</p>
           </div>
         </div>
       </footer>

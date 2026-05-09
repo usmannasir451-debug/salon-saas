@@ -253,7 +253,7 @@ export default function PnLPage() {
         })
       }
 
-      doc.save(`SalonPro-PnL-${format(selectedMonth, 'MMMM-yyyy')}.pdf`)
+      doc.save(`Snipforce-PnL-${format(selectedMonth, 'MMMM-yyyy')}.pdf`)
     } finally {
       setPdfLoading(false)
     }

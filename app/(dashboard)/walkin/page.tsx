@@ -22,21 +22,17 @@ type PaymentMethodConfig = { value: string; label: string; enabled: boolean }
 const DEFAULT_PAYMENT_METHODS: PaymentMethodConfig[] = [
   { value: 'cash', label: 'Cash', enabled: true },
   { value: 'card', label: 'Card', enabled: true },
-  { value: 'easypaisa', label: 'EasyPaisa', enabled: true },
-  { value: 'jazzcash', label: 'JazzCash', enabled: true },
 ]
 
 const PAYMENT_ICON_MAP: Record<string, { icon: React.ElementType; color: string }> = {
   cash: { icon: Banknote, color: 'bg-green-500 hover:bg-green-600' },
   card: { icon: CreditCard, color: 'bg-blue-500 hover:bg-blue-600' },
-  jazzcash: { icon: Smartphone, color: 'bg-red-500 hover:bg-red-600' },
-  easypaisa: { icon: Wallet, color: 'bg-emerald-600 hover:bg-emerald-700' },
 }
 import FeedbackModal from '@/components/FeedbackModal'
 import InvoiceModal, { type InvoiceData } from '@/components/InvoiceModal'
 import {
   Zap, Plus, Loader2, Receipt, X, Printer, CheckCircle2, Clock, FileText,
-  Banknote, CreditCard, Smartphone, Wallet, User, Phone, Search, Star,
+  Banknote, CreditCard, User, Phone, Search, Star,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -46,7 +42,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
-function formatCurrency(n: number, currency = 'PKR') {
+function formatCurrency(n: number, currency = 'USD') {
   return `${currency} ${Math.round(n).toLocaleString()}`
 }
 
@@ -86,7 +82,7 @@ function ReceiptView({ walkin, currency, salonName, serviceNames }: {
   return (
     <div id="walkin-receipt" className="bg-white rounded-xl border border-gray-200 p-6 font-mono text-sm max-w-xs mx-auto">
       <div className="text-center mb-4">
-        <p className="font-bold text-lg">{salonName || 'SalonPro'}</p>
+        <p className="font-bold text-lg">{salonName || 'Snipforce'}</p>
         <p className="text-xs text-gray-500">Walk-In Receipt</p>
         <p className="text-xs text-gray-400">{format(new Date(walkin.created_at), 'MMM d, yyyy — h:mm a')}</p>
       </div>
@@ -141,7 +137,7 @@ function ReceiptView({ walkin, currency, salonName, serviceNames }: {
       <div className="border-t border-dashed border-gray-300 my-3" />
       <div className="text-center text-xs text-gray-400">
         <p>Thank you for visiting!</p>
-        <p className="mt-1">Powered by SalonPro</p>
+        <p className="mt-1">Powered by Snipforce</p>
       </div>
     </div>
   )

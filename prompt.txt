@@ -1,32 +1,104 @@
-Make these changes to SalonPro:
+You are an expert SaaS developer and UI/UX designer. Make these comprehensive changes to the SalonPro app:
 
-1. REMOVE PUBLIC SIGNUP & TRIAL
-- Remove the signup/register page and all "Sign Up Free", "Start Free Trial", "14-day free trial" buttons and text from the landing page and everywhere in the app
-- Remove any trial-related banners, countdowns, or messages
-- The only way to get an account is through the admin panel
-- Landing page should only have a "Login" button - no signup option
-- Login page should only have email/password fields - remove "Don't have an account? Sign up" link
-- Remove any pricing section that implies self-signup
+PART 1 - REBRAND TO SNIPFORCE
+- Find and replace every instance of "SalonPro", "Salon Pro", "salonpro" with "Snipforce" across ALL files including:
+  - All page titles, metadata, layouts
+  - All components, headers, footers
+  - Landing page
+  - Login page
+  - Suspended page
+  - Admin panel
+  - "Powered by SalonPro" → "Powered by Snipforce"
+  - package.json name field
+  - Any alt text, aria labels, or comments mentioning SalonPro
 
-2. SUBSCRIPTION STATUS
-- Add subscription_status column to profiles table: 'active' or 'suspended' (default 'active')
-- If subscription_status is 'suspended': after login redirect to /suspended page
-- /suspended page shows: "Your account has been suspended. Please contact SalonPro support." with WhatsApp button linking to wa.me/92XXXXXXXXX (I will fill in the number)
-- No way to bypass suspended page
+PART 2 - MAKE PRODUCT GLOBAL (Remove Pakistan-specific content)
+- Remove CNIC field from staff management completely
+- Remove any Pakistan-specific phone number formatting or validation
+- Remove any hardcoded Pakistani references in UI text
+- Payment methods: Remove JazzCash and EasyPaisa from hardcoded defaults
+- Keep only Cash and Card as default payment methods
+- The custom payment method feature (where owner can add their own) stays and becomes the primary way to add local payment methods
+- Make currency configurable globally - default to USD but owner can set any currency in settings
+- Remove any Pakistan-specific content from landing page
+- Make all placeholder text generic and international
+- Staff fields: make phone format universal, remove any local ID field references
 
-3. ADMIN PANEL (/admin)
-- Only accessible if logged-in user email matches NEXT_PUBLIC_ADMIN_EMAIL environment variable
-- If not admin: redirect to /dashboard
-- Show list of all salons: salon name, owner email, status, date joined
-- Toggle button to Activate or Suspend any salon instantly
-- "Create New Salon Account" button that:
-  - Takes: salon name, owner email, temporary password
-  - Creates user in Supabase Auth using service role key
-  - Creates their profile with salon_name and status active
-  - Shows the credentials on screen to copy and send to client
-- Search bar to find salon by name or email
+PART 3 - COMPLETELY REVAMP LANDING PAGE
+Create a world-class, modern SaaS landing page for Snipforce with:
 
-4. ENVIRONMENT VARIABLE
-- Admin panel protected by NEXT_PUBLIC_ADMIN_EMAIL environment variable
+DESIGN:
+- Dark elegant theme: deep navy/charcoal background (#0a0f1e) with rose/pink accents matching the app
+- 3D floating card animations using CSS transforms and keyframe animations
+- Smooth scroll animations: elements fade and slide in as user scrolls (use Intersection Observer)
+- Glassmorphism cards: backdrop-filter blur with semi-transparent backgrounds
+- Gradient text headings: rose to purple gradient
+- Subtle particle or grid background pattern
+- Professional typography: large bold headings, clean body text
 
-Generate SQL migration for subscription_status column.
+SECTIONS (in order):
+
+1. NAVBAR
+- Snipforce logo (text logo with scissors icon)
+- Navigation: Features, Pricing, About
+- "Login" button (rose colored)
+- Sticky on scroll with blur background
+
+2. HERO SECTION
+- Large headline: "Run Your Salon. Not Your Spreadsheets."
+- Subheadline: "Snipforce is the all-in-one platform for modern salons and spas — appointments, staff, inventory, and financials in one place."
+- "Request a Demo" CTA button (large, rose gradient)
+- 3D floating mockup of the dashboard on the right side using CSS 3D transforms
+- Animated stats below: "500+ Salons" "98% Satisfaction" "30+ Countries"
+
+3. FEATURES SECTION
+- Heading: "Everything your salon needs"
+- 6 feature cards in a grid with glassmorphism style and hover 3D tilt effect:
+  * Smart Appointments — "Calendar-based booking with staff scheduling and client history"
+  * Walk-In POS — "Instant walk-in processing with one-click payments and receipts"
+  * Inventory Control — "Track products, get low-stock alerts, manage suppliers"
+  * Financial Reports — "Real-time P&L, expense tracking, payroll and salary management"
+  * Client Loyalty — "Built-in loyalty points system to retain and reward your best clients"
+  * Team Management — "Staff profiles, performance tracking, commission and payroll"
+
+4. HOW IT WORKS SECTION
+- 3 steps with icons and connecting line:
+  * Step 1: "We set up your account" — We configure Snipforce for your salon
+  * Step 2: "Your team gets access" — Assign roles to your staff instantly
+  * Step 3: "Watch your business grow" — Real-time insights and happy clients
+
+5. TESTIMONIALS SECTION
+- 3 testimonial cards with glassmorphism style
+- Fake but realistic testimonials from salon owners
+- Star ratings
+
+6. PRICING SECTION
+- 3 tiers with glassmorphism cards:
+  * Starter: $29/month — 1 location, up to 5 staff
+  * Growth: $59/month — 3 locations, up to 15 staff  
+  * Enterprise: $99/month — Unlimited locations and staff
+- "Contact us to get started" CTA on each plan (no self-signup)
+- Middle card highlighted with rose gradient border
+
+7. FOOTER
+- Snipforce logo
+- Links: Features, Pricing, Contact, Login
+- "Powered by Snipforce"
+- Copyright 2026
+
+ANIMATIONS TO IMPLEMENT:
+- Hero mockup: floating animation (up/down 20px, 3s ease infinite)
+- Feature cards: 3D tilt on mouse hover using JavaScript mousemove
+- Stats counter: number counting animation when scrolled into view
+- Scroll reveal: all sections fade in from bottom when entering viewport
+- Navbar: blur/shadow appears on scroll
+- CTA buttons: subtle pulse glow animation
+
+TECHNICAL:
+- Use Next.js with Tailwind CSS
+- All animations pure CSS and vanilla JS (no extra libraries needed)
+- Mobile responsive — animations simplified on mobile
+- Fast loading — no heavy libraries
+- "Request a Demo" and all CTAs link to a simple contact form or WhatsApp link: wa.me/92XXXXXXXXX (I will fill in number)
+
+Generate complete landing page in app/page.tsx replacing the existing one entirely.

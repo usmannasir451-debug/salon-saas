@@ -122,7 +122,7 @@ function InvoicePrintArea({ data }: { data: InvoiceData }) {
       {/* Footer */}
       <div className="mt-6 pt-4 border-t border-dashed border-gray-200 text-center text-xs text-gray-400 space-y-1">
         <p>Thank you for choosing {data.salonName}!</p>
-        <p className="text-[10px]">Powered by SalonPro</p>
+        <p className="text-[10px]">Powered by Snipforce</p>
       </div>
     </div>
   )
@@ -292,7 +292,7 @@ export default function InvoiceModal({ open, onClose, data }: InvoiceModalProps)
     doc.text(`Thank you for choosing ${data.salonName}!`, 74, y, { align: 'center' })
     y += 5
     doc.setFontSize(8)
-    doc.text('Powered by SalonPro', 74, y, { align: 'center' })
+    doc.text('Powered by Snipforce', 74, y, { align: 'center' })
 
     doc.save(`invoice-${data.id.slice(-8)}.pdf`)
   }

@@ -9,7 +9,7 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: 'SalonPro - Salon & Spa Management',
+  title: 'Snipforce - Salon & Spa Management',
   description:
     'World-class salon and spa management software. Appointments, staff, services, and analytics — all in one beautiful dashboard.',
   keywords: 'salon management, spa software, appointment booking, salon software',

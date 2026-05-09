@@ -10,7 +10,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             <Scissors className="w-4 h-4 text-white" />
           </div>
           <span className="font-bold text-gray-900 group-hover:text-primary transition-colors">
-            SalonPro
+            Snipforce
           </span>
         </Link>
       </header>
@@ -18,8 +18,8 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         {children}
       </main>
       <footer className="text-center text-xs text-gray-400 py-4 space-y-1">
-        <p>© 2024 SalonPro. All rights reserved.</p>
-        <p className="text-gray-300">Powered by SalonPro</p>
+        <p>© 2026 Snipforce. All rights reserved.</p>
+        <p className="text-gray-300">Powered by Snipforce</p>
       </footer>
     </div>
   )

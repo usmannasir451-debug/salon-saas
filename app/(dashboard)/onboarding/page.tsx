@@ -152,7 +152,7 @@ export default function OnboardingPage() {
   async function finishOnboarding() {
     const supabase = createClient()
     await supabase.from('profiles').update({ onboarding_completed: true }).eq('id', ownerId)
-    toast.success('Setup complete! Welcome to SalonPro 🎉')
+    toast.success('Setup complete! Welcome to Snipforce 🎉')
     router.push('/dashboard')
   }
 
@@ -178,7 +178,7 @@ export default function OnboardingPage() {
           <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center mx-auto mb-3 shadow-lg shadow-primary/30">
             <Scissors className="w-6 h-6 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Welcome to SalonPro!</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Welcome to Snipforce!</h1>
           <p className="text-gray-500 text-sm mt-1">Let&apos;s get your salon set up in 4 quick steps</p>
         </div>
 
@@ -382,7 +382,7 @@ export default function OnboardingPage() {
               <div className="space-y-4">
                 <div>
                   <h2 className="text-lg font-bold text-gray-900">Invite a Team Member</h2>
-                  <p className="text-sm text-gray-500 mt-0.5">Give your team access to SalonPro</p>
+                  <p className="text-sm text-gray-500 mt-0.5">Give your team access to Snipforce</p>
                 </div>
                 <div className="space-y-3">
                   <div>

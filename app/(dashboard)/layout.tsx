@@ -51,7 +51,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             {children}
           </main>
           <footer className="lg:block text-center py-3 text-xs text-gray-300">
-            Powered by SalonPro
+            Powered by Snipforce
           </footer>
         </div>
         {/* Floating walk-in button on all pages */}

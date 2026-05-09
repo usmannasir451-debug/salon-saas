@@ -23,7 +23,6 @@ const emptyForm = {
   designation: '',
   emergency_contact_name: '',
   emergency_contact_phone: '',
-  cnic: '',
   basic_salary: '',
   is_active: true,
 }
@@ -75,7 +74,6 @@ export default function StaffPage() {
       designation: member.designation ?? '',
       emergency_contact_name: member.emergency_contact_name ?? '',
       emergency_contact_phone: member.emergency_contact_phone ?? '',
-      cnic: member.cnic ?? '',
       basic_salary: member.basic_salary != null ? String(member.basic_salary) : '',
       is_active: member.is_active,
     })
@@ -99,7 +97,6 @@ export default function StaffPage() {
       designation: form.designation.trim() || null,
       emergency_contact_name: form.emergency_contact_name.trim() || null,
       emergency_contact_phone: form.emergency_contact_phone.trim() || null,
-      cnic: form.cnic.trim() || null,
       basic_salary: form.basic_salary ? parseFloat(form.basic_salary) : null,
       is_active: form.is_active,
       user_id: ownerId,
@@ -164,9 +161,7 @@ export default function StaffPage() {
             <Users className="w-6 h-6 text-primary" />
             Staff
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            <span className="font-urdu">اسٹاف مینجمنٹ</span> — Manage your salon team
-          </p>
+          <p className="text-sm text-gray-500 mt-0.5">Manage your salon team</p>
         </div>
         <div className="flex items-center gap-2">
           {inactiveCount > 0 && (
@@ -232,7 +227,7 @@ export default function StaffPage() {
                 {member.joining_date && (
                   <div className="flex items-center gap-1.5 text-xs text-gray-500">
                     <CalendarDays className="w-3.5 h-3.5 text-gray-400" />
-                    <span>Joined {new Date(member.joining_date + 'T00:00:00').toLocaleDateString('en-PK', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                    <span>Joined {new Date(member.joining_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                   </div>
                 )}
                 {/* Active/Inactive toggle */}
@@ -266,12 +261,12 @@ export default function StaffPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="staffName">Full Name *</Label>
-                <Input id="staffName" placeholder="e.g. Fatima Ahmed" value={form.name}
+                <Input id="staffName" placeholder="e.g. Sarah Johnson" value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })} required className="h-9" />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="phone">Phone *</Label>
-                <Input id="phone" type="tel" placeholder="0300-1234567" value={form.phone}
+                <Input id="phone" type="tel" placeholder="+1-555-0123" value={form.phone}
                   onChange={(e) => setForm({ ...form, phone: e.target.value })} required className="h-9" />
               </div>
             </div>
@@ -303,16 +298,10 @@ export default function StaffPage() {
                   className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/20" />
               </div>
               <div className="space-y-1.5">
-                <Label>Basic Salary (PKR)</Label>
+                <Label>Basic Salary</Label>
                 <Input type="number" min="0" placeholder="e.g. 25000" value={form.basic_salary}
                   onChange={(e) => setForm({ ...form, basic_salary: e.target.value })} className="h-9" />
               </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label>CNIC</Label>
-              <Input placeholder="e.g. 42101-1234567-1" value={form.cnic}
-                onChange={(e) => setForm({ ...form, cnic: e.target.value })} className="h-9" />
             </div>
 
             <div className="rounded-xl bg-gray-50 border border-gray-100 p-3 space-y-3">

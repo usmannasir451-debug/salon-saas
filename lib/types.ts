@@ -2,7 +2,7 @@ export type UserRole = 'owner' | 'regional_manager' | 'manager' | 'receptionist'
 
 export type DiscountType = 'fixed' | 'percentage'
 export type DiscountReason = 'loyalty' | 'promo' | 'staff_discount' | 'birthday' | 'other'
-export type PaymentMethod = 'cash' | 'card' | 'jazzcash' | 'easypaisa'
+export type PaymentMethod = string
 
 export type Service = {
   id: string
@@ -24,7 +24,6 @@ export type StaffMember = {
   designation?: string | null
   emergency_contact_name?: string | null
   emergency_contact_phone?: string | null
-  cnic?: string | null
   basic_salary?: number | null
   is_active: boolean
   created_at: string

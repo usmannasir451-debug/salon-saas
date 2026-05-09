@@ -25,7 +25,9 @@
       "Bash(Format-Table FullName)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\Tesla Laptops\\\\salon-saas\" -Force | Select-Object Name, @{Name='Type';Expression={if\\($_.PSIsContainer\\){'Folder'}else{'File'}}} | Format-Table -AutoSize)"
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\Tesla Laptops\\\\salon-saas\" -Force | Select-Object Name, @{Name='Type';Expression={if\\($_.PSIsContainer\\){'Folder'}else{'File'}}} | Format-Table -AutoSize)",
+      "Bash(Get-ChildItem -Depth 2)",
+      "Bash(Format-Table -Property Name, PSIsContainer)"
     ]
   }
 }

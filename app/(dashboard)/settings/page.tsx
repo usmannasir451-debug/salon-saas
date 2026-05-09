@@ -36,8 +36,6 @@ type PaymentMethodConfig = { value: string; label: string; enabled: boolean }
 const DEFAULT_PAYMENT_METHODS: PaymentMethodConfig[] = [
   { value: 'cash', label: 'Cash', enabled: true },
   { value: 'card', label: 'Card', enabled: true },
-  { value: 'easypaisa', label: 'EasyPaisa', enabled: true },
-  { value: 'jazzcash', label: 'JazzCash', enabled: true },
 ]
 
 const TIMEZONES = [

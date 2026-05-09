@@ -24,7 +24,7 @@ const SALARY_TYPES: { value: SalaryType; label: string }[] = [
   { value: 'both', label: 'Fixed + Commission' },
 ]
 
-const PAYMENT_METHODS = ['Cash', 'Bank Transfer', 'JazzCash', 'EasyPaisa', 'Other']
+const PAYMENT_METHODS = ['Cash', 'Bank Transfer', 'Other']
 
 function formatCurrency(n: number, currency = 'USD') {
   return `${currency} ${Math.round(n).toLocaleString()}`

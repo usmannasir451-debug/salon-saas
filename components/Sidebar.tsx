@@ -106,7 +106,7 @@ export default function Sidebar({ salonName, salonLogoUrl, userEmail, role = 'ow
               <p className="font-bold text-sm text-gray-900 leading-tight truncate">
                 {salonName || 'My Salon'}
               </p>
-              <p className="text-[10px] text-primary font-medium leading-tight">SalonPro</p>
+              <p className="text-[10px] text-primary font-medium leading-tight">Snipforce</p>
             </div>
           </Link>
           {ownerId && <NotificationBell ownerId={ownerId} side="left" />}
@@ -176,7 +176,7 @@ export default function Sidebar({ salonName, salonLogoUrl, userEmail, role = 'ow
 
       {/* Powered by */}
       <div className="px-4 pb-3 text-center">
-        <p className="text-[10px] text-gray-300">Powered by SalonPro</p>
+        <p className="text-[10px] text-gray-300">Powered by Snipforce</p>
       </div>
     </div>
   )
@@ -199,7 +199,7 @@ export default function Sidebar({ salonName, salonLogoUrl, userEmail, role = 'ow
             )}
           </div>
           <span className="font-bold text-sm text-gray-900">
-            {salonName || 'SalonPro'}
+            {salonName || 'Snipforce'}
           </span>
         </Link>
         <div className="flex items-center gap-1">

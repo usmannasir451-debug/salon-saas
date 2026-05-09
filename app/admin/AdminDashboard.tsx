@@ -100,7 +100,7 @@ export default function AdminDashboard({ salons }: { salons: Salon[] }) {
               <Scissors className="w-4 h-4 text-white" />
             </div>
             <div>
-              <span className="font-bold text-gray-900">SalonPro</span>
+              <span className="font-bold text-gray-900">Snipforce</span>
               <Badge className="ml-2 bg-primary/10 text-primary border-primary/20 text-xs">Admin</Badge>
             </div>
           </div>

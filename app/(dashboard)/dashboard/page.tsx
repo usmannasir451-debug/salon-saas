@@ -431,7 +431,7 @@ export default function DashboardPage() {
       doc.setTextColor(255, 255, 255)
       doc.setFontSize(22)
       doc.setFont('helvetica', 'bold')
-      doc.text('SalonPro', 14, 16)
+      doc.text('Snipforce', 14, 16)
       doc.setFontSize(11)
       doc.setFont('helvetica', 'normal')
       doc.text(`Monthly Report — ${format(new Date(), 'MMMM yyyy')}`, 14, 26)
@@ -475,7 +475,7 @@ export default function DashboardPage() {
         y = (doc as any).lastAutoTable.finalY + 12
       }
 
-      doc.save(`SalonPro-${salonName || 'Report'}-${format(new Date(), 'MMMM-yyyy')}.pdf`)
+      doc.save(`Snipforce-${salonName || 'Report'}-${format(new Date(), 'MMMM-yyyy')}.pdf`)
     } finally {
       setPdfLoading(false)
     }

@@ -16,7 +16,7 @@ export default async function SuspendedPage() {
           <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
             <Scissors className="w-5 h-5 text-white" />
           </div>
-          <span className="font-bold text-xl text-gray-900">SalonPro</span>
+          <span className="font-bold text-xl text-gray-900">Snipforce</span>
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl shadow-gray-200/50 p-8 border border-gray-100">
@@ -28,7 +28,7 @@ export default async function SuspendedPage() {
 
           <h1 className="text-2xl font-bold text-gray-900 mb-3">Account Suspended</h1>
           <p className="text-gray-600 mb-8">
-            Your account has been suspended. Please contact SalonPro support to restore access.
+            Your account has been suspended. Please contact Snipforce support to restore access.
           </p>
 
           <a
