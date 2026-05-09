@@ -60,6 +60,7 @@ export default function TeamPage() {
   const [removing, setRemoving] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [form, setForm] = useState(emptyForm)
+  const [emailConfigured, setEmailConfigured] = useState(true)
 
   useEffect(() => {
     if (role !== 'owner') {
@@ -67,6 +68,7 @@ export default function TeamPage() {
       return
     }
     loadData()
+    fetch('/api/invite').then((r) => r.json()).then((d) => setEmailConfigured(d.emailConfigured ?? true))
   }, [role, router])
 
   async function loadData() {
@@ -315,13 +317,15 @@ export default function TeamPage() {
               </div>
             )}
 
-            <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-700 flex gap-2">
-              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-              <span>
-                Requires <code className="bg-amber-100 px-0.5 rounded">SUPABASE_SERVICE_ROLE_KEY</code> in{' '}
-                <code className="bg-amber-100 px-0.5 rounded">.env.local</code> for email delivery.
-              </span>
-            </div>
+            {!emailConfigured && (
+              <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-700 flex gap-2">
+                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                <span>
+                  Requires <code className="bg-amber-100 px-0.5 rounded">SUPABASE_SERVICE_ROLE_KEY</code> in{' '}
+                  <code className="bg-amber-100 px-0.5 rounded">.env.local</code> for email delivery.
+                </span>
+              </div>
+            )}
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} size="sm">

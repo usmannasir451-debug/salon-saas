@@ -2,6 +2,10 @@ import { createClient as createServerClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 
+export async function GET() {
+  return NextResponse.json({ emailConfigured: !!process.env.SUPABASE_SERVICE_ROLE_KEY })
+}
+
 export async function POST(request: Request) {
   const supabase = await createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
