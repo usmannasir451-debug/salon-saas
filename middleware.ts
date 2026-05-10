@@ -4,9 +4,16 @@ import { NextResponse, type NextRequest } from 'next/server'
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return supabaseResponse
+  }
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {
@@ -25,9 +32,13 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  let user: { id: string; email?: string } | null = null
+  try {
+    const { data } = await supabase.auth.getUser()
+    user = data.user
+  } catch {
+    return supabaseResponse
+  }
 
   const { pathname } = request.nextUrl
   const authRoutes = ['/login', '/signup', '/reset-password']
@@ -56,14 +67,18 @@ export async function middleware(request: NextRequest) {
   }
 
   if (user && isProtectedRoute && !pathname.startsWith('/suspended')) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('subscription_status')
-      .eq('id', user.id)
-      .single()
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('subscription_status')
+        .eq('id', user.id)
+        .single()
 
-    if (profile?.subscription_status === 'suspended') {
-      return NextResponse.redirect(new URL('/suspended', request.url))
+      if (profile?.subscription_status === 'suspended') {
+        return NextResponse.redirect(new URL('/suspended', request.url))
+      }
+    } catch {
+      // proceed on DB error
     }
   }
 
