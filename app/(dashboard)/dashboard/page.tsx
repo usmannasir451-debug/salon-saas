@@ -202,9 +202,8 @@ export default function DashboardPage() {
     setSixMonthClients((sixMonthClientRes.data as unknown as typeof sixMonthClients) ?? [])
 
     // Last month data (stored for branch-aware comparison)
-    setLastMonthAppts((lastMonthApptRes.data ?? []) as typeof lastMonthAppts)
-    setLastMonthWalkIns((lastMonthWalkinRes.data ?? []) as typeof lastMonthWalkIns)
-
+setLastMonthAppts((lastMonthApptRes.data ?? []) as unknown as typeof lastMonthAppts)
+setLastMonthWalkIns((lastMonthWalkinRes.data ?? []) as typeof lastMonthWalkIns)
     // Low stock
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const low = (inventoryRes.data ?? []).filter((i: any) => Number(i.quantity) <= Number(i.reorder_level))
