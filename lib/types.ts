@@ -93,6 +93,9 @@ export type SalonMember = {
   member_user_id: string | null
   email: string
   role: Exclude<UserRole, 'owner'>
+  display_name?: string | null
+  permissions?: string[] | null
+  last_set_password?: string | null
   staff_id?: string | null
   status: 'pending' | 'active'
   invited_at: string
@@ -231,5 +234,19 @@ export type CustomInventoryCategory = {
   id: string
   user_id: string
   name: string
+  created_at: string
+}
+
+export type Lead = {
+  id: string
+  name: string
+  phone: string
+  salon_name: string
+  branches: string
+  city: string
+  source: string
+  message: string | null
+  status: 'new' | 'contacted' | 'converted' | 'lost'
+  notes: string | null
   created_at: string
 }

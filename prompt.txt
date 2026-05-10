@@ -1,1 +1,94 @@
-Fix "Failed to fetch" Console TypeError on the main page. This is a Supabase auth connection error. Check if the Supabase client is properly initialized and the environment variables are being read correctly. Also check if there are any CORS or connection issues with the Supabase URL in the client configuration.
+You are an expert SaaS developer working on "Snipforce". Make these changes:
+
+PART 1 - ADMIN PANEL IMPROVEMENTS
+
+1. DELETE SALON ACCOUNT
+- Add a "Delete" button on each salon row in admin panel
+- Clicking delete shows a confirmation modal: "Are you sure you want to permanently delete [salon name]? This will delete all their data."
+- On confirm: delete the user from Supabase Auth AND delete their profile and all related data (appointments, staff, clients, etc.)
+- Use cascade delete or manual deletion in correct order to avoid foreign key errors
+
+2. CHANGE EMAIL ADDRESS
+- Add "Change Email" button on each salon row in admin panel
+- Opens a modal with current email shown and new email input field
+- Updates email in Supabase Auth using service role key
+- Updates email in profiles table as well
+- Show success/error message
+
+3. SALON DETAIL VIEW
+- Clicking on a salon name opens a detail page or expanded view showing:
+  * Salon name, email, status, date joined, plan
+  * Total sub-users count with their names, roles/access, and credentials (email + last set password with eye toggle)
+  * Total appointments count
+  * Total revenue (sum of all payments)
+  * Quick actions: Activate, Suspend, Delete, Change Email
+
+4. LEADS SECTION IN ADMIN PANEL
+- Add "Leads" to admin panel left sidebar navigation (below "All Salons")
+- Leads page shows all demo requests in a table: name, phone, salon name, branches count, date submitted, status (new/contacted/converted/lost)
+- Admin can change lead status
+- Admin can add notes to each lead
+- Show count badge on "Leads" sidebar item for new uncontacted leads
+
+PART 2 - DEMO REQUEST FORM ON LANDING PAGE
+
+- Replace the "Request a Demo" WhatsApp redirect button with a proper form modal
+- Form fields:
+  * Full Name
+  * Phone Number
+  * Salon/Business Name
+  * Number of Branches (dropdown: 1, 2-5, 5-10, 10+)
+  * City
+  * How did you hear about us? (dropdown: Social Media, Friend/Referral, Google Search, Other)
+  * Message (optional textarea)
+- On submit: save to a "leads" table in Supabase
+- Show success message: "Thank you! We will contact you within 24 hours."
+- Form should match the dark landing page theme
+
+PART 3 - CUSTOM ROLE & PERMISSIONS SYSTEM (Replace fixed roles)
+
+- Remove the hardcoded roles: Regional Manager, Manager, Receptionist, Cashier, Staff
+- Keep only "Owner" as a fixed role with full access
+- Add new system where Owner can create custom users with custom access:
+
+USER CREATION FLOW:
+- Owner goes to Team Members page
+- Clicks "Add Team Member"
+- Form shows:
+  * Display Name (e.g. "Cashier", "Front Desk", "Manager")
+  * Email Address
+  * Password
+  * Access Rights — checklist of all pages/features:
+    □ Dashboard
+    □ Appointments
+    □ Calendar
+    □ Walk-In
+    □ Services
+    □ Staff
+    □ Performance
+    □ Reviews
+    □ Clients
+    □ Inventory
+    □ Expenses
+    □ Payroll
+    □ Reports / P&L
+    □ Team Members
+    □ Settings
+
+- Save these permissions in a new table: salon_members with a permissions JSON column
+- Navigation sidebar: only show pages the user has permission for
+- If user tries to access a page they don't have permission for: redirect to dashboard with "Access Denied" message
+
+EDIT PERMISSIONS:
+- Owner can edit any team member's permissions anytime
+- Owner can reset their password
+- Owner can deactivate/delete team member
+
+PART 4 - SQL & TECHNICAL
+
+- Create leads table: id, name, phone, salon_name, branches, city, source, message, status (new/contacted/converted/lost), notes, created_at, owner_id (null for public submissions)
+- Update salon_members table: add permissions JSONB column (array of allowed page keys)
+- RLS policies on leads table
+- Generate complete SQL migration at the end
+- Mobile responsive throughout
+- Maintain pink/rose theme with shadcn/ui

@@ -7,6 +7,7 @@ export interface UserCtx {
   role: UserRole
   ownerId: string
   staffId?: string
+  permissions?: string[] | null
 }
 
 const defaultCtx: UserCtx = { role: 'owner', ownerId: '' }

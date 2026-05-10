@@ -2,11 +2,35 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Scissors, Star, Check, Calendar, Zap, Package, BarChart3, Gift, Users } from 'lucide-react'
+import { Scissors, Star, Check, Calendar, Zap, Package, BarChart3, Gift, Users, X, Loader2 } from 'lucide-react'
+
+type DemoForm = {
+  name: string
+  phone: string
+  salonName: string
+  branches: string
+  city: string
+  source: string
+  message: string
+}
+
+const emptyForm: DemoForm = {
+  name: '',
+  phone: '',
+  salonName: '',
+  branches: '',
+  city: '',
+  source: '',
+  message: '',
+}
 
 export default function LandingPage() {
   const [scrolled, setScrolled] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [demoOpen, setDemoOpen] = useState(false)
+  const [form, setForm] = useState<DemoForm>(emptyForm)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20)
@@ -78,6 +102,47 @@ export default function LandingPage() {
       })
     }
   }, [])
+
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    document.body.style.overflow = demoOpen ? 'hidden' : ''
+    return () => { document.body.style.overflow = '' }
+  }, [demoOpen])
+
+  async function handleDemoSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setSubmitting(true)
+    try {
+      const res = await fetch('/api/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: form.name,
+          phone: form.phone,
+          salon_name: form.salonName,
+          branches: form.branches,
+          city: form.city,
+          source: form.source,
+          message: form.message || undefined,
+        }),
+      })
+      if (res.ok) {
+        setSubmitted(true)
+      } else {
+        const d = await res.json()
+        alert(d.error ?? 'Something went wrong. Please try again.')
+      }
+    } catch {
+      alert('Network error. Please try again.')
+    }
+    setSubmitting(false)
+  }
+
+  function openDemo() {
+    setForm(emptyForm)
+    setSubmitted(false)
+    setDemoOpen(true)
+  }
 
   return (
     <div style={{ background: '#0a0f1e', minHeight: '100vh', color: '#fff' }}>
@@ -214,11 +279,13 @@ export default function LandingPage() {
               </p>
 
               <div className="flex flex-wrap gap-4">
-                <a href="https://wa.me/923171116067" target="_blank" rel="noopener noreferrer">
-                  <button className="sf-cta-btn px-8 py-4 rounded-xl font-semibold text-base text-white" style={{ background: 'linear-gradient(135deg, #f43f5e, #db2777)' }}>
-                    Request a Demo
-                  </button>
-                </a>
+                <button
+                  onClick={openDemo}
+                  className="sf-cta-btn px-8 py-4 rounded-xl font-semibold text-base text-white"
+                  style={{ background: 'linear-gradient(135deg, #f43f5e, #db2777)' }}
+                >
+                  Request a Demo
+                </button>
                 <a href="#features">
                   <button className="sf-glass px-8 py-4 rounded-xl font-semibold text-base text-white hover:bg-white/10 transition-colors">
                     See Features
@@ -258,7 +325,6 @@ export default function LandingPage() {
                   </div>
                   {/* App UI */}
                   <div style={{ display: 'flex', minHeight: 290 }}>
-                    {/* Sidebar */}
                     <div style={{ width: 156, borderRight: '1px solid rgba(255,255,255,0.04)', padding: 14, flexShrink: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 14 }}>
                         <div style={{ width: 22, height: 22, background: '#f43f5e', borderRadius: 5, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -273,7 +339,6 @@ export default function LandingPage() {
                         </div>
                       ))}
                     </div>
-                    {/* Main content */}
                     <div style={{ flex: 1, padding: 18 }}>
                       <div style={{ marginBottom: 14 }}>
                         <div style={{ height: 13, width: 110, background: '#fff', borderRadius: 3, marginBottom: 5 }} />
@@ -327,10 +392,7 @@ export default function LandingPage() {
               { Icon: Gift, title: 'Client Loyalty', desc: 'Built-in loyalty points system to retain and reward your best clients', color: '#f59e0b' },
               { Icon: Users, title: 'Team Management', desc: 'Staff profiles, performance tracking, commission and payroll', color: '#ec4899' },
             ].map(({ Icon, title, desc, color }, idx) => (
-              <div
-                key={title}
-                className={`sf-glass sf-tilt rounded-2xl p-6 sf-reveal sf-d${(idx % 3) + 1} cursor-default`}
-              >
+              <div key={title} className={`sf-glass sf-tilt rounded-2xl p-6 sf-reveal sf-d${(idx % 3) + 1} cursor-default`}>
                 <div style={{ width: 48, height: 48, background: `${color}20`, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
                   <Icon style={{ width: 24, height: 24, color }} />
                 </div>
@@ -350,7 +412,6 @@ export default function LandingPage() {
             <h2 className="text-4xl md:text-5xl font-bold">How it works</h2>
           </div>
           <div className="relative grid grid-cols-1 md:grid-cols-3 gap-10 md:gap-8">
-            {/* Connecting line (desktop) */}
             <div className="hidden md:block absolute top-9 left-[22%] right-[22%] h-px" style={{ background: 'linear-gradient(90deg, #f43f5e, #a855f7, #f43f5e)', opacity: 0.25 }} />
             {[
               { step: '01', title: 'We set up your account', desc: 'We configure Snipforce for your salon — branding, staff, services, all ready to go.', color: '#f43f5e' },
@@ -407,24 +468,11 @@ export default function LandingPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
             {[
-              {
-                name: 'Starter', price: '$29', period: '/month', highlight: false,
-                features: ['1 location', 'Up to 5 staff', 'Appointments & walk-ins', 'Basic reports', 'Email support'],
-              },
-              {
-                name: 'Growth', price: '$59', period: '/month', highlight: true,
-                features: ['3 locations', 'Up to 15 staff', 'Everything in Starter', 'Advanced analytics', 'Loyalty program', 'Priority support'],
-              },
-              {
-                name: 'Enterprise', price: '$99', period: '/month', highlight: false,
-                features: ['Unlimited locations', 'Unlimited staff', 'Everything in Growth', 'Custom branding', 'API access', 'Dedicated support'],
-              },
+              { name: 'Starter', price: '$29', period: '/month', highlight: false, features: ['1 location', 'Up to 5 staff', 'Appointments & walk-ins', 'Basic reports', 'Email support'] },
+              { name: 'Growth', price: '$59', period: '/month', highlight: true, features: ['3 locations', 'Up to 15 staff', 'Everything in Starter', 'Advanced analytics', 'Loyalty program', 'Priority support'] },
+              { name: 'Enterprise', price: '$99', period: '/month', highlight: false, features: ['Unlimited locations', 'Unlimited staff', 'Everything in Growth', 'Custom branding', 'API access', 'Dedicated support'] },
             ].map(({ name, price, period, highlight, features }, idx) => (
-              <div
-                key={name}
-                className={`sf-reveal sf-d${idx + 1} rounded-2xl p-6 relative ${highlight ? 'sf-pricing-pop' : 'sf-glass'}`}
-                style={{ zIndex: 0 }}
-              >
+              <div key={name} className={`sf-reveal sf-d${idx + 1} rounded-2xl p-6 relative ${highlight ? 'sf-pricing-pop' : 'sf-glass'}`} style={{ zIndex: 0 }}>
                 {highlight && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-xs font-semibold text-white whitespace-nowrap" style={{ background: 'linear-gradient(135deg, #f43f5e, #a855f7)' }}>
                     Most Popular
@@ -443,14 +491,13 @@ export default function LandingPage() {
                     </li>
                   ))}
                 </ul>
-                <a href="https://wa.me/923171116067" target="_blank" rel="noopener noreferrer">
-                  <button
-                    className="w-full py-3 rounded-xl text-sm font-semibold transition-all hover:opacity-90"
-                    style={highlight ? { background: 'linear-gradient(135deg, #f43f5e, #a855f7)', color: '#fff' } : { background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}
-                  >
-                    Contact us to get started
-                  </button>
-                </a>
+                <button
+                  onClick={openDemo}
+                  className="w-full py-3 rounded-xl text-sm font-semibold transition-all hover:opacity-90"
+                  style={highlight ? { background: 'linear-gradient(135deg, #f43f5e, #a855f7)', color: '#fff' } : { background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}
+                >
+                  Contact us to get started
+                </button>
               </div>
             ))}
           </div>
@@ -484,9 +531,9 @@ export default function LandingPage() {
               <h4 className="text-white font-semibold text-sm mb-4">Contact</h4>
               <ul className="space-y-2.5">
                 <li>
-                  <a href="https://wa.me/923171116067" target="_blank" rel="noopener noreferrer" className="text-sm text-gray-500 hover:text-white transition-colors">
-                    WhatsApp Support
-                  </a>
+                  <button onClick={openDemo} className="text-sm text-gray-500 hover:text-white transition-colors">
+                    Request a Demo
+                  </button>
                 </li>
                 <li>
                   <Link href="/login" className="text-sm text-gray-500 hover:text-white transition-colors">
@@ -502,6 +549,175 @@ export default function LandingPage() {
           </div>
         </div>
       </footer>
+
+      {/* ── DEMO REQUEST MODAL ── */}
+      {demoOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            onClick={() => setDemoOpen(false)}
+          />
+          {/* Modal */}
+          <div
+            className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl"
+            style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 0 60px rgba(244,63,94,0.15), 0 40px 80px rgba(0,0,0,0.8)' }}
+          >
+            <button
+              onClick={() => setDemoOpen(false)}
+              className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors z-10"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="p-6 sm:p-8">
+              {submitted ? (
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ background: 'rgba(34,197,94,0.15)', border: '2px solid rgba(34,197,94,0.3)' }}>
+                    <Check className="w-8 h-8 text-green-400" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-white mb-2">Thank you!</h3>
+                  <p className="text-gray-400 mb-6">
+                    We will contact you within 24 hours to schedule your demo.
+                  </p>
+                  <button
+                    onClick={() => setDemoOpen(false)}
+                    className="px-6 py-2.5 rounded-lg text-sm font-medium text-white transition-colors"
+                    style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}
+                  >
+                    Close
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="mb-6">
+                    <div className="flex items-center gap-2.5 mb-3">
+                      <div className="w-8 h-8 bg-rose-500 rounded-lg flex items-center justify-center">
+                        <Scissors className="w-4 h-4 text-white" />
+                      </div>
+                      <span className="font-bold text-white">Snipforce</span>
+                    </div>
+                    <h2 className="text-2xl font-bold text-white">Request a Demo</h2>
+                    <p className="text-gray-400 text-sm mt-1">Fill in your details and we will reach out within 24 hours.</p>
+                  </div>
+
+                  <form onSubmit={handleDemoSubmit} className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-400 mb-1.5">Full Name *</label>
+                        <input
+                          type="text"
+                          required
+                          value={form.name}
+                          onChange={(e) => setForm({ ...form, name: e.target.value })}
+                          placeholder="Your name"
+                          className="w-full rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-600 outline-none focus:ring-1 focus:ring-rose-500"
+                          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-400 mb-1.5">Phone Number *</label>
+                        <input
+                          type="tel"
+                          required
+                          value={form.phone}
+                          onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                          placeholder="+1 234 567 8900"
+                          className="w-full rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-600 outline-none focus:ring-1 focus:ring-rose-500"
+                          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-400 mb-1.5">Salon / Business Name *</label>
+                      <input
+                        type="text"
+                        required
+                        value={form.salonName}
+                        onChange={(e) => setForm({ ...form, salonName: e.target.value })}
+                        placeholder="e.g. Glamour Beauty Studio"
+                        className="w-full rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-600 outline-none focus:ring-1 focus:ring-rose-500"
+                        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-400 mb-1.5">Number of Branches *</label>
+                        <select
+                          required
+                          value={form.branches}
+                          onChange={(e) => setForm({ ...form, branches: e.target.value })}
+                          className="w-full rounded-lg px-3 py-2.5 text-sm text-white outline-none focus:ring-1 focus:ring-rose-500 appearance-none cursor-pointer"
+                          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+                        >
+                          <option value="" style={{ background: '#111827' }}>Select...</option>
+                          <option value="1" style={{ background: '#111827' }}>1 branch</option>
+                          <option value="2-5" style={{ background: '#111827' }}>2–5 branches</option>
+                          <option value="5-10" style={{ background: '#111827' }}>5–10 branches</option>
+                          <option value="10+" style={{ background: '#111827' }}>10+ branches</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-400 mb-1.5">City *</label>
+                        <input
+                          type="text"
+                          required
+                          value={form.city}
+                          onChange={(e) => setForm({ ...form, city: e.target.value })}
+                          placeholder="e.g. Dubai"
+                          className="w-full rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-600 outline-none focus:ring-1 focus:ring-rose-500"
+                          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-400 mb-1.5">How did you hear about us? *</label>
+                      <select
+                        required
+                        value={form.source}
+                        onChange={(e) => setForm({ ...form, source: e.target.value })}
+                        className="w-full rounded-lg px-3 py-2.5 text-sm text-white outline-none focus:ring-1 focus:ring-rose-500 appearance-none cursor-pointer"
+                        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+                      >
+                        <option value="" style={{ background: '#111827' }}>Select...</option>
+                        <option value="Social Media" style={{ background: '#111827' }}>Social Media</option>
+                        <option value="Friend/Referral" style={{ background: '#111827' }}>Friend / Referral</option>
+                        <option value="Google Search" style={{ background: '#111827' }}>Google Search</option>
+                        <option value="Other" style={{ background: '#111827' }}>Other</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-400 mb-1.5">Message (optional)</label>
+                      <textarea
+                        rows={3}
+                        value={form.message}
+                        onChange={(e) => setForm({ ...form, message: e.target.value })}
+                        placeholder="Tell us about your salon..."
+                        className="w-full rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-600 outline-none focus:ring-1 focus:ring-rose-500 resize-none"
+                        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className="w-full py-3.5 rounded-xl font-semibold text-white text-sm flex items-center justify-center gap-2 transition-opacity hover:opacity-90 disabled:opacity-70"
+                      style={{ background: 'linear-gradient(135deg, #f43f5e, #db2777)' }}
+                    >
+                      {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                      {submitting ? 'Submitting...' : 'Request Demo'}
+                    </button>
+                  </form>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

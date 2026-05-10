@@ -37,6 +37,24 @@ import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
 import NotificationBell from '@/components/NotificationBell'
 
+const PERM_TO_HREF: Record<string, string> = {
+  dashboard: '/dashboard',
+  appointments: '/appointments',
+  calendar: '/calendar',
+  walkin: '/walkin',
+  services: '/services',
+  staff: '/staff',
+  performance: '/staff/performance',
+  reviews: '/reviews',
+  clients: '/clients',
+  inventory: '/inventory',
+  expenses: '/expenses',
+  payroll: '/payroll',
+  reports: '/reports/pnl',
+  team: '/team',
+  settings: '/settings',
+}
+
 const allNavItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/appointments', label: 'Appointments', icon: CalendarDays },
@@ -63,15 +81,34 @@ interface SidebarProps {
   userEmail?: string
   role?: UserRole
   ownerId?: string
+  permissions?: string[] | null
 }
 
-export default function Sidebar({ salonName, salonLogoUrl, userEmail, role = 'owner', ownerId }: SidebarProps) {
+export default function Sidebar({
+  salonName,
+  salonLogoUrl,
+  userEmail,
+  role = 'owner',
+  ownerId,
+  permissions,
+}: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
 
-  const allowedPaths = ROLE_NAV[role]
+  let allowedPaths: string[]
+  if (role === 'owner') {
+    allowedPaths = ROLE_NAV['owner']
+  } else if (permissions && permissions.length > 0) {
+    const permSet = new Set(permissions)
+    allowedPaths = Object.entries(PERM_TO_HREF)
+      .filter(([key]) => permSet.has(key))
+      .map(([, href]) => href)
+  } else {
+    allowedPaths = ROLE_NAV[role]
+  }
+
   const navItems = allNavItems.filter((item) => allowedPaths.includes(item.href))
 
   async function handleLogout() {
@@ -87,7 +124,7 @@ export default function Sidebar({ salonName, salonLogoUrl, userEmail, role = 'ow
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
-      {/* Brand / Logo + Notification Bell */}
+      {/* Brand */}
       <div className="px-4 py-4 border-b border-gray-100">
         <div className="flex items-center justify-between">
           <Link
@@ -141,7 +178,6 @@ export default function Sidebar({ salonName, salonLogoUrl, userEmail, role = 'ow
 
       {/* User section */}
       <div className="px-4 py-4 space-y-3">
-        {/* Notifications row removed from here — bell is in top header */}
         <div className="flex items-center gap-3 px-1">
           <div className="w-8 h-8 bg-primary/20 flex items-center justify-center rounded-full flex-shrink-0 overflow-hidden">
             {salonLogoUrl ? (
@@ -174,7 +210,6 @@ export default function Sidebar({ salonName, salonLogoUrl, userEmail, role = 'ow
         </Button>
       </div>
 
-      {/* Powered by */}
       <div className="px-4 pb-3 text-center">
         <p className="text-[10px] text-gray-300">Powered by Snipforce</p>
       </div>
@@ -198,9 +233,7 @@ export default function Sidebar({ salonName, salonLogoUrl, userEmail, role = 'ow
               <Scissors className="w-3.5 h-3.5 text-white" />
             )}
           </div>
-          <span className="font-bold text-sm text-gray-900">
-            {salonName || 'Snipforce'}
-          </span>
+          <span className="font-bold text-sm text-gray-900">{salonName || 'Snipforce'}</span>
         </Link>
         <div className="flex items-center gap-1">
           {ownerId && <NotificationBell ownerId={ownerId} />}

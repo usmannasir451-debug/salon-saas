@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import Sidebar from '@/components/Sidebar'
 import FloatingWalkIn from '@/components/FloatingWalkIn'
 import { RoleProvider, type UserCtx } from '@/components/RoleContext'
+import { PermissionGuard } from '@/components/PermissionGuard'
 import type { UserRole } from '@/lib/types'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -13,7 +14,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   const { data: membership } = await supabase
     .from('salon_members')
-    .select('owner_id, role, staff_id')
+    .select('owner_id, role, staff_id, permissions')
     .eq('member_user_id', user.id)
     .eq('status', 'active')
     .single()
@@ -21,11 +22,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
   let role: UserRole = 'owner'
   let ownerId = user.id
   let staffId: string | undefined
+  let permissions: string[] | null = null
 
   if (membership) {
     role = membership.role as Exclude<UserRole, 'owner'>
     ownerId = membership.owner_id
     staffId = membership.staff_id ?? undefined
+    permissions = (membership.permissions as string[] | null) ?? null
   }
 
   const { data: profile } = await supabase
@@ -34,7 +37,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     .eq('id', ownerId)
     .single()
 
-  const ctx: UserCtx = { role, ownerId, staffId }
+  const ctx: UserCtx = { role, ownerId, staffId, permissions }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -45,16 +48,16 @@ export default async function DashboardLayout({ children }: { children: React.Re
           userEmail={user.email}
           role={role}
           ownerId={ownerId}
+          permissions={permissions}
         />
         <div className="lg:pl-60">
           <main className="pt-16 lg:pt-0 min-h-screen">
-            {children}
+            <PermissionGuard>{children}</PermissionGuard>
           </main>
           <footer className="lg:block text-center py-3 text-xs text-gray-300">
             Powered by Snipforce
           </footer>
         </div>
-        {/* Floating walk-in button on all pages */}
         <FloatingWalkIn role={role} />
       </RoleProvider>
     </div>
