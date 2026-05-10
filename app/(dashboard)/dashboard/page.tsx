@@ -9,20 +9,21 @@ import { useUserContext } from '@/components/RoleContext'
 import type { Branch } from '@/lib/types'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  LineChart, Line, PieChart, Pie, Cell,
 } from 'recharts'
 import {
   CalendarDays, TrendingUp, Scissors, Users, Clock, Loader2, Sparkles, Download, MessageCircle,
-  Building2, CheckCircle2, ReceiptText, Sun, Sunset, Moon, AlertTriangle, Package,
-  TrendingDown, UserCheck, Star, Gift, CreditCard, Zap,
+  Building2, CheckCircle2, ReceiptText, AlertTriangle, Package,
+  TrendingDown, UserCheck, Star, Gift, CreditCard, Zap, Plus, DollarSign, UserPlus, Activity,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 
-// ─── Types ──────────────────────────────────────────────────────────────────
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 type ServiceRef = { id: string; name: string; price: number }
-type StaffRef = { id: string; name: string }
+type StaffRef   = { id: string; name: string }
 
 type AppRow = {
   id: string
@@ -50,6 +51,8 @@ type WalkInRow = {
   services?: ServiceRef | null
 }
 
+type ExpenseRow = { amount: number; branch_id: string | null }
+
 type LowStockItem = { id: string; name: string; quantity: number; unit: string }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -68,11 +71,11 @@ function whatsappUrl(phone: string, clientName: string, date: string, time: stri
 }
 
 const statusConfig: Record<string, { label: string; className: string }> = {
-  pending: { label: 'Pending', className: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
+  pending:   { label: 'Pending',   className: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
   confirmed: { label: 'Confirmed', className: 'bg-blue-50 text-blue-700 border-blue-200' },
   completed: { label: 'Completed', className: 'bg-green-50 text-green-700 border-green-200' },
   cancelled: { label: 'Cancelled', className: 'bg-red-50 text-red-700 border-red-200' },
-  no_show: { label: 'No Show', className: 'bg-gray-50 text-gray-600 border-gray-200' },
+  no_show:   { label: 'No Show',   className: 'bg-gray-50 text-gray-600 border-gray-200' },
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -87,6 +90,11 @@ function RevenueTooltip({ active, payload, label, currency }: any) {
 }
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const HOURS = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+const WEEK_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const DOW_TO_LABEL = [6, 0, 1, 2, 3, 4, 5] // JS getDay (0=Sun) → WEEK_DAYS index
+
+const DONUT_COLORS = ['#f43f5e', '#ec4899', '#a855f7', '#3b82f6', '#f97316', '#10b981', '#6b7280']
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
@@ -96,8 +104,11 @@ export default function DashboardPage() {
 
   const [allAppointments, setAllAppointments] = useState<AppRow[]>([])
   const [walkIns, setWalkIns] = useState<WalkInRow[]>([])
+  const [allExpenses, setAllExpenses] = useState<ExpenseRow[]>([])
+  const [sixMonthAppts, setSixMonthAppts] = useState<{ appointment_date: string; status: string; branch_id?: string; services?: { price: number } | null }[]>([])
+  const [sixMonthWalkIns, setSixMonthWalkIns] = useState<{ total: number; created_at: string; branch_id?: string }[]>([])
+  const [sixMonthClients, setSixMonthClients] = useState<{ created_at: string }[]>([])
   const [lowStockItems, setLowStockItems] = useState<LowStockItem[]>([])
-  const [monthExpenses, setMonthExpenses] = useState(0)
   const [lastMonthRevenue, setLastMonthRevenue] = useState(0)
   const [salonName, setSalonName] = useState('')
   const [currency, setCurrency] = useState('USD')
@@ -123,15 +134,21 @@ export default function DashboardPage() {
   async function loadDashboard() {
     const supabase = createClient()
 
-    const todayStr = format(new Date(), 'yyyy-MM-dd')
-    const monthStart = format(startOfMonth(new Date()), 'yyyy-MM-dd')
-    const monthEnd = format(endOfMonth(new Date()), 'yyyy-MM-dd')
+    const todayStr       = format(new Date(), 'yyyy-MM-dd')
+    const monthStart     = format(startOfMonth(new Date()), 'yyyy-MM-dd')
+    const monthEnd       = format(endOfMonth(new Date()), 'yyyy-MM-dd')
     const lastMonthStart = format(startOfMonth(subMonths(new Date(), 1)), 'yyyy-MM-dd')
-    const lastMonthEnd = format(endOfMonth(subMonths(new Date(), 1)), 'yyyy-MM-dd')
-    const sevenDaysAgo = format(subDays(new Date(), 6), 'yyyy-MM-dd')
-    const queryStart = monthStart < sevenDaysAgo ? monthStart : sevenDaysAgo
+    const lastMonthEnd   = format(endOfMonth(subMonths(new Date(), 1)), 'yyyy-MM-dd')
+    const sevenDaysAgo   = format(subDays(new Date(), 6), 'yyyy-MM-dd')
+    const sixMonthsAgo   = format(startOfMonth(subMonths(new Date(), 5)), 'yyyy-MM-dd')
+    const queryStart     = monthStart < sevenDaysAgo ? monthStart : sevenDaysAgo
 
-    const [profileRes, apptRes, walkInRes, branchRes, expenseRes, lastMonthApptRes, lastMonthWalkinRes, inventoryRes, reviewRes, clientBdayRes, staffBdayRes] = await Promise.all([
+    const [
+      profileRes, apptRes, walkInRes, branchRes, expenseRes,
+      lastMonthApptRes, lastMonthWalkinRes, inventoryRes, reviewRes,
+      clientBdayRes, staffBdayRes,
+      sixMonthApptRes, sixMonthWalkInRes, sixMonthClientRes,
+    ] = await Promise.all([
       supabase.from('profiles').select('salon_name, salon_currency').eq('id', ownerId).single(),
       supabase.from('appointments')
         .select('id, client_name, client_phone, service_id, staff_id, branch_id, appointment_date, appointment_time, status, payment_method, notes, services(id, name, price), staff(id, name)')
@@ -144,7 +161,7 @@ export default function DashboardPage() {
         .eq('user_id', ownerId)
         .gte('created_at', monthStart + 'T00:00:00'),
       supabase.from('branches').select('*').eq('user_id', ownerId).order('name'),
-      supabase.from('expenses').select('amount').eq('user_id', ownerId)
+      supabase.from('expenses').select('amount, branch_id').eq('user_id', ownerId)
         .gte('expense_date', monthStart).lte('expense_date', monthEnd),
       supabase.from('appointments')
         .select('services(price), status')
@@ -153,12 +170,24 @@ export default function DashboardPage() {
         .lte('appointment_date', lastMonthEnd),
       supabase.from('walk_ins').select('total').eq('user_id', ownerId)
         .gte('created_at', lastMonthStart + 'T00:00:00').lte('created_at', lastMonthEnd + 'T23:59:59'),
-      supabase.from('inventory_items')
-        .select('id, name, quantity, reorder_level, unit')
-        .eq('user_id', ownerId),
+      supabase.from('inventory_items').select('id, name, quantity, reorder_level, unit').eq('user_id', ownerId),
       supabase.from('reviews').select('rating').eq('user_id', ownerId),
       supabase.from('clients').select('name, phone, birthday').eq('user_id', ownerId).not('birthday', 'is', null),
       supabase.from('staff').select('id, name, birthday').eq('user_id', ownerId).not('birthday', 'is', null),
+      // 6-month data for trend charts
+      supabase.from('appointments')
+        .select('appointment_date, status, branch_id, services(price)')
+        .eq('user_id', ownerId)
+        .eq('status', 'completed')
+        .gte('appointment_date', sixMonthsAgo),
+      supabase.from('walk_ins')
+        .select('total, created_at, branch_id')
+        .eq('user_id', ownerId)
+        .gte('created_at', sixMonthsAgo + 'T00:00:00'),
+      supabase.from('clients')
+        .select('created_at')
+        .eq('user_id', ownerId)
+        .gte('created_at', sixMonthsAgo + 'T00:00:00'),
     ])
 
     setSalonName(profileRes.data?.salon_name ?? '')
@@ -166,15 +195,14 @@ export default function DashboardPage() {
     setAllAppointments((apptRes.data as unknown as AppRow[]) ?? [])
     setWalkIns((walkInRes.data as unknown as WalkInRow[]) ?? [])
     setBranches((branchRes.data as Branch[]) ?? [])
-
-    // Monthly expenses
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const expTotal = (expenseRes.data ?? []).reduce((s: number, e: any) => s + Number(e.amount ?? 0), 0)
-    setMonthExpenses(expTotal)
+    setAllExpenses((expenseRes.data as unknown as ExpenseRow[]) ?? [])
+    setSixMonthAppts((sixMonthApptRes.data as unknown as typeof sixMonthAppts) ?? [])
+    setSixMonthWalkIns((sixMonthWalkInRes.data as unknown as typeof sixMonthWalkIns) ?? [])
+    setSixMonthClients((sixMonthClientRes.data as unknown as typeof sixMonthClients) ?? [])
 
     // Last month revenue
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const lmApptRev = (lastMonthApptRes.data ?? []).filter((a: any) => a.status === 'completed')
+    const lmApptRev   = (lastMonthApptRes.data ?? []).filter((a: any) => a.status === 'completed')
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .reduce((s: number, a: any) => s + Number(a.services?.price ?? 0), 0)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -189,7 +217,7 @@ export default function DashboardPage() {
     // Avg rating
     const reviews = (reviewRes.data ?? []) as { rating: number }[]
     const totalRev = reviews.length
-    const avgRat = totalRev > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / totalRev : 0
+    const avgRat   = totalRev > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / totalRev : 0
     setAvgRating(avgRat)
     setTotalReviews(totalRev)
 
@@ -199,21 +227,17 @@ export default function DashboardPage() {
       .filter((c) => c.birthday && new Date(c.birthday + 'T00:00:00').getMonth() === currentMonth)
     setBirthdayClients(bClients)
 
-    // Staff birthday notifications (fire once per day)
+    // Staff birthday notifications
     const staffWithBirthday = ((staffBdayRes.data ?? []) as { id: string; name: string; birthday: string }[])
       .filter((s) => s.birthday && format(new Date(s.birthday + 'T00:00:00'), 'MM-dd') === format(new Date(), 'MM-dd'))
     if (staffWithBirthday.length > 0) {
       const { count: bdayCount } = await supabase
-        .from('notifications')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', ownerId)
-        .eq('type', 'staff_birthday')
-        .gte('created_at', todayStr + 'T00:00:00')
+        .from('notifications').select('id', { count: 'exact', head: true })
+        .eq('user_id', ownerId).eq('type', 'staff_birthday').gte('created_at', todayStr + 'T00:00:00')
       if (!bdayCount) {
         void Promise.all(staffWithBirthday.map((s) =>
           supabase.from('notifications').insert({
-            user_id: ownerId,
-            type: 'staff_birthday',
+            user_id: ownerId, type: 'staff_birthday',
             title: 'Staff Birthday Today! 🎂',
             message: `${s.name}'s birthday is today. Wish them well!`,
             link: '/staff',
@@ -222,18 +246,14 @@ export default function DashboardPage() {
       }
     }
 
-    // Low inventory notification (fire once per day)
+    // Low inventory notification
     if (low.length > 0) {
       const { count: invCount } = await supabase
-        .from('notifications')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', ownerId)
-        .eq('type', 'low_inventory')
-        .gte('created_at', todayStr + 'T00:00:00')
+        .from('notifications').select('id', { count: 'exact', head: true })
+        .eq('user_id', ownerId).eq('type', 'low_inventory').gte('created_at', todayStr + 'T00:00:00')
       if (!invCount) {
         void supabase.from('notifications').insert({
-          user_id: ownerId,
-          type: 'low_inventory',
+          user_id: ownerId, type: 'low_inventory',
           title: 'Low Inventory Alert',
           message: `${low.length} item(s) running low: ${(low as LowStockItem[]).slice(0, 2).map((i) => i.name).join(', ')}`,
           link: '/inventory',
@@ -244,7 +264,8 @@ export default function DashboardPage() {
     setLoading(false)
   }
 
-  // ── Branch filter ──
+  // ── Branch filter ──────────────────────────────────────────────────────────
+
   const branchFiltered = useMemo(() => {
     if (activeBranch === 'all') return allAppointments
     return allAppointments.filter(a => a.branch_id === activeBranch)
@@ -255,34 +276,43 @@ export default function DashboardPage() {
     return walkIns.filter(w => w.branch_id === activeBranch)
   }, [walkIns, activeBranch])
 
-  // ── Monthly data ──
+  const branchFilteredExpenses = useMemo(() => {
+    if (activeBranch === 'all') return allExpenses
+    return allExpenses.filter(e => e.branch_id === activeBranch || e.branch_id == null)
+  }, [allExpenses, activeBranch])
+
+  // ── Monthly data ──────────────────────────────────────────────────────────
+
   const monthlyAppts = useMemo(() => {
     const monthStart = startOfMonth(new Date())
     return branchFiltered.filter(a => new Date(a.appointment_date + 'T00:00:00') >= monthStart)
   }, [branchFiltered])
 
-  // ── Period-filtered appointments ──
+  // ── Period-filtered appointments ──────────────────────────────────────────
+
   const periodFiltered = useMemo(() => {
-    const todayStr = format(new Date(), 'yyyy-MM-dd')
-    const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 })
+    const todayStr   = format(new Date(), 'yyyy-MM-dd')
+    const weekStart  = startOfWeek(new Date(), { weekStartsOn: 1 })
     const monthStart = startOfMonth(new Date())
     switch (activeFilter) {
       case 'today': return branchFiltered.filter(a => a.appointment_date === todayStr)
-      case 'week': return branchFiltered.filter(a => new Date(a.appointment_date + 'T00:00:00') >= weekStart)
-      default: return branchFiltered.filter(a => new Date(a.appointment_date + 'T00:00:00') >= monthStart)
+      case 'week':  return branchFiltered.filter(a => new Date(a.appointment_date + 'T00:00:00') >= weekStart)
+      default:      return branchFiltered.filter(a => new Date(a.appointment_date + 'T00:00:00') >= monthStart)
     }
   }, [branchFiltered, activeFilter])
 
-  // ── Today walk-ins ──
+  // ── Today walk-ins ──────────────────────────────────────────────────────────
+
   const todayWalkIns = useMemo(() => {
     const todayStr = format(new Date(), 'yyyy-MM-dd')
     return branchFilteredWalkIns.filter(w => w.created_at.startsWith(todayStr))
   }, [branchFilteredWalkIns])
 
-  // ── Revenue chart (last 7 days — appt + walkin) ──
+  // ── Revenue chart (last 7 days) ──────────────────────────────────────────────
+
   const revenueChartData = useMemo(() => {
     return Array.from({ length: 7 }, (_, i) => {
-      const date = format(subDays(new Date(), 6 - i), 'yyyy-MM-dd')
+      const date    = format(subDays(new Date(), 6 - i), 'yyyy-MM-dd')
       const apptRev = branchFiltered
         .filter(a => a.appointment_date === date && a.status === 'completed')
         .reduce((sum, a) => sum + Number(a.services?.price ?? 0), 0)
@@ -293,61 +323,104 @@ export default function DashboardPage() {
     })
   }, [branchFiltered, branchFilteredWalkIns])
 
-  // ── Summary stats for selected period ──
+  // ── Summary stats ─────────────────────────────────────────────────────────
+
   const stats = useMemo(() => {
-    const completed = periodFiltered.filter(a => a.status === 'completed')
-    const apptRevenue = completed.reduce((sum, a) => sum + Number(a.services?.price ?? 0), 0)
+    const completed    = periodFiltered.filter(a => a.status === 'completed')
+    const apptRevenue  = completed.reduce((sum, a) => sum + Number(a.services?.price ?? 0), 0)
     const periodWalkIns = activeFilter === 'today' ? todayWalkIns : branchFilteredWalkIns
     const walkinRevenue = periodWalkIns.reduce((sum, w) => sum + Number(w.total ?? 0), 0)
-    const revenue = apptRevenue + walkinRevenue
-    const totalClients = new Set([
-      ...periodFiltered.map(a => a.client_name),
-    ]).size
+    const revenue       = apptRevenue + walkinRevenue
+    const totalClients  = new Set(periodFiltered.map(a => a.client_name)).size
     return {
-      total: periodFiltered.length,
+      total:    periodFiltered.length,
       completed: completed.length,
-      walkins: activeFilter === 'today' ? todayWalkIns.length : branchFilteredWalkIns.length,
+      walkins:  activeFilter === 'today' ? todayWalkIns.length : branchFilteredWalkIns.length,
       revenue,
-      avgBill: completed.length + (activeFilter === 'today' ? todayWalkIns.length : branchFilteredWalkIns.length) > 0
+      avgBill:  completed.length + (activeFilter === 'today' ? todayWalkIns.length : branchFilteredWalkIns.length) > 0
         ? Math.round(revenue / (completed.length + (activeFilter === 'today' ? todayWalkIns.length : branchFilteredWalkIns.length)))
         : 0,
-      clients: totalClients,
+      clients:  totalClients,
     }
   }, [periodFiltered, activeFilter, todayWalkIns, branchFilteredWalkIns])
 
-  // ── Monthly revenue & net profit ──
+  // ── Monthly revenue & net profit (branch-filtered expenses) ──────────────
+
   const monthlyRevenue = useMemo(() => {
-    const apptRev = monthlyAppts.filter(a => a.status === 'completed')
-      .reduce((s, a) => s + Number(a.services?.price ?? 0), 0)
+    const apptRev   = monthlyAppts.filter(a => a.status === 'completed').reduce((s, a) => s + Number(a.services?.price ?? 0), 0)
     const walkinRev = branchFilteredWalkIns.reduce((s, w) => s + Number(w.total ?? 0), 0)
     return apptRev + walkinRev
   }, [monthlyAppts, branchFilteredWalkIns])
 
-  const netProfit = monthlyRevenue - monthExpenses
+  const monthExpenses = useMemo(() => branchFilteredExpenses.reduce((s, e) => s + Number(e.amount), 0), [branchFilteredExpenses])
+  const netProfit     = monthlyRevenue - monthExpenses
   const revenueChangePct = lastMonthRevenue > 0
     ? Math.round(((monthlyRevenue - lastMonthRevenue) / lastMonthRevenue) * 100)
     : null
 
-  // ── Top services by revenue ──
+  // ── 6-month revenue trend ────────────────────────────────────────────────
+
+  const revenueTrendData = useMemo(() => {
+    return Array.from({ length: 6 }, (_, i) => {
+      const monthDate = startOfMonth(subMonths(new Date(), 5 - i))
+      const monthStr  = format(monthDate, 'yyyy-MM')
+      const apptRev   = sixMonthAppts
+        .filter(a => a.appointment_date.startsWith(monthStr) && (activeBranch === 'all' || a.branch_id === activeBranch))
+        .reduce((s, a) => s + Number((a.services as { price?: number } | null)?.price ?? 0), 0)
+      const walkinRev = sixMonthWalkIns
+        .filter(w => w.created_at.startsWith(monthStr) && (activeBranch === 'all' || w.branch_id === activeBranch))
+        .reduce((s, w) => s + Number(w.total ?? 0), 0)
+      return { month: format(monthDate, 'MMM yy'), revenue: apptRev + walkinRev }
+    })
+  }, [sixMonthAppts, sixMonthWalkIns, activeBranch])
+
+  // ── Client growth (6 months) ─────────────────────────────────────────────
+
+  const clientGrowthData = useMemo(() => {
+    return Array.from({ length: 6 }, (_, i) => {
+      const monthDate = startOfMonth(subMonths(new Date(), 5 - i))
+      const monthStr  = format(monthDate, 'yyyy-MM')
+      const count     = sixMonthClients.filter(c => c.created_at.startsWith(monthStr)).length
+      return { month: format(monthDate, 'MMM yy'), count }
+    })
+  }, [sixMonthClients])
+
+  // ── Top services by count ────────────────────────────────────────────────
+
+  const topServicesByCount = useMemo(() => {
+    const map = new Map<string, number>()
+    monthlyAppts.filter(a => a.status === 'completed' && a.services).forEach(a => {
+      const name = a.services!.name
+      map.set(name, (map.get(name) ?? 0) + 1)
+    })
+    return Array.from(map.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5)
+  }, [monthlyAppts])
+
+  // ── Top services by revenue ───────────────────────────────────────────────
+
   const topServices = useMemo(() => {
     const map = new Map<string, { name: string; revenue: number; count: number }>()
     monthlyAppts.filter(a => a.status === 'completed' && a.services).forEach(a => {
-      const name = a.services!.name
+      const name  = a.services!.name
       const price = Number(a.services!.price)
-      const prev = map.get(name)
+      const prev  = map.get(name)
       if (prev) { prev.revenue += price; prev.count++ }
       else map.set(name, { name, revenue: price, count: 1 })
     })
     return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue).slice(0, 5)
   }, [monthlyAppts])
 
-  // ── Top staff by revenue ──
+  // ── Top staff by revenue ──────────────────────────────────────────────────
+
   const topStaff = useMemo(() => {
     const map = new Map<string, { name: string; revenue: number; count: number }>()
     monthlyAppts.filter(a => a.status === 'completed' && a.staff).forEach(a => {
-      const name = a.staff!.name
+      const name  = a.staff!.name
       const price = Number(a.services?.price ?? 0)
-      const prev = map.get(name)
+      const prev  = map.get(name)
       if (prev) { prev.revenue += price; prev.count++ }
       else map.set(name, { name, revenue: price, count: 1 })
     })
@@ -359,27 +432,55 @@ export default function DashboardPage() {
     return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue).slice(0, 5)
   }, [monthlyAppts, branchFilteredWalkIns])
 
-  // ── Busy hours ──
-  const busyHours = useMemo(() => {
-    let morning = 0, afternoon = 0, evening = 0
-    monthlyAppts.forEach(a => {
-      const hour = parseInt(a.appointment_time.split(':')[0])
-      if (hour >= 8 && hour < 12) morning++
-      else if (hour >= 12 && hour < 17) afternoon++
-      else if (hour >= 17 && hour < 21) evening++
+  // ── Staff utilization (booking count as % of top) ────────────────────────
+
+  const staffUtilization = useMemo(() => {
+    const map = new Map<string, number>()
+    monthlyAppts.filter(a => a.staff).forEach(a => {
+      const name = a.staff!.name
+      map.set(name, (map.get(name) ?? 0) + 1)
     })
-    const peak = Math.max(morning, afternoon, evening, 1)
-    return [
-      { label: 'Morning', time: '8am–12pm', count: morning, pct: Math.round((morning / peak) * 100), icon: Sun, color: 'bg-amber-400' },
-      { label: 'Afternoon', time: '12pm–5pm', count: afternoon, pct: Math.round((afternoon / peak) * 100), icon: Sunset, color: 'bg-orange-400' },
-      { label: 'Evening', time: '5pm–9pm', count: evening, pct: Math.round((evening / peak) * 100), icon: Moon, color: 'bg-primary' },
-    ]
+    const max = Math.max(...Array.from(map.values()), 1)
+    return Array.from(map.entries())
+      .map(([name, count]) => ({ name, count, pct: Math.round((count / max) * 100) }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 6)
   }, [monthlyAppts])
 
-  // ── Revenue by payment method ──
+  // ── Peak hours heatmap ────────────────────────────────────────────────────
+
+  const peakHeatmap = useMemo(() => {
+    const map: Record<string, number> = {}
+    monthlyAppts.forEach(a => {
+      const dow   = new Date(a.appointment_date + 'T00:00:00').getDay()
+      const wdIdx = DOW_TO_LABEL[dow]
+      const hour  = parseInt(a.appointment_time.split(':')[0])
+      if (hour >= 7 && hour <= 20) {
+        const key  = `${wdIdx}-${hour}`
+        map[key]   = (map[key] ?? 0) + 1
+      }
+    })
+    const max = Math.max(...Object.values(map), 1)
+    return { map, max }
+  }, [monthlyAppts])
+
+  // ── Busiest days of week ──────────────────────────────────────────────────
+
+  const busyDays = useMemo(() => {
+    const counts = [0, 0, 0, 0, 0, 0, 0]
+    monthlyAppts.forEach(a => {
+      const dow = new Date(a.appointment_date + 'T00:00:00').getDay()
+      counts[dow]++
+    })
+    const peak = Math.max(...counts, 1)
+    return DAYS.map((day, i) => ({ day, count: counts[i], pct: Math.round((counts[i] / peak) * 100) }))
+  }, [monthlyAppts])
+
+  // ── Payment method donut ──────────────────────────────────────────────────
+
   const paymentBreakdown = useMemo(() => {
     const periodWalkIns = activeFilter === 'today' ? todayWalkIns : branchFilteredWalkIns
-    const completed = periodFiltered.filter(a => a.status === 'completed')
+    const completed     = periodFiltered.filter(a => a.status === 'completed')
     const map = new Map<string, number>()
     periodWalkIns.forEach(w => {
       const m = w.payment_method ?? 'cash'
@@ -395,18 +496,25 @@ export default function DashboardPage() {
       .sort((a, b) => b.amount - a.amount)
   }, [periodFiltered, activeFilter, todayWalkIns, branchFilteredWalkIns])
 
-  // ── Busiest days of week ──
-  const busyDays = useMemo(() => {
-    const counts = [0, 0, 0, 0, 0, 0, 0]
-    monthlyAppts.forEach(a => {
-      const dow = new Date(a.appointment_date + 'T00:00:00').getDay()
-      counts[dow]++
-    })
-    const peak = Math.max(...counts, 1)
-    return DAYS.map((day, i) => ({ day, count: counts[i], pct: Math.round((counts[i] / peak) * 100) }))
-  }, [monthlyAppts])
+  // ── Today's summary ───────────────────────────────────────────────────────
 
-  // ── Today timeline ──
+  const todaySummary = useMemo(() => {
+    const todayStr        = format(new Date(), 'yyyy-MM-dd')
+    const todayAllAppts   = branchFiltered.filter(a => a.appointment_date === todayStr)
+    const todayCompleted  = todayAllAppts.filter(a => a.status === 'completed')
+    const todayPending    = todayAllAppts.filter(a => ['pending', 'confirmed'].includes(a.status))
+    const revAppts        = todayCompleted.reduce((s, a) => s + Number(a.services?.price ?? 0), 0)
+    const revWalkins      = todayWalkIns.reduce((s, w) => s + Number(w.total ?? 0), 0)
+    return {
+      revenue:      revAppts + revWalkins,
+      appointments: todayAllAppts.length,
+      walkIns:      todayWalkIns.length,
+      pending:      todayPending.length,
+    }
+  }, [branchFiltered, todayWalkIns])
+
+  // ── Today timeline ────────────────────────────────────────────────────────
+
   const todayAppts = useMemo(() => {
     const todayStr = format(new Date(), 'yyyy-MM-dd')
     return branchFiltered
@@ -414,7 +522,8 @@ export default function DashboardPage() {
       .sort((a, b) => a.appointment_time.localeCompare(b.appointment_time))
   }, [branchFiltered])
 
-  // ── PDF Download ──
+  // ── PDF ───────────────────────────────────────────────────────────────────
+
   async function downloadPDF() {
     setPdfLoading(true)
     try {
@@ -424,22 +533,19 @@ export default function DashboardPage() {
       ])
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const doc = new jsPDF() as any
-      const W = doc.internal.pageSize.width
+      const W   = doc.internal.pageSize.width
 
       doc.setFillColor(244, 63, 94)
       doc.rect(0, 0, W, 38, 'F')
       doc.setTextColor(255, 255, 255)
-      doc.setFontSize(22)
-      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(22); doc.setFont('helvetica', 'bold')
       doc.text('Snipforce', 14, 16)
-      doc.setFontSize(11)
-      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(11); doc.setFont('helvetica', 'normal')
       doc.text(`Monthly Report — ${format(new Date(), 'MMMM yyyy')}`, 14, 26)
       if (salonName) doc.text(salonName, 14, 34)
 
       doc.setTextColor(30, 30, 30)
-      doc.setFontSize(13)
-      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(13); doc.setFont('helvetica', 'bold')
       doc.text('Summary', 14, 52)
 
       autoTable(doc, {
@@ -459,10 +565,8 @@ export default function DashboardPage() {
       })
 
       let y: number = (doc as any).lastAutoTable.finalY + 12
-
       if (topServices.length > 0) {
-        doc.setFontSize(13)
-        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(13); doc.setFont('helvetica', 'bold')
         doc.text('Top Services', 14, y)
         autoTable(doc, {
           startY: y + 4,
@@ -480,6 +584,8 @@ export default function DashboardPage() {
       setPdfLoading(false)
     }
   }
+
+  // ─── Render ───────────────────────────────────────────────────────────────
 
   if (loading) {
     return (
@@ -503,14 +609,32 @@ export default function DashboardPage() {
           </div>
           <p className="text-gray-500 text-sm">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button onClick={downloadPDF} disabled={pdfLoading} variant="outline"
-            className="gap-2 border-primary/30 text-primary hover:bg-primary/5 flex-shrink-0">
-            {pdfLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-            <span className="hidden sm:inline">Monthly Report</span>
-            <span className="sm:hidden">PDF</span>
-          </Button>
-        </div>
+        <Button onClick={downloadPDF} disabled={pdfLoading} variant="outline"
+          className="gap-2 border-primary/30 text-primary hover:bg-primary/5 flex-shrink-0">
+          {pdfLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+          <span className="hidden sm:inline">Monthly Report</span>
+          <span className="sm:hidden">PDF</span>
+        </Button>
+      </div>
+
+      {/* Quick Actions Row */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: 'New Appointment', href: '/appointments', icon: CalendarDays, color: 'bg-primary/10 text-primary' },
+          { label: 'New Walk-in',     href: '/walkin',       icon: Zap,          color: 'bg-orange-50 text-orange-600' },
+          { label: 'Add Expense',     href: '/expenses',     icon: DollarSign,   color: 'bg-red-50 text-red-600' },
+          { label: 'Add Client',      href: '/clients',      icon: UserPlus,     color: 'bg-blue-50 text-blue-600' },
+        ].map(({ label, href, icon: Icon, color }) => (
+          <Link key={label} href={href}>
+            <div className={`flex items-center gap-2.5 p-3 rounded-xl border border-gray-100 hover:shadow-sm transition-all cursor-pointer bg-white group`}>
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${color}`}>
+                <Icon className="w-4 h-4" />
+              </div>
+              <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">{label}</span>
+              <Plus className="w-3.5 h-3.5 text-gray-400 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
+          </Link>
+        ))}
       </div>
 
       {/* Low inventory alert */}
@@ -518,7 +642,7 @@ export default function DashboardPage() {
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center gap-3">
           <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
           <p className="text-sm text-amber-800 flex-1">
-            <strong>{lowStockItems.length} item(s)</strong> are running low on stock:{' '}
+            <strong>{lowStockItems.length} item(s)</strong> running low:{' '}
             {lowStockItems.slice(0, 3).map(i => `${i.name} (${i.quantity} ${i.unit})`).join(', ')}
             {lowStockItems.length > 3 ? ` and ${lowStockItems.length - 3} more` : ''}
           </p>
@@ -543,12 +667,8 @@ export default function DashboardPage() {
                 <div key={c.name} className="flex items-center gap-1.5 bg-white border border-pink-200 rounded-lg px-2 py-1">
                   <span className="text-xs font-medium text-gray-800">{c.name}</span>
                   {c.phone && (
-                    <a
-                      href={`https://wa.me/${c.phone.replace(/\D/g, '').replace(/^0/, '92')}?text=${encodeURIComponent(`Happy Birthday ${c.name}! 🎂🌸`)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-green-600 hover:text-green-700"
-                    >
+                    <a href={`https://wa.me/${c.phone.replace(/\D/g, '').replace(/^0/, '92')}?text=${encodeURIComponent(`Happy Birthday ${c.name}! 🎂🌸`)}`}
+                      target="_blank" rel="noopener noreferrer" className="text-green-600 hover:text-green-700">
                       <MessageCircle className="w-3 h-3" />
                     </a>
                   )}
@@ -596,9 +716,30 @@ export default function DashboardPage() {
         )}
       </div>
 
+      {/* Today's Summary Card (only when filter=today) */}
+      {activeFilter === 'today' && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {[
+            { label: 'Revenue Today',   value: formatCurrency(todaySummary.revenue, currency), icon: TrendingUp,   bg: 'bg-blue-50',   ic: 'text-blue-600' },
+            { label: 'Appointments',    value: String(todaySummary.appointments),              icon: CalendarDays, bg: 'bg-primary/10', ic: 'text-primary' },
+            { label: 'Walk-ins',        value: String(todaySummary.walkIns),                   icon: Zap,          bg: 'bg-orange-50',  ic: 'text-orange-500' },
+            { label: 'Pending',         value: String(todaySummary.pending),                   icon: Clock,        bg: 'bg-yellow-50',  ic: 'text-yellow-600' },
+          ].map(s => (
+            <Card key={s.label} className="border-gray-100 hover:shadow-md transition-shadow">
+              <CardContent className="pt-5 pb-4">
+                <div className={`w-10 h-10 rounded-xl ${s.bg} flex items-center justify-center mb-3`}>
+                  <s.icon className={`w-5 h-5 ${s.ic}`} />
+                </div>
+                <p className="text-xl font-bold text-gray-900 mb-0.5 leading-tight">{s.value}</p>
+                <p className="text-xs text-gray-500">{s.label}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        {/* Revenue */}
         <Card className="border-gray-100 hover:shadow-md transition-shadow">
           <CardContent className="pt-5 pb-4">
             <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center mb-3">
@@ -617,7 +758,6 @@ export default function DashboardPage() {
             </div>
           </CardContent>
         </Card>
-        {/* Appointments */}
         <Card className="border-gray-100 hover:shadow-md transition-shadow">
           <CardContent className="pt-5 pb-4">
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
@@ -627,7 +767,6 @@ export default function DashboardPage() {
             <p className="text-xs text-gray-500">Appointments</p>
           </CardContent>
         </Card>
-        {/* Walk-Ins */}
         <Card className="border-gray-100 hover:shadow-md transition-shadow">
           <CardContent className="pt-5 pb-4">
             <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center mb-3">
@@ -637,7 +776,6 @@ export default function DashboardPage() {
             <p className="text-xs text-gray-500">Walk-Ins</p>
           </CardContent>
         </Card>
-        {/* Avg Bill */}
         <Card className="border-gray-100 hover:shadow-md transition-shadow">
           <CardContent className="pt-5 pb-4">
             <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center mb-3">
@@ -647,16 +785,13 @@ export default function DashboardPage() {
             <p className="text-xs text-gray-500">Avg Bill</p>
           </CardContent>
         </Card>
-        {/* Salon Rating */}
         <Card className="border-gray-100 hover:shadow-md transition-shadow">
           <CardContent className="pt-5 pb-4">
             <div className="w-10 h-10 rounded-xl bg-yellow-50 flex items-center justify-center mb-3">
               <Star className="w-5 h-5 text-yellow-500" />
             </div>
             <div className="flex items-baseline gap-1">
-              <p className="text-xl font-bold text-gray-900 leading-tight">
-                {avgRating > 0 ? avgRating.toFixed(1) : '—'}
-              </p>
+              <p className="text-xl font-bold text-gray-900 leading-tight">{avgRating > 0 ? avgRating.toFixed(1) : '—'}</p>
               {avgRating > 0 && <span className="text-yellow-400 text-sm">★</span>}
             </div>
             <p className="text-xs text-gray-500">Avg Rating</p>
@@ -683,7 +818,7 @@ export default function DashboardPage() {
                 <TrendingDown className="w-5 h-5 text-red-500" />
               </div>
               <p className="text-xl font-bold text-gray-900 leading-tight">{formatCurrency(monthExpenses, currency)}</p>
-              <p className="text-xs text-gray-500">Expenses</p>
+              <p className="text-xs text-gray-500">Expenses{activeBranch !== 'all' ? ' (Branch)' : ''}</p>
             </CardContent>
           </Card>
           <Card className={`border-2 ${netProfit >= 0 ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
@@ -711,34 +846,41 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Payment Method Breakdown */}
-      {paymentBreakdown.length > 0 && (
-        <Card className="border-gray-100">
-          <CardHeader className="pb-2 border-b border-gray-50">
+      {/* Revenue Trend — 6 months (Line Chart) */}
+      <Card className="border-gray-100">
+        <CardHeader className="pb-2 border-b border-gray-50">
+          <div className="flex items-center justify-between">
             <CardTitle className="text-base flex items-center gap-2">
-              <CreditCard className="w-4 h-4 text-primary" /> Revenue by Payment Method
+              <Activity className="w-4 h-4 text-primary" /> Revenue Trend — Last 6 Months
             </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-4">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {paymentBreakdown.map(({ method, amount }) => {
-                const max = paymentBreakdown[0].amount || 1
-                return (
-                  <div key={method} className="bg-gray-50 rounded-xl p-3">
-                    <p className="text-xs text-gray-500 mb-1">{method}</p>
-                    <p className="text-sm font-bold text-gray-900">{formatCurrency(amount, currency)}</p>
-                    <div className="h-1 bg-gray-200 rounded-full mt-2">
-                      <div className="h-full bg-primary rounded-full" style={{ width: `${(amount / max) * 100}%` }} />
-                    </div>
-                  </div>
-                )
-              })}
+            <Badge className="bg-primary/10 text-primary border-primary/20 text-xs">
+              {formatCurrency(revenueTrendData.reduce((s, d) => s + d.revenue, 0), currency)} total
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-4">
+          {revenueTrendData.every(d => d.revenue === 0) ? (
+            <div className="flex flex-col items-center justify-center h-40 text-gray-400">
+              <TrendingUp className="w-8 h-8 mb-2 opacity-30" />
+              <p className="text-sm">No revenue data yet</p>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          ) : (
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={revenueTrendData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false}
+                  tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} width={36} />
+                <Tooltip content={<RevenueTooltip currency={currency} />} />
+                <Line type="monotone" dataKey="revenue" stroke="#f43f5e" strokeWidth={2.5}
+                  dot={{ fill: '#f43f5e', r: 4 }} activeDot={{ r: 6 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
 
-      {/* Revenue Chart */}
+      {/* Revenue Chart (last 7 days) */}
       <Card className="border-gray-100">
         <CardHeader className="pb-2 border-b border-gray-50">
           <div className="flex items-center justify-between">
@@ -755,7 +897,7 @@ export default function DashboardPage() {
               <p className="text-sm">No revenue data yet</p>
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={200}>
+            <ResponsiveContainer width="100%" height={180}>
               <BarChart data={revenueChartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
                 <XAxis dataKey="day" tick={{ fontSize: 12, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
@@ -769,70 +911,196 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
 
-      {/* Top Services + Busy Hours */}
+      {/* Payment Method Donut + Service Popularity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Payment Method Donut */}
         <Card className="border-gray-100">
           <CardHeader className="pb-2 border-b border-gray-50">
             <CardTitle className="text-base flex items-center gap-2">
-              <Scissors className="w-4 h-4 text-primary" /> Top Services This Month
+              <CreditCard className="w-4 h-4 text-primary" /> Payment Methods
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-4">
-            {topServices.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-6">No completed appointments yet</p>
+            {paymentBreakdown.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-8">No payment data</p>
             ) : (
-              <div className="space-y-3">
-                {topServices.map((s, i) => {
-                  const maxRev = topServices[0].revenue || 1
-                  return (
-                    <div key={s.name}>
-                      <div className="flex items-center justify-between text-sm mb-1">
-                        <div className="flex items-center gap-2">
-                          <span className="w-5 h-5 rounded-full bg-primary/10 text-primary text-xs flex items-center justify-center font-bold flex-shrink-0">{i + 1}</span>
-                          <span className="font-medium text-gray-800 truncate">{s.name}</span>
-                        </div>
-                        <div className="text-right flex-shrink-0 ml-2">
-                          <span className="font-bold text-primary text-xs">{formatCurrency(s.revenue, currency)}</span>
-                          <span className="text-gray-400 text-xs ml-1">({s.count})</span>
-                        </div>
+              <div className="flex items-center gap-4">
+                <ResponsiveContainer width={140} height={140}>
+                  <PieChart>
+                    <Pie data={paymentBreakdown} dataKey="amount" nameKey="method"
+                      cx="50%" cy="50%" innerRadius={38} outerRadius={60} paddingAngle={3}>
+                      {paymentBreakdown.map((_, i) => (
+                        <Cell key={i} fill={DONUT_COLORS[i % DONUT_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(v: unknown) => formatCurrency(Number(v ?? 0), currency)} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="flex-1 space-y-2">
+                  {paymentBreakdown.map(({ method, amount }, i) => {
+                    const total = paymentBreakdown.reduce((s, p) => s + p.amount, 0)
+                    return (
+                      <div key={method} className="flex items-center gap-2">
+                        <div className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: DONUT_COLORS[i % DONUT_COLORS.length] }} />
+                        <span className="text-xs text-gray-600 flex-1 truncate">{method}</span>
+                        <span className="text-xs font-semibold text-gray-800">{Math.round((amount / total) * 100)}%</span>
                       </div>
-                      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-primary rounded-full transition-all"
-                          style={{ width: `${(s.revenue / maxRev) * 100}%` }} />
-                      </div>
-                    </div>
-                  )
-                })}
+                    )
+                  })}
+                </div>
               </div>
             )}
           </CardContent>
         </Card>
 
+        {/* Service Popularity (booking count) */}
         <Card className="border-gray-100">
           <CardHeader className="pb-2 border-b border-gray-50">
             <CardTitle className="text-base flex items-center gap-2">
-              <Clock className="w-4 h-4 text-primary" /> Busy Hours This Month
+              <Scissors className="w-4 h-4 text-primary" /> Service Popularity This Month
             </CardTitle>
           </CardHeader>
-          <CardContent className="pt-5">
-            {monthlyAppts.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-6">No appointments this month</p>
+          <CardContent className="pt-4">
+            {topServicesByCount.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-6">No completed appointments yet</p>
             ) : (
-              <div className="grid grid-cols-3 gap-3">
-                {busyHours.map(h => (
-                  <div key={h.label} className="flex flex-col items-center">
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-2"
-                      style={{ backgroundColor: h.label === 'Morning' ? '#fef3c7' : h.label === 'Afternoon' ? '#ffedd5' : '#fff1f3' }}>
-                      <h.icon className={`w-5 h-5 ${h.label === 'Morning' ? 'text-amber-500' : h.label === 'Afternoon' ? 'text-orange-500' : 'text-primary'}`} />
+              <ResponsiveContainer width="100%" height={Math.max(120, topServicesByCount.length * 38)}>
+                <BarChart data={topServicesByCount} layout="vertical" margin={{ top: 0, right: 24, left: 8, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" horizontal={false} />
+                  <XAxis type="number" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} width={110} />
+                  <Tooltip formatter={(v: unknown) => [Number(v ?? 0), 'Bookings']} />
+                  <Bar dataKey="count" fill="#f43f5e" radius={[0, 4, 4, 0]} maxBarSize={28} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Peak Hours Heatmap */}
+      <Card className="border-gray-100">
+        <CardHeader className="pb-2 border-b border-gray-50">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Clock className="w-4 h-4 text-primary" /> Peak Hours This Month
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-4">
+          {monthlyAppts.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-6">No appointments this month</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <div className="min-w-[480px]">
+                {/* Hour labels */}
+                <div className="flex mb-1">
+                  <div className="w-8 flex-shrink-0" />
+                  {HOURS.map(h => (
+                    <div key={h} className="flex-1 text-center text-[9px] text-gray-400 font-medium">
+                      {h < 12 ? `${h}a` : h === 12 ? '12p' : `${h - 12}p`}
                     </div>
-                    <p className="text-xl font-bold text-gray-900">{h.count}</p>
-                    <p className="text-xs font-medium text-gray-700">{h.label}</p>
-                    <p className="text-[10px] text-gray-400 mt-0.5">{h.time}</p>
-                    <div className="w-full mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div className={`h-full rounded-full ${h.color} transition-all`} style={{ width: `${h.pct}%` }} />
-                    </div>
+                  ))}
+                </div>
+                {/* Grid */}
+                {WEEK_DAYS.map((day, wdIdx) => (
+                  <div key={day} className="flex items-center mb-1">
+                    <div className="w-8 text-[10px] text-gray-500 font-medium flex-shrink-0">{day}</div>
+                    {HOURS.map(hour => {
+                      const count = peakHeatmap.map[`${wdIdx}-${hour}`] ?? 0
+                      const intensity = count / peakHeatmap.max
+                      return (
+                        <div key={hour} className="flex-1 mx-0.5 h-6 rounded-sm flex items-center justify-center"
+                          style={{
+                            backgroundColor: count === 0
+                              ? '#f3f4f6'
+                              : `rgba(244, 63, 94, ${0.15 + intensity * 0.85})`,
+                          }}
+                          title={`${day} ${hour}:00 — ${count} appt${count !== 1 ? 's' : ''}`}>
+                          {count > 0 && (
+                            <span className="text-[8px] font-bold"
+                              style={{ color: intensity > 0.5 ? '#fff' : '#f43f5e' }}>
+                              {count}
+                            </span>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 ))}
+                {/* Legend */}
+                <div className="flex items-center gap-2 mt-2 justify-end">
+                  <span className="text-[9px] text-gray-400">Low</span>
+                  {[0.15, 0.4, 0.65, 0.9].map(o => (
+                    <div key={o} className="w-4 h-3 rounded-sm" style={{ backgroundColor: `rgba(244,63,94,${o})` }} />
+                  ))}
+                  <span className="text-[9px] text-gray-400">High</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Client Growth + Staff Utilization */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Client Growth */}
+        <Card className="border-gray-100">
+          <CardHeader className="pb-2 border-b border-gray-50">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Users className="w-4 h-4 text-primary" /> New Clients — Last 6 Months
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            {clientGrowthData.every(d => d.count === 0) ? (
+              <p className="text-sm text-gray-400 text-center py-6">No new client data</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={160}>
+                <BarChart data={clientGrowthData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} width={24} allowDecimals={false} />
+                  <Tooltip formatter={(v: unknown) => [Number(v ?? 0), 'New Clients']} />
+                  <Bar dataKey="count" fill="#ec4899" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Staff Utilization */}
+        <Card className="border-gray-100">
+          <CardHeader className="pb-2 border-b border-gray-50">
+            <CardTitle className="text-base flex items-center gap-2">
+              <UserCheck className="w-4 h-4 text-primary" /> Staff Utilization This Month
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            {staffUtilization.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-6">No staff data this month</p>
+            ) : (
+              <div className="space-y-3">
+                {staffUtilization.map((s, i) => {
+                  const colors = ['bg-primary', 'bg-rose-400', 'bg-pink-400', 'bg-fuchsia-400', 'bg-purple-400', 'bg-violet-400']
+                  return (
+                    <div key={s.name} className="flex items-center gap-3">
+                      <div className={`w-7 h-7 rounded-lg ${colors[i] ?? colors[0]} flex items-center justify-center flex-shrink-0`}>
+                        <span className="text-white text-xs font-bold">{s.name[0]?.toUpperCase()}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-xs font-medium text-gray-800 truncate">{s.name}</p>
+                          <span className="text-xs font-bold text-gray-700 ml-2 flex-shrink-0">
+                            {s.count} booking{s.count !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                          <div className={`h-full ${colors[i] ?? colors[0]} rounded-full transition-all`}
+                            style={{ width: `${s.pct}%` }} />
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             )}
           </CardContent>
@@ -856,8 +1124,7 @@ export default function DashboardPage() {
                   <div key={d.day} className="flex items-center gap-3">
                     <span className="text-xs font-medium text-gray-600 w-7 flex-shrink-0">{d.day}</span>
                     <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-primary/70 rounded-full transition-all"
-                        style={{ width: `${d.pct}%` }} />
+                      <div className="h-full bg-primary/70 rounded-full transition-all" style={{ width: `${d.pct}%` }} />
                     </div>
                     <span className="text-xs font-medium text-gray-700 w-5 text-right flex-shrink-0">{d.count}</span>
                   </div>
@@ -959,74 +1226,6 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {/* Appointments List */}
-      <Card className="border-gray-100">
-        <CardHeader className="pb-3 border-b border-gray-50">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base">{filterLabels[activeFilter]} Appointments</CardTitle>
-            <Badge className="bg-primary/10 text-primary border-primary/20">{periodFiltered.length} total</Badge>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-4">
-          {periodFiltered.length === 0 ? (
-            <div className="text-center py-10">
-              <CalendarDays className="w-10 h-10 text-gray-200 mx-auto mb-3" />
-              <p className="text-gray-500 font-medium">No appointments</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {periodFiltered.map(appt => {
-                const sc = statusConfig[appt.status] ?? statusConfig.pending
-                return (
-                  <div key={appt.id}
-                    className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 hover:bg-gray-100/80 transition-colors group">
-                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <Clock className="w-4 h-4 text-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-semibold text-gray-900">{appt.client_name}</p>
-                        {appt.services && (
-                          <>
-                            <span className="text-gray-300">•</span>
-                            <p className="text-sm text-gray-600 truncate">{appt.services.name}</p>
-                            <span className="text-xs font-medium text-primary">{formatCurrency(appt.services.price, currency)}</span>
-                          </>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                        <span className="text-xs text-gray-400">
-                          {activeFilter !== 'today' && (
-                            <>{format(new Date(appt.appointment_date + 'T00:00:00'), 'MMM d')} · </>
-                          )}
-                          {appt.appointment_time.slice(0, 5)}
-                        </span>
-                        {appt.staff && (
-                          <>
-                            <span className="text-gray-300">·</span>
-                            <span className="text-xs text-gray-400">{appt.staff.name}</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      <Badge className={`text-xs border ${sc.className}`}>{sc.label}</Badge>
-                      {appt.client_phone && (
-                        <a href={whatsappUrl(appt.client_phone, appt.client_name, appt.appointment_date, appt.appointment_time, salonName)}
-                          target="_blank" rel="noopener noreferrer"
-                          className="p-1.5 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
-                          title="Send WhatsApp reminder">
-                          <MessageCircle className="w-3.5 h-3.5" />
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
     </div>
   )
 }

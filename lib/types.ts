@@ -24,7 +24,9 @@ export type StaffMember = {
   designation?: string | null
   emergency_contact_name?: string | null
   emergency_contact_phone?: string | null
-  basic_salary?: number | null
+  salary_type?: SalaryType | null
+  fixed_amount?: number | null
+  commission_percentage?: number | null
   is_active: boolean
   created_at: string
 }
@@ -75,6 +77,8 @@ export type Profile = {
   loyalty_earn_pct?: number
   loyalty_expiry_days?: number | null
   subscription_status?: 'active' | 'suspended'
+  expense_categories?: string[] | null
+  expense_budgets?: Record<string, number> | null
   created_at: string
 }
 
@@ -140,12 +144,15 @@ export type ExpenseCategory =
 export type Expense = {
   id: string
   user_id: string
-  category: ExpenseCategory
+  branch_id?: string | null
+  category: string
   description: string
   amount: number
   expense_date: string
-  paid_by?: string
-  notes?: string
+  paid_by?: string | null
+  notes?: string | null
+  receipt_url?: string | null
+  approval_status?: 'pending' | 'approved'
   is_recurring: boolean
   created_at: string
 }

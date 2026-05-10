@@ -1,86 +1,86 @@
-You are an expert SaaS developer working on "Snipforce". Fix and improve the custom permissions and sub-user system completely:
+You are an expert SaaS developer working on "Snipforce". Make these improvements:
 
-PART 1 - FIX SUB-USER SYSTEM ARCHITECTURE
+PART 1 - EXPENSES BRANCH-WISE FIX
 
-Current problem: Sub-users created by salon owner are not properly linked to the salon and data is not shared correctly.
+1. Add branch_id field to expenses table (nullable for single-branch salons)
+2. When adding expense: show branch dropdown if salon has multiple branches, otherwise hide it
+3. Dashboard fix: when filtering by specific branch, only show that branch's expenses in calculations
+4. Net profit calculation must be: branch revenue - branch expenses (not total expenses)
+5. Add branch filter to /expenses page - filter expenses by branch
+6. Expense summary chart should be filterable by branch
 
-Fix this architecture:
-- When owner creates a sub-user (cashier/manager etc), that sub-user logs in and sees THE SAME salon data as the owner
-- Sub-user is NOT a separate salon - they work under the owner's salon
-- All data (appointments, walk-ins, clients, staff, services) belongs to the owner's salon
-- Sub-user just has limited access based on permissions given by owner
-- In salon_members table: member_user_id links to auth.users, owner_id links to the salon owner's profile
-- When sub-user logs in: system finds their salon_members record, gets owner_id, uses that owner_id to fetch all salon data
+CUSTOM EXPENSE CATEGORIES:
+- Keep existing preset categories: Staff Refreshments, Salon Materials, Inventory, Utilities, Rent, Marketing, Miscellaneous
+- Add "Add Custom Category" option at bottom of dropdown
+- When selected: show text input to type custom category name
+- Save custom categories per salon in profiles table as expense_categories JSON array
+- Custom categories appear in dropdown alongside presets
+- Allow deleting custom categories from settings
 
-PART 2 - FIX NAVIGATION AND ROUTING FOR SUB-USERS
+EXPENSE ARCHITECTURE IMPROVEMENTS:
+- Add receipt/attachment field (optional photo upload to Supabase storage)
+- Add "paid_by" field - who paid (owner, petty cash, card)
+- Add expense approval status for managers (pending/approved) - owner approves
+- Monthly budget setting per category in settings - show warning when over budget
+- Expense summary: show this month vs last month comparison
 
-Current problem: Walk-in redirects to appointments for sub-users.
+PART 2 - DASHBOARD IMPROVEMENTS
 
-Fix:
-- When sub-user logs in: check their permissions from salon_members table
-- Build navigation sidebar showing ONLY their permitted pages
-- All pages must use owner_id (not their own user_id) when fetching/saving data
-- Fix walk-in page, appointments page, calendar page to work correctly for sub-users
-- If sub-user tries to access a page they don't have permission for: show "Access Denied" and redirect to their first permitted page
-- Create a useUserContext hook that returns: isOwner, ownerId, permissions, role_name for use across all pages
+REMOVE:
+- Remove "This Month Appointments" list at bottom of dashboard - too cluttered for live use
 
-PART 3 - OWNER-ONLY FEATURES
+ADD THESE VISUALIZATIONS:
+1. Revenue Trend Line Chart - last 6 months revenue trend (appointments + walk-ins combined)
+2. Payment Method Breakdown - pie/donut chart showing cash vs card vs other payment methods this month
+3. Service Popularity Chart - horizontal bar chart top 5 services by booking count this month
+4. Peak Hours Heatmap - show which hours are busiest across the week (7 days x hours grid with color intensity)
+5. Client Growth Chart - new clients per month for last 6 months (bar chart)
+6. Today's Summary Card - show: total revenue today, appointments today, walk-ins today, pending appointments
+7. Staff Utilization - show each staff member's booking rate this month as progress bars
+8. Quick Actions Row - buttons: New Appointment, New Walk-in, Add Expense, Add Client
 
-These features should NEVER be accessible to sub-users regardless of permissions given:
-- Team Members page (/team) - only owner can manage users
-- Settings page (/settings) - only owner can change salon settings
-- Payroll page (/payroll) - only owner can see salaries
-- Admin panel (/admin) - only super admin
+ALL CHARTS:
+- Filterable by branch (if multiple branches exist)
+- Use recharts library
+- Mobile responsive
+- Match pink/rose theme
 
-Even if owner accidentally gives these permissions - system should block sub-users from these pages.
+PART 3 - STAFF SALARY & PAYROLL CONSOLIDATION
 
-PART 4 - IMPROVE TEAM MEMBER CREATION FLOW
+PROBLEM: Basic salary field exists in both staff creation AND payroll setup causing confusion.
 
-When owner creates a new team member:
-- Form fields: Display Name (e.g. "Front Desk Manager"), Email, Password
-- Permission checklist (checkboxes):
-  □ Dashboard - View salon overview and KPIs
-  □ Appointments - View and manage bookings
-  □ Calendar - View appointment calendar
-  □ Walk-In - Process walk-in customers and payments
-  □ Services - View and manage services and deals
-  □ Staff - View and manage staff members
-  □ Performance - View staff performance reports
-  □ Reviews - View customer reviews
-  □ Clients - View and manage client profiles
-  □ Inventory - View and manage inventory
-  □ Expenses - View and add expenses
-  □ Reports/P&L - View financial reports
-- Quick preset buttons:
-  * "Cashier Setup" - auto-ticks: Appointments, Calendar, Walk-In
-  * "Manager Setup" - auto-ticks: Dashboard, Appointments, Calendar, Walk-In, Services, Staff, Clients
-  * "Receptionist Setup" - auto-ticks: Appointments, Calendar, Clients
-- After creation: show credentials summary with copy button and WhatsApp share button
-- Owner can edit permissions anytime
-- Owner can reset password of any sub-user
-- Owner can deactivate/delete sub-user
+SOLUTION - Consolidate into one place:
 
-PART 5 - ADMIN PANEL - SALON DETAIL WITH SUB-USERS
+STAFF CREATION/EDIT FORM - Add complete salary section:
+- Salary Type: 
+  * Fixed Monthly (enter amount)
+  * Commission Only (enter commission % of revenue they generate)
+  * Fixed + Commission (enter both fixed amount AND commission %)
+- Fields shown based on selection:
+  * Fixed amount: input field in currency
+  * Commission %: input field with % symbol
+- Remove the basic_salary field that was previously added - replace with this proper system
 
-In admin panel when viewing a salon:
-- Show "Team Members" section listing all sub-users of that salon
-- Each sub-user row shows: display name, email, permissions list, last set password (with eye toggle), status (active/inactive)
-- Admin can see exactly who has access to each salon
-- Show total sub-user count on the main salons list
+PAYROLL PAGE:
+- Remove salary setup from payroll page completely
+- Payroll page only shows: calculate and pay
+- Auto-calculate based on salary info stored in staff record
+- Show breakdown: Fixed Salary (pro-rated if joined mid-month) + Commission Earned = Total Payable
+- Pro-rata calculation: if joined_date is in current month, calculate proportional salary
+- Show joining date and pro-rata percentage clearly
+- "Mark as Paid" button with payment date and method
+- Salary history below each staff member
 
-PART 6 - DATA ISOLATION
-
-Make sure:
-- Sub-user saving a new appointment: saved under owner's salon (using owner_id)
-- Sub-user processing walk-in: saved under owner's salon
-- Sub-user viewing clients: sees owner's salon clients only
-- Sub-user viewing staff: sees owner's salon staff only
-- No data leakage between different salons
+STAFF LIST:
+- Show salary type badge on each staff card (Fixed/Commission/Both)
+- Show monthly salary amount
 
 TECHNICAL REQUIREMENTS:
-- Fix RLS policies to allow sub-users to read/write owner's salon data
-- Update all pages to use effective owner_id when querying
-- salon_members table must have: owner_id, member_user_id, display_name, permissions (JSONB array), status, last_set_password
+- Update staff table: remove basic_salary column, add salary_type (fixed/commission/both), fixed_amount numeric, commission_percentage numeric
+- Update expenses table: add branch_id, receipt_url, paid_by, approval_status
+- Update profiles table: add expense_categories JSONB, expense_budgets JSONB
 - Generate complete SQL migration at the end
+- RLS policies on all changes
 - Mobile responsive
-- Maintain pink/rose theme
+- Pink/rose theme with shadcn/ui
+- Recharts for all charts
