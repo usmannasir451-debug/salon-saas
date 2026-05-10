@@ -14,7 +14,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   const { data: membership } = await supabase
     .from('salon_members')
-    .select('owner_id, role, staff_id, permissions')
+    .select('owner_id, role, staff_id, permissions, display_name')
     .eq('member_user_id', user.id)
     .eq('status', 'active')
     .single()
@@ -23,12 +23,15 @@ export default async function DashboardLayout({ children }: { children: React.Re
   let ownerId = user.id
   let staffId: string | undefined
   let permissions: string[] | null = null
+  let displayName: string | null = null
+  const isOwner = !membership
 
   if (membership) {
     role = membership.role as Exclude<UserRole, 'owner'>
     ownerId = membership.owner_id
     staffId = membership.staff_id ?? undefined
     permissions = (membership.permissions as string[] | null) ?? null
+    displayName = membership.display_name ?? null
   }
 
   const { data: profile } = await supabase
@@ -37,7 +40,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     .eq('id', ownerId)
     .single()
 
-  const ctx: UserCtx = { role, ownerId, staffId, permissions }
+  const ctx: UserCtx = { role, ownerId, staffId, permissions, isOwner, displayName }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -49,6 +52,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           role={role}
           ownerId={ownerId}
           permissions={permissions}
+          displayName={displayName}
         />
         <div className="lg:pl-60">
           <main className="pt-16 lg:pt-0 min-h-screen">
@@ -58,7 +62,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             Powered by Snipforce
           </footer>
         </div>
-        <FloatingWalkIn role={role} />
+        <FloatingWalkIn />
       </RoleProvider>
     </div>
   )

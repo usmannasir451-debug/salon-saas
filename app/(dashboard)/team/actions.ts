@@ -83,7 +83,7 @@ export async function createTeamMember(
   if (insertError) return { error: insertError.message }
 
   revalidatePath('/team')
-  return { success: true }
+  return { success: true, email: email.toLowerCase(), password: storedPassword ?? password }
 }
 
 export async function updateTeamMember(
@@ -132,6 +132,23 @@ export async function resetTeamMemberPassword(
     .eq('id', memberId)
     .eq('owner_id', user.id)
 
+  return { success: true }
+}
+
+export async function toggleTeamMemberStatus(memberId: string, newStatus: 'active' | 'inactive') {
+  const user = await getOwnerUser()
+  if (!user) return { error: 'Only salon owners can update team members' }
+
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('salon_members')
+    .update({ status: newStatus })
+    .eq('id', memberId)
+    .eq('owner_id', user.id)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/team')
   return { success: true }
 }
 

@@ -2,12 +2,16 @@
 
 import Link from 'next/link'
 import { Zap } from 'lucide-react'
-import type { UserRole } from '@/lib/types'
+import { useUserContext } from '@/components/RoleContext'
 
-const WALKIN_ROLES: UserRole[] = ['owner', 'regional_manager', 'manager', 'receptionist', 'cashier']
+export default function FloatingWalkIn() {
+  const { role, permissions } = useUserContext()
 
-export default function FloatingWalkIn({ role }: { role: UserRole }) {
-  if (!WALKIN_ROLES.includes(role)) return null
+  const canSeeWalkIn =
+    ['owner', 'regional_manager', 'manager', 'receptionist', 'cashier'].includes(role) ||
+    (permissions && permissions.includes('walkin'))
+
+  if (!canSeeWalkIn) return null
 
   return (
     <Link

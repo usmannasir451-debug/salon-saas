@@ -12,10 +12,16 @@ export default async function AdminPage() {
   }
 
   const adminSupabase = createAdminClient()
-  const { data: salons } = await adminSupabase
+  const { data: salonsRaw } = await adminSupabase
     .from('profiles')
-    .select('id, email, salon_name, subscription_status, created_at, last_set_password')
+    .select('id, email, salon_name, subscription_status, created_at, last_set_password, salon_members(count)')
     .order('created_at', { ascending: false })
+
+  const salons = (salonsRaw ?? []).map((s) => ({
+    ...s,
+    member_count: (s.salon_members as unknown as [{ count: number }])[0]?.count ?? 0,
+    salon_members: undefined,
+  }))
 
   return <AdminDashboard salons={salons ?? []} />
 }

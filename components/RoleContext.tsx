@@ -8,9 +8,11 @@ export interface UserCtx {
   ownerId: string
   staffId?: string
   permissions?: string[] | null
+  isOwner: boolean
+  displayName?: string | null
 }
 
-const defaultCtx: UserCtx = { role: 'owner', ownerId: '' }
+const defaultCtx: UserCtx = { role: 'owner', ownerId: '', isOwner: true }
 export const RoleContext = createContext<UserCtx>(defaultCtx)
 export const useUserContext = () => useContext(RoleContext)
 

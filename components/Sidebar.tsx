@@ -82,6 +82,7 @@ interface SidebarProps {
   role?: UserRole
   ownerId?: string
   permissions?: string[] | null
+  displayName?: string | null
 }
 
 export default function Sidebar({
@@ -91,6 +92,7 @@ export default function Sidebar({
   role = 'owner',
   ownerId,
   permissions,
+  displayName,
 }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
@@ -188,7 +190,9 @@ export default function Sidebar({
           </div>
           <div className="overflow-hidden flex-1">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <p className="text-xs font-semibold text-gray-800 truncate">{salonName ?? 'My Salon'}</p>
+              <p className="text-xs font-semibold text-gray-800 truncate">
+                {role !== 'owner' && displayName ? displayName : (salonName ?? 'My Salon')}
+              </p>
               {role !== 'owner' && (
                 <Badge className={cn('text-[10px] px-1.5 py-0', ROLE_COLORS[role])}>
                   {ROLE_LABELS[role]}

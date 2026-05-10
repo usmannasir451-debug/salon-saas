@@ -29,7 +29,8 @@
       "Bash(Get-ChildItem -Depth 2)",
       "Bash(Format-Table -Property Name, PSIsContainer)",
       "Bash(dir \"C:\\\\Users\\\\Tesla Laptops\\\\salon-saas\\\\app\" -Recurse -Directory)",
-      "PowerShell(ls \"C:\\\\Users\\\\Tesla Laptops\\\\salon-saas\" | ForEach-Object { \"$\\($_.Mode\\) $\\($_.Name\\)\" })"
+      "PowerShell(ls \"C:\\\\Users\\\\Tesla Laptops\\\\salon-saas\" | ForEach-Object { \"$\\($_.Mode\\) $\\($_.Name\\)\" })",
+      "Bash(Select-Object -Property Name, PSIsContainer)"
     ]
   }
 }

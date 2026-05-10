@@ -123,7 +123,7 @@ export async function getSalonDetails(userId: string) {
   const [membersRes, apptRes, walkinRes] = await Promise.all([
     supabase
       .from('salon_members')
-      .select('id, email, role, display_name, status, joined_at, last_set_password')
+      .select('id, email, role, display_name, status, joined_at, last_set_password, permissions')
       .eq('owner_id', userId),
     supabase
       .from('appointments')

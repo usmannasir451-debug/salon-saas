@@ -24,6 +24,10 @@ const PERM_TO_HREF: Record<string, string> = {
   settings: '/settings',
 }
 
+// Always blocked for sub-users — even if owner accidentally grants these permissions
+const OWNER_ONLY_PATHS = ['/team', '/settings', '/payroll', '/admin']
+const OWNER_ONLY_PERM_KEYS = new Set(['team', 'settings', 'payroll'])
+
 export function PermissionGuard({ children }: { children: React.ReactNode }) {
   const { role, permissions } = useUserContext()
   const pathname = usePathname()
@@ -32,15 +36,28 @@ export function PermissionGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (role === 'owner') return
 
-    let allowed: string[]
+    const isOwnerOnlyPath = OWNER_ONLY_PATHS.some(
+      (p) => pathname === p || pathname.startsWith(p + '/')
+    )
 
+    let allowed: string[]
     if (permissions && permissions.length > 0) {
       const permSet = new Set(permissions)
       allowed = Object.entries(PERM_TO_HREF)
-        .filter(([key]) => permSet.has(key))
+        .filter(([key]) => permSet.has(key) && !OWNER_ONLY_PERM_KEYS.has(key))
         .map(([, href]) => href)
     } else {
-      allowed = ROLE_NAV[role] ?? []
+      allowed = (ROLE_NAV[role] ?? []).filter(
+        (p) => !OWNER_ONLY_PATHS.some((op) => p === op || p.startsWith(op + '/'))
+      )
+    }
+
+    const firstAllowed = allowed[0] ?? '/appointments'
+
+    if (isOwnerOnlyPath) {
+      toast.error('Access denied — owner only')
+      router.replace(firstAllowed)
+      return
     }
 
     const isAllowed = allowed.some(
@@ -49,7 +66,7 @@ export function PermissionGuard({ children }: { children: React.ReactNode }) {
 
     if (!isAllowed) {
       toast.error('Access denied')
-      router.replace('/dashboard')
+      router.replace(firstAllowed)
     }
   }, [pathname, role, permissions, router])
 

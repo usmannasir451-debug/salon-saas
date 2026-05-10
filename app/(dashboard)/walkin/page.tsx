@@ -144,7 +144,7 @@ function ReceiptView({ walkin, currency, salonName, serviceNames }: {
 }
 
 export default function WalkInPage() {
-  const { role, ownerId } = useUserContext()
+  const { role, ownerId, permissions } = useUserContext()
   const router = useRouter()
 
   const [walkIns, setWalkIns] = useState<WalkIn[]>([])
@@ -172,12 +172,15 @@ export default function WalkInPage() {
   const [lookingUp, setLookingUp] = useState(false)
 
   useEffect(() => {
-    if (!['owner', 'regional_manager', 'manager', 'receptionist', 'cashier'].includes(role)) {
+    const hasAccess =
+      ['owner', 'regional_manager', 'manager', 'receptionist', 'cashier'].includes(role) ||
+      (permissions && permissions.includes('walkin'))
+    if (!hasAccess) {
       router.replace('/appointments')
       return
     }
     loadData()
-  }, [role, router]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [role, permissions, router]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadData() {
     const supabase = createClient()

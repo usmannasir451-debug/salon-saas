@@ -67,6 +67,7 @@ type Salon = {
   subscription_status: string | null
   created_at: string
   last_set_password: string | null
+  member_count?: number
 }
 
 type CreatedCredentials = {
@@ -84,6 +85,7 @@ type SalonDetailData = {
     status: string
     joined_at: string | null
     last_set_password: string | null
+    permissions: string[] | null
   }>
   appointmentCount: number
   revenue: number
@@ -534,14 +536,22 @@ export default function AdminDashboard({ salons: initialSalons }: { salons: Salo
                                 )}
                               </button>
                             </div>
-                            <p className="text-xs text-gray-400 mt-0.5">
-                              Joined{' '}
-                              {new Date(salon.created_at).toLocaleDateString('en-US', {
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric',
-                              })}
-                            </p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <p className="text-xs text-gray-400">
+                                Joined{' '}
+                                {new Date(salon.created_at).toLocaleDateString('en-US', {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric',
+                                })}
+                              </p>
+                              {(salon.member_count ?? 0) > 0 && (
+                                <span className="inline-flex items-center gap-1 text-xs text-primary bg-primary/5 border border-primary/20 px-1.5 py-0.5 rounded-full">
+                                  <Users className="w-3 h-3" />
+                                  {salon.member_count} sub-user{salon.member_count !== 1 ? 's' : ''}
+                                </span>
+                              )}
+                            </div>
                             {salon.last_set_password && (
                               <div className="flex items-center gap-1.5 mt-1">
                                 <span className="text-xs text-gray-400">PW:</span>
@@ -1035,12 +1045,26 @@ export default function AdminDashboard({ salons: initialSalons }: { salons: Salo
                                 'text-xs shrink-0',
                                 m.status === 'active'
                                   ? 'bg-green-50 text-green-700 border-green-200'
+                                  : m.status === 'inactive'
+                                  ? 'bg-gray-100 text-gray-500 border-gray-200'
                                   : 'bg-yellow-50 text-yellow-700 border-yellow-200'
                               )}
                             >
                               {m.status}
                             </Badge>
                           </div>
+                          {m.permissions && m.permissions.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {m.permissions.map((p: string) => (
+                                <span
+                                  key={p}
+                                  className="text-[10px] bg-primary/5 text-primary border border-primary/15 px-1.5 py-0.5 rounded-full"
+                                >
+                                  {p}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                           {m.last_set_password && (
                             <div className="flex items-center gap-1.5 mt-0.5">
                               <span className="text-xs text-gray-400">PW:</span>
