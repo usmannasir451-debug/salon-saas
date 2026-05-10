@@ -109,7 +109,8 @@ export default function DashboardPage() {
   const [sixMonthWalkIns, setSixMonthWalkIns] = useState<{ total: number; created_at: string; branch_id?: string }[]>([])
   const [sixMonthClients, setSixMonthClients] = useState<{ created_at: string }[]>([])
   const [lowStockItems, setLowStockItems] = useState<LowStockItem[]>([])
-  const [lastMonthRevenue, setLastMonthRevenue] = useState(0)
+  const [lastMonthAppts, setLastMonthAppts] = useState<{ status: string; branch_id?: string; services?: { price: number } | null }[]>([])
+  const [lastMonthWalkIns, setLastMonthWalkIns] = useState<{ total: number; branch_id?: string }[]>([])
   const [salonName, setSalonName] = useState('')
   const [currency, setCurrency] = useState('USD')
   const [branches, setBranches] = useState<Branch[]>([])
@@ -164,11 +165,11 @@ export default function DashboardPage() {
       supabase.from('expenses').select('amount, branch_id').eq('user_id', ownerId)
         .gte('expense_date', monthStart).lte('expense_date', monthEnd),
       supabase.from('appointments')
-        .select('services(price), status')
+        .select('status, branch_id, services(price)')
         .eq('user_id', ownerId)
         .gte('appointment_date', lastMonthStart)
         .lte('appointment_date', lastMonthEnd),
-      supabase.from('walk_ins').select('total').eq('user_id', ownerId)
+      supabase.from('walk_ins').select('total, branch_id').eq('user_id', ownerId)
         .gte('created_at', lastMonthStart + 'T00:00:00').lte('created_at', lastMonthEnd + 'T23:59:59'),
       supabase.from('inventory_items').select('id, name, quantity, reorder_level, unit').eq('user_id', ownerId),
       supabase.from('reviews').select('rating').eq('user_id', ownerId),
@@ -200,14 +201,9 @@ export default function DashboardPage() {
     setSixMonthWalkIns((sixMonthWalkInRes.data as unknown as typeof sixMonthWalkIns) ?? [])
     setSixMonthClients((sixMonthClientRes.data as unknown as typeof sixMonthClients) ?? [])
 
-    // Last month revenue
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const lmApptRev   = (lastMonthApptRes.data ?? []).filter((a: any) => a.status === 'completed')
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .reduce((s: number, a: any) => s + Number(a.services?.price ?? 0), 0)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const lmWalkinRev = (lastMonthWalkinRes.data ?? []).reduce((s: number, w: any) => s + Number(w.total ?? 0), 0)
-    setLastMonthRevenue(lmApptRev + lmWalkinRev)
+    // Last month data (stored for branch-aware comparison)
+    setLastMonthAppts((lastMonthApptRes.data ?? []) as typeof lastMonthAppts)
+    setLastMonthWalkIns((lastMonthWalkinRes.data ?? []) as typeof lastMonthWalkIns)
 
     // Low stock
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -278,7 +274,7 @@ export default function DashboardPage() {
 
   const branchFilteredExpenses = useMemo(() => {
     if (activeBranch === 'all') return allExpenses
-    return allExpenses.filter(e => e.branch_id === activeBranch || e.branch_id == null)
+    return allExpenses.filter(e => e.branch_id === activeBranch)
   }, [allExpenses, activeBranch])
 
   // ── Monthly data ──────────────────────────────────────────────────────────
@@ -308,6 +304,11 @@ export default function DashboardPage() {
     return branchFilteredWalkIns.filter(w => w.created_at.startsWith(todayStr))
   }, [branchFilteredWalkIns])
 
+  const weekWalkIns = useMemo(() => {
+    const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 })
+    return branchFilteredWalkIns.filter(w => new Date(w.created_at) >= weekStart)
+  }, [branchFilteredWalkIns])
+
   // ── Revenue chart (last 7 days) ──────────────────────────────────────────────
 
   const revenueChartData = useMemo(() => {
@@ -326,23 +327,24 @@ export default function DashboardPage() {
   // ── Summary stats ─────────────────────────────────────────────────────────
 
   const stats = useMemo(() => {
-    const completed    = periodFiltered.filter(a => a.status === 'completed')
-    const apptRevenue  = completed.reduce((sum, a) => sum + Number(a.services?.price ?? 0), 0)
-    const periodWalkIns = activeFilter === 'today' ? todayWalkIns : branchFilteredWalkIns
+    const completed     = periodFiltered.filter(a => a.status === 'completed')
+    const apptRevenue   = completed.reduce((sum, a) => sum + Number(a.services?.price ?? 0), 0)
+    const periodWalkIns = activeFilter === 'today' ? todayWalkIns : activeFilter === 'week' ? weekWalkIns : branchFilteredWalkIns
     const walkinRevenue = periodWalkIns.reduce((sum, w) => sum + Number(w.total ?? 0), 0)
     const revenue       = apptRevenue + walkinRevenue
     const totalClients  = new Set(periodFiltered.map(a => a.client_name)).size
+    const walkInCount   = periodWalkIns.length
     return {
       total:    periodFiltered.length,
       completed: completed.length,
-      walkins:  activeFilter === 'today' ? todayWalkIns.length : branchFilteredWalkIns.length,
+      walkins:  walkInCount,
       revenue,
-      avgBill:  completed.length + (activeFilter === 'today' ? todayWalkIns.length : branchFilteredWalkIns.length) > 0
-        ? Math.round(revenue / (completed.length + (activeFilter === 'today' ? todayWalkIns.length : branchFilteredWalkIns.length)))
+      avgBill:  completed.length + walkInCount > 0
+        ? Math.round(revenue / (completed.length + walkInCount))
         : 0,
       clients:  totalClients,
     }
-  }, [periodFiltered, activeFilter, todayWalkIns, branchFilteredWalkIns])
+  }, [periodFiltered, activeFilter, todayWalkIns, weekWalkIns, branchFilteredWalkIns])
 
   // ── Monthly revenue & net profit (branch-filtered expenses) ──────────────
 
@@ -354,6 +356,17 @@ export default function DashboardPage() {
 
   const monthExpenses = useMemo(() => branchFilteredExpenses.reduce((s, e) => s + Number(e.amount), 0), [branchFilteredExpenses])
   const netProfit     = monthlyRevenue - monthExpenses
+
+  const lastMonthRevenue = useMemo(() => {
+    const apptRev = lastMonthAppts
+      .filter(a => a.status === 'completed' && (activeBranch === 'all' || a.branch_id === activeBranch))
+      .reduce((s, a) => s + Number(a.services?.price ?? 0), 0)
+    const walkinRev = lastMonthWalkIns
+      .filter(w => activeBranch === 'all' || w.branch_id === activeBranch)
+      .reduce((s, w) => s + Number(w.total ?? 0), 0)
+    return apptRev + walkinRev
+  }, [lastMonthAppts, lastMonthWalkIns, activeBranch])
+
   const revenueChangePct = lastMonthRevenue > 0
     ? Math.round(((monthlyRevenue - lastMonthRevenue) / lastMonthRevenue) * 100)
     : null
@@ -479,7 +492,7 @@ export default function DashboardPage() {
   // ── Payment method donut ──────────────────────────────────────────────────
 
   const paymentBreakdown = useMemo(() => {
-    const periodWalkIns = activeFilter === 'today' ? todayWalkIns : branchFilteredWalkIns
+    const periodWalkIns = activeFilter === 'today' ? todayWalkIns : activeFilter === 'week' ? weekWalkIns : branchFilteredWalkIns
     const completed     = periodFiltered.filter(a => a.status === 'completed')
     const map = new Map<string, number>()
     periodWalkIns.forEach(w => {
@@ -494,7 +507,7 @@ export default function DashboardPage() {
       .map(([method, amount]) => ({ method: method.charAt(0).toUpperCase() + method.slice(1).replace(/_/g, ' '), amount }))
       .filter(e => e.amount > 0)
       .sort((a, b) => b.amount - a.amount)
-  }, [periodFiltered, activeFilter, todayWalkIns, branchFilteredWalkIns])
+  }, [periodFiltered, activeFilter, todayWalkIns, weekWalkIns, branchFilteredWalkIns])
 
   // ── Today's summary ───────────────────────────────────────────────────────
 

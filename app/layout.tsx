@@ -13,6 +13,13 @@ export const metadata: Metadata = {
   description:
     'World-class salon and spa management software. Appointments, staff, services, and analytics — all in one beautiful dashboard.',
   keywords: 'salon management, spa software, appointment booking, salon software',
+  icons: {
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+    ],
+    shortcut: '/favicon.svg',
+    apple: '/favicon.svg',
+  },
 }
 
 export default function RootLayout({

@@ -1,86 +1,45 @@
-You are an expert SaaS developer working on "Snipforce". Make these improvements:
+You are an expert SaaS developer working on "Snipforce". Fix these three issues:
 
-PART 1 - EXPENSES BRANCH-WISE FIX
+PART 1 - FIX PAYROLL PRORATA ERROR
 
-1. Add branch_id field to expenses table (nullable for single-branch salons)
-2. When adding expense: show branch dropdown if salon has multiple branches, otherwise hide it
-3. Dashboard fix: when filtering by specific branch, only show that branch's expenses in calculations
-4. Net profit calculation must be: branch revenue - branch expenses (not total expenses)
-5. Add branch filter to /expenses page - filter expenses by branch
-6. Expense summary chart should be filterable by branch
+Error: "Could not find the 'prorata_detail' column of 'payroll_entries' in the schema cache"
 
-CUSTOM EXPENSE CATEGORIES:
-- Keep existing preset categories: Staff Refreshments, Salon Materials, Inventory, Utilities, Rent, Marketing, Miscellaneous
-- Add "Add Custom Category" option at bottom of dropdown
-- When selected: show text input to type custom category name
-- Save custom categories per salon in profiles table as expense_categories JSON array
-- Custom categories appear in dropdown alongside presets
-- Allow deleting custom categories from settings
+Fix:
+- Check payroll_entries table structure in the codebase
+- The code is trying to insert/select prorata_detail column but it does not exist in the database
+- Either add the missing column to the migration OR remove it from the code - choose whichever is the correct fix based on the architecture
+- Make sure payroll generation works without any schema errors
+- Test that monthly payroll can be generated successfully for all staff members
 
-EXPENSE ARCHITECTURE IMPROVEMENTS:
-- Add receipt/attachment field (optional photo upload to Supabase storage)
-- Add "paid_by" field - who paid (owner, petty cash, card)
-- Add expense approval status for managers (pending/approved) - owner approves
-- Monthly budget setting per category in settings - show warning when over budget
-- Expense summary: show this month vs last month comparison
+PART 2 - FIX DASHBOARD REVENUE CALCULATION BUG
 
-PART 2 - DASHBOARD IMPROVEMENTS
+Problem: "All Branches" total revenue shows 300,000+ but individual branches combined show less than 100,000 - numbers are inconsistent.
 
-REMOVE:
-- Remove "This Month Appointments" list at bottom of dashboard - too cluttered for live use
+Root cause investigation and fix:
+- Check how "All Branches" revenue is calculated vs individual branch revenue
+- Walk-ins and appointments may be getting double counted in "All Branches" view
+- Some records may have null branch_id causing them to appear in "All Branches" but not in any specific branch - these should still be counted correctly
+- Fix the revenue aggregation logic:
+  * "All Branches" = sum of ALL appointments + walk-ins for this owner (regardless of branch)
+  * Single branch = sum of appointments + walk-ins WHERE branch_id = selected branch
+  * Records with null branch_id should appear in "All Branches" only, not in specific branch views
+- Apply same fix to: revenue KPIs, expense calculations, net profit, all charts
+- Make sure no double counting anywhere
+- Test with multiple branches to confirm numbers add up correctly
 
-ADD THESE VISUALIZATIONS:
-1. Revenue Trend Line Chart - last 6 months revenue trend (appointments + walk-ins combined)
-2. Payment Method Breakdown - pie/donut chart showing cash vs card vs other payment methods this month
-3. Service Popularity Chart - horizontal bar chart top 5 services by booking count this month
-4. Peak Hours Heatmap - show which hours are busiest across the week (7 days x hours grid with color intensity)
-5. Client Growth Chart - new clients per month for last 6 months (bar chart)
-6. Today's Summary Card - show: total revenue today, appointments today, walk-ins today, pending appointments
-7. Staff Utilization - show each staff member's booking rate this month as progress bars
-8. Quick Actions Row - buttons: New Appointment, New Walk-in, Add Expense, Add Client
+PART 3 - ADD CUSTOM FAVICON
 
-ALL CHARTS:
-- Filterable by branch (if multiple branches exist)
-- Use recharts library
-- Mobile responsive
-- Match pink/rose theme
-
-PART 3 - STAFF SALARY & PAYROLL CONSOLIDATION
-
-PROBLEM: Basic salary field exists in both staff creation AND payroll setup causing confusion.
-
-SOLUTION - Consolidate into one place:
-
-STAFF CREATION/EDIT FORM - Add complete salary section:
-- Salary Type: 
-  * Fixed Monthly (enter amount)
-  * Commission Only (enter commission % of revenue they generate)
-  * Fixed + Commission (enter both fixed amount AND commission %)
-- Fields shown based on selection:
-  * Fixed amount: input field in currency
-  * Commission %: input field with % symbol
-- Remove the basic_salary field that was previously added - replace with this proper system
-
-PAYROLL PAGE:
-- Remove salary setup from payroll page completely
-- Payroll page only shows: calculate and pay
-- Auto-calculate based on salary info stored in staff record
-- Show breakdown: Fixed Salary (pro-rated if joined mid-month) + Commission Earned = Total Payable
-- Pro-rata calculation: if joined_date is in current month, calculate proportional salary
-- Show joining date and pro-rata percentage clearly
-- "Mark as Paid" button with payment date and method
-- Salary history below each staff member
-
-STAFF LIST:
-- Show salary type badge on each staff card (Fixed/Commission/Both)
-- Show monthly salary amount
+- Create a custom favicon for Snipforce using a scissors icon in pink/rose color (#e11d48 or similar)
+- Generate favicon in multiple sizes: 16x16, 32x32, 180x180 (apple touch icon)
+- Add favicon.ico, apple-touch-icon.png to the /public folder
+- Update app/layout.tsx metadata to include all favicon references
+- Replace the current default Next.js/Vercel favicon completely
+- The scissors icon should be simple, clean and recognizable at small sizes
+- Use SVG-based approach for crisp rendering at all sizes
 
 TECHNICAL REQUIREMENTS:
-- Update staff table: remove basic_salary column, add salary_type (fixed/commission/both), fixed_amount numeric, commission_percentage numeric
-- Update expenses table: add branch_id, receipt_url, paid_by, approval_status
-- Update profiles table: add expense_categories JSONB, expense_budgets JSONB
-- Generate complete SQL migration at the end
-- RLS policies on all changes
+- Generate SQL migration for prorata_detail column if needed
+- Fix must not break existing payroll data
+- Dashboard fix must work for single branch salons too
 - Mobile responsive
-- Pink/rose theme with shadcn/ui
-- Recharts for all charts
+- No breaking changes to existing functionality
