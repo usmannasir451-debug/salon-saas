@@ -39,8 +39,6 @@ export default function ResetPasswordPage() {
       <CardHeader className="text-center pb-2">
         <CardTitle className="text-2xl">Reset Password</CardTitle>
         <CardDescription>
-          <span className="font-urdu text-base">پاس ورڈ ری سیٹ کریں</span>
-          <br />
           {sent ? 'Check your email for the reset link' : "Enter your email and we'll send a reset link"}
         </CardDescription>
       </CardHeader>

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { format, startOfMonth, endOfMonth, subMonths, startOfDay } from 'date-fns'
 import { createClient } from '@/lib/supabase/client'
 import { useUserContext } from '@/components/RoleContext'
+import { useCurrency } from '@/hooks/useCurrency'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
@@ -34,9 +35,6 @@ type StaffPerf = {
 
 type MonthlyPoint = { month: string; revenue: number; appointments: number }
 
-function formatPKR(n: number) {
-  return `PKR ${Math.round(n).toLocaleString('en-PK')}`
-}
 
 function StarRow({ rating }: { rating: number }) {
   return (
@@ -63,6 +61,7 @@ const BADGE_CONFIG: Record<string, { label: string; color: string; icon: React.E
 export default function StaffPerformancePage() {
   const { role, ownerId } = useUserContext()
   const router = useRouter()
+  const { formatAmount: formatPKR } = useCurrency()
 
   const [staff, setStaff] = useState<StaffPerf[]>([])
   const [loading, setLoading] = useState(true)

@@ -14,7 +14,7 @@ import {
 import {
   CalendarDays, TrendingUp, Scissors, Users, Clock, Loader2, Sparkles, Download, MessageCircle,
   Building2, CheckCircle2, ReceiptText, AlertTriangle, Package,
-  TrendingDown, UserCheck, Star, Gift, CreditCard, Zap, Plus, DollarSign, UserPlus, Activity,
+  TrendingDown, UserCheck, Star, Gift, CreditCard, Zap, Activity,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -37,6 +37,7 @@ type AppRow = {
   status: string
   payment_method?: string | null
   notes?: string
+  total_amount?: number | null
   services?: ServiceRef | null
   staff?: StaffRef | null
 }
@@ -105,11 +106,11 @@ export default function DashboardPage() {
   const [allAppointments, setAllAppointments] = useState<AppRow[]>([])
   const [walkIns, setWalkIns] = useState<WalkInRow[]>([])
   const [allExpenses, setAllExpenses] = useState<ExpenseRow[]>([])
-  const [sixMonthAppts, setSixMonthAppts] = useState<{ appointment_date: string; status: string; branch_id?: string; services?: { price: number } | null }[]>([])
+  const [sixMonthAppts, setSixMonthAppts] = useState<{ appointment_date: string; status: string; branch_id?: string; total_amount?: number | null; services?: { price: number } | null }[]>([])
   const [sixMonthWalkIns, setSixMonthWalkIns] = useState<{ total: number; created_at: string; branch_id?: string }[]>([])
   const [sixMonthClients, setSixMonthClients] = useState<{ created_at: string }[]>([])
   const [lowStockItems, setLowStockItems] = useState<LowStockItem[]>([])
-  const [lastMonthAppts, setLastMonthAppts] = useState<{ status: string; branch_id?: string; services?: { price: number } | null }[]>([])
+  const [lastMonthAppts, setLastMonthAppts] = useState<{ status: string; branch_id?: string; total_amount?: number | null; services?: { price: number } | null }[]>([])
   const [lastMonthWalkIns, setLastMonthWalkIns] = useState<{ total: number; branch_id?: string }[]>([])
   const [salonName, setSalonName] = useState('')
   const [currency, setCurrency] = useState('USD')
@@ -152,7 +153,7 @@ export default function DashboardPage() {
     ] = await Promise.all([
       supabase.from('profiles').select('salon_name, salon_currency').eq('id', ownerId).single(),
       supabase.from('appointments')
-        .select('id, client_name, client_phone, service_id, staff_id, branch_id, appointment_date, appointment_time, status, payment_method, notes, services(id, name, price), staff(id, name)')
+        .select('id, client_name, client_phone, service_id, staff_id, branch_id, appointment_date, appointment_time, status, payment_method, notes, total_amount, services(id, name, price), staff(id, name)')
         .eq('user_id', ownerId)
         .gte('appointment_date', queryStart)
         .order('appointment_date', { ascending: false })
@@ -165,7 +166,7 @@ export default function DashboardPage() {
       supabase.from('expenses').select('amount, branch_id').eq('user_id', ownerId)
         .gte('expense_date', monthStart).lte('expense_date', monthEnd),
       supabase.from('appointments')
-        .select('status, branch_id, services(price)')
+        .select('status, branch_id, total_amount, services(price)')
         .eq('user_id', ownerId)
         .gte('appointment_date', lastMonthStart)
         .lte('appointment_date', lastMonthEnd),
@@ -177,7 +178,7 @@ export default function DashboardPage() {
       supabase.from('staff').select('id, name, birthday').eq('user_id', ownerId).not('birthday', 'is', null),
       // 6-month data for trend charts
       supabase.from('appointments')
-        .select('appointment_date, status, branch_id, services(price)')
+        .select('appointment_date, status, branch_id, total_amount, services(price)')
         .eq('user_id', ownerId)
         .eq('status', 'completed')
         .gte('appointment_date', sixMonthsAgo),
@@ -202,8 +203,9 @@ export default function DashboardPage() {
     setSixMonthClients((sixMonthClientRes.data as unknown as typeof sixMonthClients) ?? [])
 
     // Last month data (stored for branch-aware comparison)
-setLastMonthAppts((lastMonthApptRes.data ?? []) as unknown as typeof lastMonthAppts)
-setLastMonthWalkIns((lastMonthWalkinRes.data ?? []) as typeof lastMonthWalkIns)
+    setLastMonthAppts((lastMonthApptRes.data as unknown as typeof lastMonthAppts) ?? [])
+    setLastMonthWalkIns((lastMonthWalkinRes.data ?? []) as typeof lastMonthWalkIns)
+
     // Low stock
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const low = (inventoryRes.data ?? []).filter((i: any) => Number(i.quantity) <= Number(i.reorder_level))
@@ -315,7 +317,7 @@ setLastMonthWalkIns((lastMonthWalkinRes.data ?? []) as typeof lastMonthWalkIns)
       const date    = format(subDays(new Date(), 6 - i), 'yyyy-MM-dd')
       const apptRev = branchFiltered
         .filter(a => a.appointment_date === date && a.status === 'completed')
-        .reduce((sum, a) => sum + Number(a.services?.price ?? 0), 0)
+        .reduce((sum, a) => sum + Number(a.total_amount ?? a.services?.price ?? 0), 0)
       const walkinRev = branchFilteredWalkIns
         .filter(w => w.created_at.startsWith(date))
         .reduce((sum, w) => sum + Number(w.total ?? 0), 0)
@@ -327,7 +329,7 @@ setLastMonthWalkIns((lastMonthWalkinRes.data ?? []) as typeof lastMonthWalkIns)
 
   const stats = useMemo(() => {
     const completed     = periodFiltered.filter(a => a.status === 'completed')
-    const apptRevenue   = completed.reduce((sum, a) => sum + Number(a.services?.price ?? 0), 0)
+    const apptRevenue   = completed.reduce((sum, a) => sum + Number(a.total_amount ?? a.services?.price ?? 0), 0)
     const periodWalkIns = activeFilter === 'today' ? todayWalkIns : activeFilter === 'week' ? weekWalkIns : branchFilteredWalkIns
     const walkinRevenue = periodWalkIns.reduce((sum, w) => sum + Number(w.total ?? 0), 0)
     const revenue       = apptRevenue + walkinRevenue
@@ -348,7 +350,7 @@ setLastMonthWalkIns((lastMonthWalkinRes.data ?? []) as typeof lastMonthWalkIns)
   // ── Monthly revenue & net profit (branch-filtered expenses) ──────────────
 
   const monthlyRevenue = useMemo(() => {
-    const apptRev   = monthlyAppts.filter(a => a.status === 'completed').reduce((s, a) => s + Number(a.services?.price ?? 0), 0)
+    const apptRev   = monthlyAppts.filter(a => a.status === 'completed').reduce((s, a) => s + Number(a.total_amount ?? a.services?.price ?? 0), 0)
     const walkinRev = branchFilteredWalkIns.reduce((s, w) => s + Number(w.total ?? 0), 0)
     return apptRev + walkinRev
   }, [monthlyAppts, branchFilteredWalkIns])
@@ -359,7 +361,7 @@ setLastMonthWalkIns((lastMonthWalkinRes.data ?? []) as typeof lastMonthWalkIns)
   const lastMonthRevenue = useMemo(() => {
     const apptRev = lastMonthAppts
       .filter(a => a.status === 'completed' && (activeBranch === 'all' || a.branch_id === activeBranch))
-      .reduce((s, a) => s + Number(a.services?.price ?? 0), 0)
+      .reduce((s, a) => s + Number(a.total_amount ?? a.services?.price ?? 0), 0)
     const walkinRev = lastMonthWalkIns
       .filter(w => activeBranch === 'all' || w.branch_id === activeBranch)
       .reduce((s, w) => s + Number(w.total ?? 0), 0)
@@ -378,7 +380,7 @@ setLastMonthWalkIns((lastMonthWalkinRes.data ?? []) as typeof lastMonthWalkIns)
       const monthStr  = format(monthDate, 'yyyy-MM')
       const apptRev   = sixMonthAppts
         .filter(a => a.appointment_date.startsWith(monthStr) && (activeBranch === 'all' || a.branch_id === activeBranch))
-        .reduce((s, a) => s + Number((a.services as { price?: number } | null)?.price ?? 0), 0)
+        .reduce((s, a) => s + Number(a.total_amount ?? (a.services as { price?: number } | null)?.price ?? 0), 0)
       const walkinRev = sixMonthWalkIns
         .filter(w => w.created_at.startsWith(monthStr) && (activeBranch === 'all' || w.branch_id === activeBranch))
         .reduce((s, w) => s + Number(w.total ?? 0), 0)
@@ -500,7 +502,7 @@ setLastMonthWalkIns((lastMonthWalkinRes.data ?? []) as typeof lastMonthWalkIns)
     })
     completed.forEach(a => {
       const m = a.payment_method ?? 'cash'
-      map.set(m, (map.get(m) ?? 0) + Number(a.services?.price ?? 0))
+      map.set(m, (map.get(m) ?? 0) + Number(a.total_amount ?? a.services?.price ?? 0))
     })
     return Array.from(map.entries())
       .map(([method, amount]) => ({ method: method.charAt(0).toUpperCase() + method.slice(1).replace(/_/g, ' '), amount }))
@@ -515,7 +517,7 @@ setLastMonthWalkIns((lastMonthWalkinRes.data ?? []) as typeof lastMonthWalkIns)
     const todayAllAppts   = branchFiltered.filter(a => a.appointment_date === todayStr)
     const todayCompleted  = todayAllAppts.filter(a => a.status === 'completed')
     const todayPending    = todayAllAppts.filter(a => ['pending', 'confirmed'].includes(a.status))
-    const revAppts        = todayCompleted.reduce((s, a) => s + Number(a.services?.price ?? 0), 0)
+    const revAppts        = todayCompleted.reduce((s, a) => s + Number(a.total_amount ?? a.services?.price ?? 0), 0)
     const revWalkins      = todayWalkIns.reduce((s, w) => s + Number(w.total ?? 0), 0)
     return {
       revenue:      revAppts + revWalkins,
@@ -627,26 +629,6 @@ setLastMonthWalkIns((lastMonthWalkinRes.data ?? []) as typeof lastMonthWalkIns)
           <span className="hidden sm:inline">Monthly Report</span>
           <span className="sm:hidden">PDF</span>
         </Button>
-      </div>
-
-      {/* Quick Actions Row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: 'New Appointment', href: '/appointments', icon: CalendarDays, color: 'bg-primary/10 text-primary' },
-          { label: 'New Walk-in',     href: '/walkin',       icon: Zap,          color: 'bg-orange-50 text-orange-600' },
-          { label: 'Add Expense',     href: '/expenses',     icon: DollarSign,   color: 'bg-red-50 text-red-600' },
-          { label: 'Add Client',      href: '/clients',      icon: UserPlus,     color: 'bg-blue-50 text-blue-600' },
-        ].map(({ label, href, icon: Icon, color }) => (
-          <Link key={label} href={href}>
-            <div className={`flex items-center gap-2.5 p-3 rounded-xl border border-gray-100 hover:shadow-sm transition-all cursor-pointer bg-white group`}>
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${color}`}>
-                <Icon className="w-4 h-4" />
-              </div>
-              <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">{label}</span>
-              <Plus className="w-3.5 h-3.5 text-gray-400 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
-            </div>
-          </Link>
-        ))}
       </div>
 
       {/* Low inventory alert */}

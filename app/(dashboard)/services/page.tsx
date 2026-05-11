@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { useUserContext } from '@/components/RoleContext'
+import { useCurrency } from '@/hooks/useCurrency'
 import type { Service, Deal } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,16 +16,13 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Scissors, Plus, Pencil, Trash2, Loader2, Clock, Banknote, Tag, Gift } from 'lucide-react'
 
-function formatPKR(amount: number) {
-  return `PKR ${amount.toLocaleString('en-PK')}`
-}
-
 const emptyServiceForm = { name: '', duration: '', price: '' }
 const emptyDealForm = { name: '', description: '', price: '', validity_days: '', service_ids: [] as string[] }
 
 export default function ServicesPage() {
   const { role, ownerId } = useUserContext()
   const router = useRouter()
+  const { formatAmount } = useCurrency()
 
   const [services, setServices] = useState<Service[]>([])
   const [deals, setDeals] = useState<(Deal & { deal_services?: { services: Service }[] })[]>([])
@@ -205,9 +203,7 @@ export default function ServicesPage() {
             <Scissors className="w-6 h-6 text-primary" />
             Services & Deals
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            <span className="font-urdu">سروس کیٹالاگ</span> — Manage your menu and packages
-          </p>
+          <p className="text-sm text-gray-500 mt-0.5">Manage your menu and packages</p>
         </div>
       </div>
 
@@ -271,7 +267,7 @@ export default function ServicesPage() {
                   <CardContent className="pt-0 space-y-2">
                     <Badge className="bg-green-50 text-green-700 border-green-200 gap-1 text-xs">
                       <Banknote className="w-3 h-3" />
-                      {formatPKR(service.price)}
+                      {formatAmount(service.price)}
                     </Badge>
                     <div className="flex items-center gap-1.5 text-xs text-gray-500">
                       <Clock className="w-3.5 h-3.5 text-gray-400" />
@@ -345,14 +341,14 @@ export default function ServicesPage() {
                       <div className="flex items-center gap-2">
                         <Badge className="bg-primary/10 text-primary border-primary/20 gap-1 text-xs font-bold">
                           <Tag className="w-3 h-3" />
-                          {formatPKR(deal.price)}
+                          {formatAmount(deal.price)}
                         </Badge>
                         {saving > 0 && originalPrice > 0 && (
-                          <span className="text-xs text-green-600">Save {formatPKR(saving)}</span>
+                          <span className="text-xs text-green-600">Save {formatAmount(saving)}</span>
                         )}
                       </div>
                       {originalPrice > 0 && saving > 0 && (
-                        <p className="text-xs text-gray-400 line-through">{formatPKR(originalPrice)} normally</p>
+                        <p className="text-xs text-gray-400 line-through">{formatAmount(originalPrice)} normally</p>
                       )}
                       {deal.validity_days && (
                         <p className="text-xs text-gray-500">Valid for {deal.validity_days} days</p>
@@ -434,14 +430,14 @@ export default function ServicesPage() {
                         selected ? 'bg-primary text-white' : 'bg-white border border-gray-200 text-gray-700 hover:border-primary/40'
                       }`}>
                       <span>{s.name}</span>
-                      <span className="text-xs opacity-75">{formatPKR(s.price)}</span>
+                      <span className="text-xs opacity-75">{formatAmount(s.price)}</span>
                     </button>
                   )
                 })}
               </div>
               {dealForm.service_ids.length > 0 && (
                 <p className="text-xs text-gray-500">
-                  Normal total: {formatPKR(services.filter(s => dealForm.service_ids.includes(s.id)).reduce((sum, s) => sum + s.price, 0))}
+                  Normal total: {formatAmount(services.filter(s => dealForm.service_ids.includes(s.id)).reduce((sum, s) => sum + s.price, 0))}
                 </p>
               )}
             </div>
@@ -464,12 +460,12 @@ export default function ServicesPage() {
                 <div className="flex justify-between">
                   <span className="text-gray-600">Normal price</span>
                   <span className="line-through text-gray-400">
-                    {formatPKR(services.filter(s => dealForm.service_ids.includes(s.id)).reduce((sum, s) => sum + s.price, 0))}
+                    {formatAmount(services.filter(s => dealForm.service_ids.includes(s.id)).reduce((sum, s) => sum + s.price, 0))}
                   </span>
                 </div>
                 <div className="flex justify-between font-bold mt-1">
                   <span className="text-green-700">Deal price</span>
-                  <span className="text-green-700">{formatPKR(parseFloat(dealForm.price) || 0)}</span>
+                  <span className="text-green-700">{formatAmount(parseFloat(dealForm.price) || 0)}</span>
                 </div>
               </div>
             )}

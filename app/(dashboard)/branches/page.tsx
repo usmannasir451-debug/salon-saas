@@ -136,9 +136,7 @@ export default function BranchesPage() {
             <Building2 className="w-6 h-6 text-primary" />
             Branches
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            <span className="font-urdu">برانچ مینجمنٹ</span> — Manage your salon locations
-          </p>
+          <p className="text-sm text-gray-500 mt-0.5">Manage your salon locations</p>
         </div>
         <Button onClick={openCreate} className="bg-primary hover:bg-primary/90 gap-2">
           <Plus className="w-4 h-4" />
@@ -151,7 +149,6 @@ export default function BranchesPage() {
       <div className="mb-6 p-4 rounded-xl bg-primary/5 border border-primary/15 text-sm text-gray-600">
         <p className="font-medium text-gray-800 mb-1">Multi-Branch Management</p>
         <p>Add all your salon locations here. You can assign appointments to specific branches and filter your dashboard analytics by branch.</p>
-        <p className="font-urdu text-xs text-gray-400 mt-1">ایک اکاؤنٹ سے تمام برانچیں منظم کریں</p>
       </div>
 
       {/* Branch List */}
@@ -161,9 +158,6 @@ export default function BranchesPage() {
             <Building2 className="w-8 h-8 text-primary" />
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-1">No branches yet</h3>
-          <p className="text-gray-500 text-sm mb-2">
-            <span className="font-urdu">ابھی کوئی برانچ نہیں</span>
-          </p>
           <p className="text-gray-400 text-sm mb-6">Add your first branch to start managing multiple locations</p>
           <Button onClick={openCreate} className="bg-primary hover:bg-primary/90 gap-2">
             <Plus className="w-4 h-4" /> Add Branch

@@ -59,7 +59,7 @@ export default function PnLPage() {
     const mStr = format(month, 'yyyy-MM-01')
 
     const [ta, tw, te, tp] = await Promise.all([
-      supabase.from('appointments').select('services(price), discount_amount, status')
+      supabase.from('appointments').select('total_amount, services(price), discount_amount, status')
         .eq('user_id', ownerId).gte('appointment_date', mStart).lte('appointment_date', mEnd),
       supabase.from('walk_ins').select('subtotal, discount_amount, total')
         .eq('user_id', ownerId).gte('created_at', mStart + 'T00:00:00').lte('created_at', mEnd + 'T23:59:59'),
@@ -72,7 +72,7 @@ export default function PnLPage() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const completedAppts = (ta.data ?? []).filter((a: any) => a.status === 'completed')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const aRev = completedAppts.reduce((s: number, a: any) => s + Number(a.services?.price ?? 0), 0)
+    const aRev = completedAppts.reduce((s: number, a: any) => s + Number(a.total_amount ?? a.services?.price ?? 0), 0)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const aDisc = completedAppts.reduce((s: number, a: any) => s + Number(a.discount_amount ?? 0), 0)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -115,7 +115,7 @@ export default function PnLPage() {
     const mStart = format(selectedMonth, 'yyyy-MM-dd')
     const mEnd = format(endOfMonth(selectedMonth), 'yyyy-MM-dd')
     const [pmAppt, pmWalkin] = await Promise.all([
-      supabase.from('appointments').select('payment_method, services(price), status')
+      supabase.from('appointments').select('payment_method, total_amount, services(price), status')
         .eq('user_id', ownerId).gte('appointment_date', mStart).lte('appointment_date', mEnd),
       supabase.from('walk_ins').select('payment_method, total')
         .eq('user_id', ownerId).gte('created_at', mStart + 'T00:00:00').lte('created_at', mEnd + 'T23:59:59'),
@@ -124,7 +124,7 @@ export default function PnLPage() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(pmAppt.data ?? []).filter((a: any) => a.status === 'completed').forEach((a: any) => {
       const m = a.payment_method ?? 'cash'
-      pmMap.set(m, (pmMap.get(m) ?? 0) + Number(a.services?.price ?? 0))
+      pmMap.set(m, (pmMap.get(m) ?? 0) + Number(a.total_amount ?? a.services?.price ?? 0))
     })
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(pmWalkin.data ?? []).forEach((w: any) => {

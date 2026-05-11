@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { format, differenceInDays, parseISO } from 'date-fns'
 import { createClient } from '@/lib/supabase/client'
 import { useUserContext } from '@/components/RoleContext'
+import { useCurrency } from '@/hooks/useCurrency'
 import {
   UserSearch, TrendingUp, CalendarDays, Loader2, Search, MessageCircle, Star,
   Crown, Users, Zap, Clock, Gift, Phone, ChevronRight,
@@ -70,13 +71,10 @@ function getSegment(client: Omit<ClientSummary, 'segment'>): ClientSummary['segm
 function whatsappUrl(phone: string, clientName: string) {
   const digits = phone.replace(/\D/g, '')
   const wa = digits.startsWith('0') ? '92' + digits.slice(1) : digits.startsWith('92') ? digits : '92' + digits
-  const msg = `Assalamu Alaikum ${clientName}! Aapka salon mein khushaamdeed hai. 🌸 We miss you!`
+  const msg = `Hello ${clientName}! We miss you at the salon. Come visit us soon! 🌸`
   return `https://wa.me/${wa}?text=${encodeURIComponent(msg)}`
 }
 
-function formatPKR(n: number) {
-  return `PKR ${Math.round(n).toLocaleString('en-PK')}`
-}
 
 function isBirthdayThisMonth(birthday: string | null) {
   if (!birthday) return false
@@ -87,6 +85,7 @@ function isBirthdayThisMonth(birthday: string | null) {
 export default function ClientsPage() {
   const { role, ownerId } = useUserContext()
   const router = useRouter()
+  const { formatAmount } = useCurrency()
 
   const [clients, setClients] = useState<ClientSummary[]>([])
   const [loading, setLoading] = useState(true)
@@ -388,8 +387,8 @@ export default function ClientsPage() {
                         <span className="font-medium">{c.completedVisits}</span>
                         <span className="text-gray-400 text-xs"> / {c.totalVisits}</span>
                       </td>
-                      <td className="px-4 py-3 font-medium text-gray-900">{formatPKR(c.totalSpend)}</td>
-                      <td className="px-4 py-3 text-gray-700">{formatPKR(c.avgBill)}</td>
+                      <td className="px-4 py-3 font-medium text-gray-900">{formatAmount(c.totalSpend)}</td>
+                      <td className="px-4 py-3 text-gray-700">{formatAmount(c.avgBill)}</td>
                       <td className="px-4 py-3 text-gray-500 text-xs">{c.favoriteService ?? '—'}</td>
                       <td className="px-4 py-3 text-gray-500 text-xs">
                         {c.lastVisit ? format(parseISO(c.lastVisit), 'MMM d, yyyy') : '—'}

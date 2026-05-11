@@ -152,7 +152,7 @@ export default function WalkInPage() {
   const [staffList, setStaffList] = useState<StaffItem[]>([])
   const [deals, setDeals] = useState<DealItem[]>([])
   const [paymentMethodConfig, setPaymentMethodConfig] = useState<PaymentMethodConfig[]>(DEFAULT_PAYMENT_METHODS)
-  const [currency, setCurrency] = useState('PKR')
+  const [currency, setCurrency] = useState('USD')
   const [salonName, setSalonName] = useState('')
   const [salonAddress, setSalonAddress] = useState('')
   const [taxPercentage, setTaxPercentage] = useState(0)
@@ -473,7 +473,7 @@ export default function WalkInPage() {
                 {clientProfile && (
                   <div className="flex items-center gap-2 bg-purple-50 border border-purple-200 rounded-lg px-2.5 py-1.5">
                     <Star className="w-3.5 h-3.5 text-purple-500" />
-                    <span className="text-xs text-purple-700 font-medium">{clientProfile.name} · Loyalty: PKR {clientProfile.loyalty_balance.toLocaleString()}</span>
+                    <span className="text-xs text-purple-700 font-medium">{clientProfile.name} · Loyalty: {formatCurrency(clientProfile.loyalty_balance, currency)}</span>
                   </div>
                 )}
               </div>
@@ -518,7 +518,7 @@ export default function WalkInPage() {
                           {deal.deal_services.map(ds => ds.services?.name).filter(Boolean).join(', ')}
                         </span>
                         <span className={`text-sm font-bold mt-1 ${isSelected ? 'text-white' : 'text-primary'}`}>
-                          PKR {Number(deal.price).toLocaleString()}
+                          {formatCurrency(Number(deal.price), currency)}
                         </span>
                       </button>
                     )
@@ -547,7 +547,7 @@ export default function WalkInPage() {
                       <span className="font-semibold text-sm truncate w-full">{s.name}</span>
                       <span className={`text-xs mt-1 ${selected ? 'text-white/80' : 'text-gray-500'}`}>{s.duration} min</span>
                       <span className={`text-sm font-bold mt-1 ${selected ? 'text-white' : 'text-primary'}`}>
-                        PKR {Number(s.price).toLocaleString()}
+                        {formatCurrency(Number(s.price), currency)}
                       </span>
                     </button>
                   )
@@ -562,7 +562,7 @@ export default function WalkInPage() {
                   </div>
                   <div className="text-right flex-shrink-0 ml-2">
                     <p className="text-xs text-gray-500">{selectedServices.reduce((s, svc) => s + svc.duration, 0)} min</p>
-                    <p className="font-bold text-primary">PKR {subtotal.toLocaleString()}</p>
+                    <p className="font-bold text-primary">{formatCurrency(subtotal, currency)}</p>
                   </div>
                 </div>
               )}
@@ -592,12 +592,12 @@ export default function WalkInPage() {
                 <Select value={form.discount_type} onValueChange={(v) => setForm(f => ({ ...f, discount_type: (v ?? 'percentage') as DiscountType }))}>
                   <SelectTrigger className="h-9">
                     <SelectValue>
-                      {form.discount_type === 'fixed' ? 'Fixed (PKR)' : 'Percentage (%)'}
+                      {form.discount_type === 'fixed' ? `Fixed (${currency})` : 'Percentage (%)'}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="percentage">Percentage (%)</SelectItem>
-                    <SelectItem value="fixed">Fixed (PKR)</SelectItem>
+                    <SelectItem value="fixed">Fixed ({currency})</SelectItem>
                   </SelectContent>
                 </Select>
                 <Input
@@ -624,7 +624,7 @@ export default function WalkInPage() {
               <div className="rounded-xl bg-purple-50 border border-purple-200 p-4 space-y-2">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-semibold text-purple-800">Loyalty Points</p>
-                  <span className="text-sm font-bold text-purple-700">Balance: PKR {clientProfile.loyalty_balance.toLocaleString()}</span>
+                  <span className="text-sm font-bold text-purple-700">Balance: {formatCurrency(clientProfile.loyalty_balance, currency)}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Input
@@ -641,7 +641,7 @@ export default function WalkInPage() {
                   </Button>
                 </div>
                 {loyaltyRedeemAmount > 0 && (
-                  <p className="text-xs text-purple-600">Redeeming PKR {loyaltyRedeemAmount.toLocaleString()} from loyalty points</p>
+                  <p className="text-xs text-purple-600">Redeeming {formatCurrency(loyaltyRedeemAmount, currency)} from loyalty points</p>
                 )}
               </div>
             )}
@@ -669,7 +669,7 @@ export default function WalkInPage() {
                 <span className="text-primary">{formatCurrency(total, currency)}</span>
               </div>
               {loyaltyEnabled && loyaltyEarned > 0 && (
-                <p className="text-xs text-purple-600 text-right">+PKR {loyaltyEarned.toLocaleString()} loyalty earned</p>
+                <p className="text-xs text-purple-600 text-right">+{formatCurrency(loyaltyEarned, currency)} loyalty earned</p>
               )}
             </div>
 

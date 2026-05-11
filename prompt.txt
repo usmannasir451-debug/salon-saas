@@ -1,45 +1,90 @@
-You are an expert SaaS developer working on "Snipforce". Fix these three issues:
+You are an expert SaaS developer working on "Snipforce". Make these important fixes and improvements:
 
-PART 1 - FIX PAYROLL PRORATA ERROR
+PART 1 - FIX HISTORICAL PRICING BUG (Critical)
 
-Error: "Could not find the 'prorata_detail' column of 'payroll_entries' in the schema cache"
+Problem: When service prices are updated, past appointment/walk-in revenue changes automatically. This is wrong - historical records must never change.
+
+Root cause and fix:
+- Check appointments table and walk_ins table - they likely store service_id reference instead of actual price paid
+- Add price snapshot columns to appointments: total_amount (actual amount charged at time of booking)
+- Add price snapshot to walk_ins: total_amount (actual amount charged at time of service)
+- When a new appointment is created: store the actual price at that moment in total_amount column
+- When a new walk-in is created: store the actual price at that moment in total_amount column
+- Dashboard revenue calculations must use total_amount from appointments/walk_ins tables - NOT recalculate from current service prices
+- P&L report must use stored total_amount - NOT live service prices
+- All revenue KPIs must use stored amounts
+- Check if discount_amount is also stored correctly and not recalculated
+- Fix appointment and walk-in forms to save total_amount at time of creation
+- Existing records: for any records missing total_amount, calculate from current service price as one-time migration only
+- Generate SQL migration to add total_amount column where missing
+
+PART 2 - REMOVE DASHBOARD QUICK ACTION TILES
+
+- Remove the 4 quick action buttons/tiles from dashboard top: "New Appointment", "New Walk-in", "Add Expense", "Add Client"
+- Keep the floating Walk-in button at bottom right - do not touch it
+- Clean up any unused imports after removal
+
+PART 3 - REMOVE ALL URDU TEXT
+
+- Search entire codebase for any Urdu or Arabic script text
+- Remove ALL Urdu text completely - replace with English equivalents
+- Check all components, pages, layouts, modals, tooltips, placeholders
+- Common places to check: login page, dashboard, walk-in page, appointments, onboarding wizard
+- Make sure no Urdu characters remain anywhere in the UI
+
+PART 4 - DYNAMIC CURRENCY SYSTEM
+
+Problem: Currency symbol is hardcoded as $ or PKR in various places instead of using the salon's selected currency from settings.
 
 Fix:
-- Check payroll_entries table structure in the codebase
-- The code is trying to insert/select prorata_detail column but it does not exist in the database
-- Either add the missing column to the migration OR remove it from the code - choose whichever is the correct fix based on the architecture
-- Make sure payroll generation works without any schema errors
-- Test that monthly payroll can be generated successfully for all staff members
+- Salon owner sets currency in Settings page (e.g. PKR, USD, AED, SAR, GBP, EUR)
+- Create a useCurrency() hook that:
+  * Reads currency setting from profiles table
+  * Returns currency symbol and formatter function
+  * Can be used across all pages
+- Replace ALL hardcoded currency symbols throughout the app:
+  * Dashboard KPI cards
+  * Appointments total
+  * Walk-in total
+  * Invoice generation
+  * P&L report
+  * Payroll/salary fields
+  * Staff salary input fields
+  * Expense amounts
+  * Inventory cost fields
+  * Client total spend
+  * All charts and reports
+- Currency symbols to support: PKR (₨), USD ($), AED (د.إ), SAR (﷼), GBP (£), EUR (€), CAD ($), AUD ($)
+- Format numbers correctly based on currency (e.g. PKR shows no decimals, USD shows 2 decimals)
+- Default currency: PKR if not set
 
-PART 2 - FIX DASHBOARD REVENUE CALCULATION BUG
+PART 5 - DARK MODE / NIGHT MODE
 
-Problem: "All Branches" total revenue shows 300,000+ but individual branches combined show less than 100,000 - numbers are inconsistent.
-
-Root cause investigation and fix:
-- Check how "All Branches" revenue is calculated vs individual branch revenue
-- Walk-ins and appointments may be getting double counted in "All Branches" view
-- Some records may have null branch_id causing them to appear in "All Branches" but not in any specific branch - these should still be counted correctly
-- Fix the revenue aggregation logic:
-  * "All Branches" = sum of ALL appointments + walk-ins for this owner (regardless of branch)
-  * Single branch = sum of appointments + walk-ins WHERE branch_id = selected branch
-  * Records with null branch_id should appear in "All Branches" only, not in specific branch views
-- Apply same fix to: revenue KPIs, expense calculations, net profit, all charts
-- Make sure no double counting anywhere
-- Test with multiple branches to confirm numbers add up correctly
-
-PART 3 - ADD CUSTOM FAVICON
-
-- Create a custom favicon for Snipforce using a scissors icon in pink/rose color (#e11d48 or similar)
-- Generate favicon in multiple sizes: 16x16, 32x32, 180x180 (apple touch icon)
-- Add favicon.ico, apple-touch-icon.png to the /public folder
-- Update app/layout.tsx metadata to include all favicon references
-- Replace the current default Next.js/Vercel favicon completely
-- The scissors icon should be simple, clean and recognizable at small sizes
-- Use SVG-based approach for crisp rendering at all sizes
+- Add dark mode toggle button in the top header/navigation bar
+- Use a sun/moon icon toggle
+- Implement using CSS variables and Tailwind dark: classes
+- Save user preference in localStorage so it persists across sessions
+- Dark mode colors:
+  * Background: #0f172a (dark navy)
+  * Card background: #1e293b
+  * Text: #f1f5f9
+  * Border: #334155
+  * Accent/primary: keep pink/rose (#e11d48)
+- Apply dark mode consistently to:
+  * Sidebar navigation
+  * Dashboard and all KPI cards
+  * All forms and modals
+  * Tables and lists
+  * Charts (dark background)
+  * Login page
+  * Settings page
+  * All other pages
+- Toggle should be smooth transition (CSS transition 200ms)
+- Mobile responsive dark mode
 
 TECHNICAL REQUIREMENTS:
-- Generate SQL migration for prorata_detail column if needed
-- Fix must not break existing payroll data
-- Dashboard fix must work for single branch salons too
-- Mobile responsive
-- No breaking changes to existing functionality
+- Generate SQL migration for total_amount columns
+- RLS policies maintained
+- No breaking changes to existing data
+- Mobile responsive throughout
+- Test that revenue numbers do not change when service prices are updated after fix

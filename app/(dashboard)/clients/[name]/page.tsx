@@ -4,6 +4,7 @@ import { use, useEffect, useState } from 'react'
 import { format } from 'date-fns'
 import { createClient } from '@/lib/supabase/client'
 import { useUserContext } from '@/components/RoleContext'
+import { useCurrency } from '@/hooks/useCurrency'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -37,14 +38,10 @@ const statusConfig: Record<string, { label: string; className: string }> = {
   cancelled: { label: 'Cancelled', className: 'bg-red-50 text-red-700 border-red-200' },
 }
 
-function formatPKR(n: number) {
-  return `PKR ${Math.round(n).toLocaleString('en-PK')}`
-}
-
 function whatsappUrl(phone: string, clientName: string) {
   const digits = phone.replace(/\D/g, '')
   const wa = digits.startsWith('0') ? '92' + digits.slice(1) : digits.startsWith('92') ? digits : '92' + digits
-  const msg = `Assalamu Alaikum ${clientName}! Aapka salon mein khushaamdeed hai. 🌸`
+  const msg = `Hello ${clientName}! We miss you at the salon. Come visit us soon! 🌸`
   return `https://wa.me/${wa}?text=${encodeURIComponent(msg)}`
 }
 
@@ -52,6 +49,7 @@ export default function ClientProfilePage({ params }: { params: Promise<{ name: 
   const { ownerId } = useUserContext()
   const { name } = use(params)
   const clientName = decodeURIComponent(name)
+  const { formatAmount } = useCurrency()
 
   const [appointments, setAppointments] = useState<AppRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -144,10 +142,10 @@ export default function ClientProfilePage({ params }: { params: Promise<{ name: 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         {[
-          { label: 'Visits', urdu: 'وزٹ', value: appointments.length, icon: CalendarDays, color: 'text-primary', bg: 'bg-primary/10' },
-          { label: 'Completed', urdu: 'مکمل', value: completed.length, icon: Scissors, color: 'text-green-600', bg: 'bg-green-50' },
-          { label: 'Total Spent', urdu: 'کل خرچ', value: formatPKR(totalSpent), icon: TrendingUp, color: 'text-blue-600', bg: 'bg-blue-50' },
-          { label: 'Avg Bill', urdu: 'اوسط بل', value: formatPKR(avgBill), icon: ReceiptText, color: 'text-purple-600', bg: 'bg-purple-50' },
+          { label: 'Visits', value: appointments.length, icon: CalendarDays, color: 'text-primary', bg: 'bg-primary/10' },
+          { label: 'Completed', value: completed.length, icon: Scissors, color: 'text-green-600', bg: 'bg-green-50' },
+          { label: 'Total Spent', value: formatAmount(totalSpent), icon: TrendingUp, color: 'text-blue-600', bg: 'bg-blue-50' },
+          { label: 'Avg Bill', value: formatAmount(avgBill), icon: ReceiptText, color: 'text-purple-600', bg: 'bg-purple-50' },
         ].map((s) => (
           <Card key={s.label} className="border-gray-100">
             <CardContent className="pt-4 pb-3">
@@ -156,7 +154,6 @@ export default function ClientProfilePage({ params }: { params: Promise<{ name: 
               </div>
               <p className="text-lg font-bold text-gray-900 leading-tight">{s.value}</p>
               <p className="text-xs text-gray-500">{s.label}</p>
-              <p className="font-urdu text-xs text-gray-400">{s.urdu}</p>
             </CardContent>
           </Card>
         ))}
@@ -177,7 +174,6 @@ export default function ClientProfilePage({ params }: { params: Promise<{ name: 
       <Card className="border-gray-100">
         <CardHeader className="pb-3 border-b border-gray-50">
           <CardTitle className="text-base">Appointment History</CardTitle>
-          <p className="font-urdu text-xs text-gray-400">اپائنٹمنٹ کی تاریخ</p>
         </CardHeader>
         <CardContent className="pt-4">
           {appointments.length === 0 ? (
@@ -207,7 +203,7 @@ export default function ClientProfilePage({ params }: { params: Promise<{ name: 
                             <Scissors className="w-3 h-3 text-gray-400" />
                             <span>{appt.services.name}</span>
                             <span className="font-medium text-primary">
-                              {formatPKR(appt.services.price)}
+                              {formatAmount(appt.services.price)}
                             </span>
                           </div>
                         )}

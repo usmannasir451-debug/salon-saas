@@ -43,7 +43,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const ctx: UserCtx = { role, ownerId, staffId, permissions, isOwner, displayName }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <RoleProvider value={ctx}>
         <Sidebar
           salonName={profile?.salon_name ?? undefined}

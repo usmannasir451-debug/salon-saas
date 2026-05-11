@@ -100,7 +100,7 @@ function whatsappUrl(phone: string, clientName: string, date: string, time: stri
   const wa = digits.startsWith('0') ? '92' + digits.slice(1) : digits.startsWith('92') ? digits : '92' + digits
   const d = format(new Date(date + 'T00:00:00'), 'EEEE, MMMM d')
   const t = time.slice(0, 5)
-  const msg = `Assalamu Alaikum ${clientName}! Aapki appointment ${d} ko ${t} baje hai. Aapka intezaar hai. Shukriya! 🌸`
+  const msg = `Hello ${clientName}! Your appointment is on ${d} at ${t}. We look forward to seeing you. Thank you! 🌸`
   return `https://wa.me/${wa}?text=${encodeURIComponent(msg)}`
 }
 
@@ -146,7 +146,7 @@ export default function AppointmentsPage() {
   const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(null)
   const [salonName, setSalonName] = useState('')
   const [salonAddress, setSalonAddress] = useState('')
-  const [currency, setCurrency] = useState('PKR')
+  const [currency, setCurrency] = useState('USD')
   const [taxPercentage, setTaxPercentage] = useState(0)
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -278,7 +278,7 @@ export default function AppointmentsPage() {
       ? [...dealServiceIds, ...form.service_ids.filter(id => !dealServiceIds.includes(id))]
       : form.service_ids
 
-    const payload = {
+    const basePayload = {
       client_name: form.client_name.trim(),
       client_phone: form.client_phone.trim() || null,
       service_id: allServiceIds[0] || null,
@@ -293,7 +293,7 @@ export default function AppointmentsPage() {
     }
 
     if (editingId) {
-      const { error } = await supabase.from('appointments').update(payload).eq('id', editingId)
+      const { error } = await supabase.from('appointments').update(basePayload).eq('id', editingId)
       if (error) { toast.error(error.message); setSaving(false); return }
 
       // Refresh junction table
@@ -305,6 +305,7 @@ export default function AppointmentsPage() {
       }
       toast.success('Appointment updated')
     } else {
+      const payload = { ...basePayload, total_amount: formTotal }
       const { data: newAppt, error } = await supabase.from('appointments').insert(payload).select('id').single()
       if (error) { toast.error(error.message); setSaving(false); return }
 
@@ -445,9 +446,7 @@ export default function AppointmentsPage() {
             {isStaffRole ? 'My Appointments' : 'Appointments'}
           </h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            <span className="font-urdu">اپائنٹمنٹ مینجمنٹ</span>
-            {isStaffRole && ' — Showing your appointments for today'}
-            {role === 'cashier' && ' — Mark payments and collect feedback'}
+            {isStaffRole ? 'Showing your appointments for today' : role === 'cashier' ? 'Mark payments and collect feedback' : 'Appointment Management'}
           </p>
         </div>
         {canCreate(role) && (
@@ -576,11 +575,11 @@ export default function AppointmentsPage() {
                                 ))}
                                 {isPaid && discountAmt > 0 ? (
                                   <>
-                                    <span className="line-through text-gray-400">PKR {serviceTotal.toLocaleString()}</span>
-                                    <span className="text-primary font-medium">PKR {netAmount.toLocaleString()}</span>
+                                    <span className="line-through text-gray-400">{currency} {serviceTotal.toLocaleString()}</span>
+                                    <span className="text-primary font-medium">{currency} {netAmount.toLocaleString()}</span>
                                   </>
                                 ) : (
-                                  <span className="text-primary font-medium">PKR {serviceTotal.toLocaleString()}</span>
+                                  <span className="text-primary font-medium">{currency} {serviceTotal.toLocaleString()}</span>
                                 )}
                               </div>
                             </div>
@@ -751,14 +750,14 @@ export default function AppointmentsPage() {
                       <SelectItem value="none">No deal</SelectItem>
                       {deals.map(d => (
                         <SelectItem key={d.id} value={d.id}>
-                          {d.name} — PKR {Number(d.price).toLocaleString()}
+                          {d.name} — {currency} {Number(d.price).toLocaleString()}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                   {form.deal_id && selectedDeal && (
                     <div className="bg-primary/5 rounded-lg px-3 py-2 text-xs text-primary">
-                      Deal includes: {selectedDeal.deal_services.map(ds => ds.services?.name).filter(Boolean).join(', ')} · PKR {Number(selectedDeal.price).toLocaleString()}
+                      Deal includes: {selectedDeal.deal_services.map(ds => ds.services?.name).filter(Boolean).join(', ')} · {currency} {Number(selectedDeal.price).toLocaleString()}
                       <button type="button" className="ml-2 text-gray-400 hover:text-red-500" onClick={() => setForm({ ...form, deal_id: '', service_ids: [] })}>✕ Remove</button>
                     </div>
                   )}
@@ -788,7 +787,7 @@ export default function AppointmentsPage() {
                           <span className="font-medium truncate">{s.name}</span>
                           <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                             <span className="text-xs opacity-75">{s.duration}min</span>
-                            <span className="font-semibold">PKR {s.price.toLocaleString()}</span>
+                            <span className="font-semibold">{currency} {s.price.toLocaleString()}</span>
                           </div>
                         </button>
                       )
@@ -798,7 +797,7 @@ export default function AppointmentsPage() {
                 {form.service_ids.length > 0 && (
                   <div className="flex items-center justify-between text-xs bg-primary/5 rounded-lg px-3 py-2">
                     <span className="text-gray-600">{form.service_ids.length} service(s) · {formDuration} min total</span>
-                    <span className="font-bold text-primary">PKR {formTotal.toLocaleString()}</span>
+                    <span className="font-bold text-primary">{currency} {formTotal.toLocaleString()}</span>
                   </div>
                 )}
               </div>
@@ -990,18 +989,18 @@ export default function AppointmentsPage() {
                   <div className="rounded-lg bg-primary/5 border border-primary/15 p-3 text-sm">
                     <div className="flex justify-between items-center">
                       <span className="text-gray-600">Services total</span>
-                      <span className="font-medium">PKR {svcTotal.toLocaleString()}</span>
+                      <span className="font-medium">{currency} {svcTotal.toLocaleString()}</span>
                     </div>
                     {payForm.discount && parseFloat(payForm.discount) > 0 && (
                       <div className="flex justify-between items-center mt-1">
                         <span className="text-gray-600">Discount</span>
-                        <span className="font-medium text-red-600">− PKR {parseFloat(payForm.discount).toLocaleString()}</span>
+                        <span className="font-medium text-red-600">− {currency} {parseFloat(payForm.discount).toLocaleString()}</span>
                       </div>
                     )}
                     <div className="flex justify-between items-center mt-2 pt-2 border-t border-primary/15">
                       <span className="font-semibold text-gray-800">Total due</span>
                       <span className="font-bold text-primary">
-                        PKR {Math.max(0, svcTotal - (parseFloat(payForm.discount) || 0)).toLocaleString()}
+                        {currency} {Math.max(0, svcTotal - (parseFloat(payForm.discount) || 0)).toLocaleString()}
                       </span>
                     </div>
                   </div>

@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
@@ -31,6 +31,8 @@ import {
   TrendingUp,
   Star,
   Download,
+  Sun,
+  Moon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -98,6 +100,21 @@ export default function Sidebar({
   const router = useRouter()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
+  const [isDark, setIsDark] = useState(false)
+
+  useEffect(() => {
+    const saved = localStorage.getItem('theme')
+    const prefersDark = saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)
+    setIsDark(prefersDark)
+    document.documentElement.classList.toggle('dark', prefersDark)
+  }, [])
+
+  function toggleDarkMode() {
+    const next = !isDark
+    setIsDark(next)
+    document.documentElement.classList.toggle('dark', next)
+    localStorage.setItem('theme', next ? 'dark' : 'light')
+  }
 
   let allowedPaths: string[]
   if (role === 'owner') {
@@ -148,7 +165,19 @@ export default function Sidebar({
               <p className="text-[10px] text-primary font-medium leading-tight">Snipforce</p>
             </div>
           </Link>
-          {ownerId && <NotificationBell ownerId={ownerId} side="left" />}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={toggleDarkMode}
+              className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {isDark
+                ? <Sun className="w-4 h-4 text-yellow-400" />
+                : <Moon className="w-4 h-4 text-gray-500" />
+              }
+            </button>
+            {ownerId && <NotificationBell ownerId={ownerId} side="left" />}
+          </div>
         </div>
       </div>
 
@@ -240,6 +269,16 @@ export default function Sidebar({
           <span className="font-bold text-sm text-gray-900">{salonName || 'Snipforce'}</span>
         </Link>
         <div className="flex items-center gap-1">
+          <button
+            onClick={toggleDarkMode}
+            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {isDark
+              ? <Sun className="w-4 h-4 text-yellow-400" />
+              : <Moon className="w-4 h-4 text-gray-500" />
+            }
+          </button>
           {ownerId && <NotificationBell ownerId={ownerId} />}
           <button
             className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
