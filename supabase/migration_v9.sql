@@ -25,6 +25,12 @@ create policy "Anyone can submit a lead" on public.leads
   for insert with check (true);
 
 -- Only service role (admin) can read/update/delete via admin client (bypasses RLS)
+
+-- Grants
+grant select, insert, update, delete on public.leads to authenticated;
+grant select, insert, update, delete on public.leads to service_role;
+grant select on public.leads to anon;
+
 create index if not exists idx_leads_status on public.leads(status);
 create index if not exists idx_leads_created_at on public.leads(created_at desc);
 

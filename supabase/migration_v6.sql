@@ -57,6 +57,11 @@ create policy "reviews_update" on public.reviews
 create policy "reviews_delete" on public.reviews
   for delete using (auth.uid() = user_id);
 
+-- Grants
+grant select, insert, update, delete on public.reviews to authenticated;
+grant select, insert, update, delete on public.reviews to service_role;
+grant select on public.reviews to anon;
+
 -- ═══════════════════════════════════════════════════════
 -- PART 15: CLIENTS TABLE (extended client data)
 -- ═══════════════════════════════════════════════════════
@@ -107,6 +112,11 @@ create policy "clients_update" on public.clients
 create policy "clients_delete" on public.clients
   for delete using (auth.uid() = user_id);
 
+-- Grants
+grant select, insert, update, delete on public.clients to authenticated;
+grant select, insert, update, delete on public.clients to service_role;
+grant select on public.clients to anon;
+
 -- ═══════════════════════════════════════════════════════
 -- PART 18: NOTIFICATIONS
 -- ═══════════════════════════════════════════════════════
@@ -145,6 +155,11 @@ create policy "notifications_update" on public.notifications
 create policy "notifications_delete" on public.notifications
   for delete using (auth.uid() = user_id);
 
+-- Grants
+grant select, insert, update, delete on public.notifications to authenticated;
+grant select, insert, update, delete on public.notifications to service_role;
+grant select on public.notifications to anon;
+
 -- ═══════════════════════════════════════════════════════
 -- PART 19: AUDIT LOG
 -- ═══════════════════════════════════════════════════════
@@ -175,6 +190,11 @@ create policy "audit_log_insert" on public.audit_log
       where owner_id = user_id and status = 'active'
     )
   );
+
+-- Grants
+grant select, insert, update, delete on public.audit_log to authenticated;
+grant select, insert, update, delete on public.audit_log to service_role;
+grant select on public.audit_log to anon;
 
 -- ═══════════════════════════════════════════════════════
 -- INDEXES for performance

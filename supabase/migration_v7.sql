@@ -69,6 +69,11 @@ create policy "loyalty_update" on public.loyalty_transactions
 create policy "loyalty_delete" on public.loyalty_transactions
   for delete using (user_id = get_effective_owner_id());
 
+-- Grants
+grant select, insert, update, delete on public.loyalty_transactions to authenticated;
+grant select, insert, update, delete on public.loyalty_transactions to service_role;
+grant select on public.loyalty_transactions to anon;
+
 -- ═══════════════════════════════════════════════════════
 -- PART 4: MULTI-SERVICE SUPPORT
 -- ═══════════════════════════════════════════════════════
@@ -114,6 +119,15 @@ create policy "walkin_svc_insert" on public.walk_in_services
 
 create policy "walkin_svc_delete" on public.walk_in_services
   for delete using (user_id = get_effective_owner_id());
+
+-- Grants
+grant select, insert, update, delete on public.appointment_services to authenticated;
+grant select, insert, update, delete on public.appointment_services to service_role;
+grant select on public.appointment_services to anon;
+
+grant select, insert, update, delete on public.walk_in_services to authenticated;
+grant select, insert, update, delete on public.walk_in_services to service_role;
+grant select on public.walk_in_services to anon;
 
 -- ═══════════════════════════════════════════════════════
 -- PART 5: DEALS & PACKAGES
@@ -171,6 +185,15 @@ alter table public.walk_ins
   add column if not exists deal_id uuid references public.deals(id) on delete set null,
   add column if not exists loyalty_redeemed numeric(12, 2) not null default 0;
 
+-- Grants
+grant select, insert, update, delete on public.deals to authenticated;
+grant select, insert, update, delete on public.deals to service_role;
+grant select on public.deals to anon;
+
+grant select, insert, update, delete on public.deal_services to authenticated;
+grant select, insert, update, delete on public.deal_services to service_role;
+grant select on public.deal_services to anon;
+
 -- ═══════════════════════════════════════════════════════
 -- PART 6: CUSTOM INVENTORY CATEGORIES
 -- ═══════════════════════════════════════════════════════
@@ -197,6 +220,11 @@ create policy "custom_cats_delete" on public.custom_inventory_categories
 -- Remove check constraint on inventory_items.category to allow custom categories
 alter table public.inventory_items
   drop constraint if exists inventory_items_category_check;
+
+-- Grants
+grant select, insert, update, delete on public.custom_inventory_categories to authenticated;
+grant select, insert, update, delete on public.custom_inventory_categories to service_role;
+grant select on public.custom_inventory_categories to anon;
 
 -- ═══════════════════════════════════════════════════════
 -- PERFORMANCE INDEXES

@@ -1,120 +1,12 @@
-You are an expert SaaS developer working on "Snipforce". Make these fixes and improvements:
+Supabase is changing their security policy. Starting October 30 2026, all tables need explicit GRANT statements to be accessible via the Data API. 
 
-PART 1 - FIX CALENDAR PREVIOUS/NEXT WEEK NAVIGATION
+Please update all our SQL migration files and future table creation to include proper grants. Also generate a one-time SQL script that adds the required grants to ALL existing tables in our Snipforce project so we are compliant before the October 30 deadline.
 
-Bug: Both "Previous Week" and "Next Week" buttons move calendar forward to next week. Previous button is not working correctly.
+The grants needed for each table are:
+grant select, insert, update, delete on public.TABLE_NAME to authenticated;
+grant select, insert, update, delete on public.TABLE_NAME to service_role;
+grant select on public.TABLE_NAME to anon;
 
-Fix:
-- Find the week navigation logic in app/(dashboard)/calendar/page.tsx
-- Previous week button must subtract 7 days from current week start date
-- Next week button must add 7 days from current week start date
-- Test both directions work correctly
-- Also check day view previous/next navigation for same bug
+Generate this for all our existing tables: profiles, appointments, walk_ins, staff, services, clients, expenses, inventory, inventory_items, stock_adjustments, staff_salaries, payroll_entries, reviews, deals, deal_services, branches, salon_members, leads, notifications, audit_logs, loyalty_transactions
 
-PART 2 - STAFF ATTENDANCE SYSTEM
-
-Add a complete attendance tracking system connected to payroll:
-
-ATTENDANCE PAGE (/attendance):
-- Add "Attendance" to sidebar navigation under Staff section
-- Daily attendance marking: for each working day, mark each staff member as:
-  * Present (full day)
-  * Half Day
-  * Absent
-  * On Leave (paid)
-  * Holiday
-- Monthly attendance calendar view per staff member
-- Bulk mark attendance for all staff at once for a day
-- Edit past attendance (owner only)
-- Show attendance summary per staff: total present days, absent days, leaves taken this month
-
-ATTENDANCE CONNECTED TO PAYROLL:
-- When generating monthly payroll, calculate salary based on actual attendance:
-  * Full attendance = full salary
-  * If absent days exist = deduct proportionally (absent days / working days in month)
-  * Half day = deduct half day salary
-  * On Leave (paid) = no deduction
-  * Formula: (Fixed Salary / Total Working Days) x Days Present
-- Show attendance breakdown in payroll: "Present: 22/26 days, Deduction: PKR X, Net Salary: PKR X"
-- Working days in month = all days minus Sundays (or configurable in settings)
-- If staff joined mid-month: only count working days from joining date
-
-LEAVE MANAGEMENT:
-- Each staff gets configurable leave allowance per month (set in staff profile)
-- Track leaves taken vs remaining
-- Show leave balance on staff profile
-
-DATABASE:
-- New table: attendance (id, owner_id, staff_id, date, status, branch_id, notes, created_at)
-- Add leave_allowance column to staff table
-- RLS policies on attendance table
-
-PART 3 - REMOVE FAVOURITE SERVICE COLUMN FROM CLIENTS
-
-- Remove the "Favourite Service" column from clients list/table view
-- It shows dashes everywhere and provides no value currently
-- Keep the data in database but just remove from UI display
-- Check if it appears anywhere else and remove from those views too
-
-PART 4 - SUBSCRIPTION LIMITS SYSTEM
-
-Add branch and staff limits per account:
-
-ADMIN PANEL - ACCOUNT CREATION:
-- Add two new fields when creating salon account:
-  * Max Branches Allowed (number input, default 1)
-  * Max Staff Allowed (number input, default 10)
-- Show these limits on each salon row in admin panel
-- Admin can edit limits anytime from salon detail view
-- Store in profiles table: max_branches, max_staff
-
-ENFORCEMENT IN PRODUCT:
-- Branches: when salon tries to add a new branch and they are at their limit, show error: "You have reached your branch limit (X/X). Please contact support to upgrade your plan."
-- Staff: when salon tries to add a new staff member and they are at their limit, show error: "You have reached your staff limit (X/X). Please contact support to upgrade your plan."
-- Show current usage vs limit on settings page: "Branches: 2/3" and "Staff: 8/10"
-- Show warning when at 80% of limit: "You are approaching your staff limit (8/10)"
-
-PART 5 - ARCHITECTURE REVIEW AND BUG PREVENTION
-
-Review the complete codebase for these common issues and fix them:
-
-1. DATA ISOLATION: Ensure every database query filters by owner_id - no data leakage between salons
-2. REVENUE CALCULATIONS: Confirm all revenue uses stored total_amount, never recalculates from current service prices
-3. BRANCH CALCULATIONS: Confirm branch-wise and all-branches calculations are consistent and dont double count
-4. NULL HANDLING: Check all places where null values could cause NaN or undefined to appear in UI - replace with 0 or appropriate defaults
-5. RLS POLICIES: Verify all tables have proper RLS policies
-6. SUB-USER DATA ACCESS: Confirm sub-users see owner salon data correctly using effective owner_id
-7. LOADING STATES: All data fetching should show loading spinner, not blank screen
-8. ERROR BOUNDARIES: Add proper error handling so one failed query doesnt break entire page
-9. CURRENCY: Confirm useCurrency hook is used everywhere, no hardcoded symbols remain
-10. DATE HANDLING: Confirm timezone handling is consistent - use salon timezone from settings
-
-PART 6 - LANDING PAGE PRICING UPDATE
-
-Update the pricing section on the landing page (app/page.tsx):
-
-STARTER PLAN:
-- Price: $49/month
-- Features: 1 Branch, Up to 10 Staff, All core features included
-
-GROWTH PLAN:
-- Price: $99/month  
-- Features: Up to 3 Branches, Up to 30 Staff, All features including multi-branch dashboard
-
-ENTERPRISE PLAN:
-- Price: $199/month
-- Features: Unlimited Branches, Unlimited Staff, Priority support, Custom setup
-
-- Update plan descriptions to match exactly: branch limit and staff limit as described
-- Keep "Contact us to get started" CTA on each plan
-- Make sure pricing cards look professional
-
-TECHNICAL REQUIREMENTS:
-- Add max_branches, max_staff columns to profiles table
-- Add attendance table with proper RLS
-- Add leave_allowance to staff table
-- Generate complete SQL migration for all new tables and columns
-- Mobile responsive throughout
-- Maintain dark mode support
-- Pink/rose theme
-- No breaking changes to existing data
+Also make sure all future migrations we create include these grants automatically.

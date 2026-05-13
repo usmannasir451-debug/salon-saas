@@ -101,6 +101,23 @@ create policy "Users can update own appointments" on public.appointments
 create policy "Users can delete own appointments" on public.appointments
   for delete using (auth.uid() = user_id);
 
+-- Grants
+grant select, insert, update, delete on public.profiles to authenticated;
+grant select, insert, update, delete on public.profiles to service_role;
+grant select on public.profiles to anon;
+
+grant select, insert, update, delete on public.services to authenticated;
+grant select, insert, update, delete on public.services to service_role;
+grant select on public.services to anon;
+
+grant select, insert, update, delete on public.staff to authenticated;
+grant select, insert, update, delete on public.staff to service_role;
+grant select on public.staff to anon;
+
+grant select, insert, update, delete on public.appointments to authenticated;
+grant select, insert, update, delete on public.appointments to service_role;
+grant select on public.appointments to anon;
+
 -- Auto-create profile on signup trigger
 create or replace function public.handle_new_user()
 returns trigger as $$
@@ -146,6 +163,11 @@ create policy "Users can update own branches" on public.branches
 
 create policy "Users can delete own branches" on public.branches
   for delete using (auth.uid() = user_id);
+
+-- Grants
+grant select, insert, update, delete on public.branches to authenticated;
+grant select, insert, update, delete on public.branches to service_role;
+grant select on public.branches to anon;
 
 -- Link appointments to a branch (nullable — works for single-branch salons too)
 alter table public.appointments add column if not exists branch_id uuid references public.branches(id) on delete set null;
@@ -193,6 +215,11 @@ create policy "Owners can manage their team" on public.salon_members
 -- Members can see their own membership row
 create policy "Members can view own membership" on public.salon_members
   for select using (auth.uid() = member_user_id);
+
+-- Grants
+grant select, insert, update, delete on public.salon_members to authenticated;
+grant select, insert, update, delete on public.salon_members to service_role;
+grant select on public.salon_members to anon;
 
 -- ─── Helper: returns the effective salon owner id for the current user ─────────
 -- For owners: returns their own auth.uid()
@@ -408,6 +435,11 @@ create policy "Delete salon walk_ins" on public.walk_ins
         and status = 'active'
     )
   );
+
+-- Grants
+grant select, insert, update, delete on public.walk_ins to authenticated;
+grant select, insert, update, delete on public.walk_ins to service_role;
+grant select on public.walk_ins to anon;
 
 -- ─── Supabase Storage: logos bucket ──────────────────────────────────────────
 -- Run the following in the Supabase Dashboard → Storage → New bucket

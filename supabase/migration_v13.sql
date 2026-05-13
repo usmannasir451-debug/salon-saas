@@ -56,6 +56,11 @@ CREATE POLICY "attendance_update" ON public.attendance
 CREATE POLICY "attendance_delete" ON public.attendance
   FOR DELETE USING (owner_id = get_effective_owner_id());
 
+-- Grants
+grant select, insert, update, delete on public.attendance to authenticated;
+grant select, insert, update, delete on public.attendance to service_role;
+grant select on public.attendance to anon;
+
 -- ── 6. Indexes for performance ───────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS attendance_owner_date_idx ON public.attendance(owner_id, date);
 CREATE INDEX IF NOT EXISTS attendance_staff_date_idx ON public.attendance(staff_id, date);

@@ -63,6 +63,11 @@ create policy "expenses_delete" on public.expenses
     )
   );
 
+-- Grants
+grant select, insert, update, delete on public.expenses to authenticated;
+grant select, insert, update, delete on public.expenses to service_role;
+grant select on public.expenses to anon;
+
 -- ═══════════════════════════════════════════════════════
 -- PART 9: INVENTORY
 -- ═══════════════════════════════════════════════════════
@@ -154,6 +159,15 @@ create policy "stock_adj_insert" on public.stock_adjustments
         and role in ('manager')
     )
   );
+
+-- Grants
+grant select, insert, update, delete on public.inventory_items to authenticated;
+grant select, insert, update, delete on public.inventory_items to service_role;
+grant select on public.inventory_items to anon;
+
+grant select, insert, update, delete on public.stock_adjustments to authenticated;
+grant select, insert, update, delete on public.stock_adjustments to service_role;
+grant select on public.stock_adjustments to anon;
 
 -- ═══════════════════════════════════════════════════════
 -- PART 10: PAYROLL
@@ -251,6 +265,15 @@ create policy "payroll_update" on public.payroll_entries
         and role in ('manager')
     )
   );
+
+-- Grants
+grant select, insert, update, delete on public.staff_salaries to authenticated;
+grant select, insert, update, delete on public.staff_salaries to service_role;
+grant select on public.staff_salaries to anon;
+
+grant select, insert, update, delete on public.payroll_entries to authenticated;
+grant select, insert, update, delete on public.payroll_entries to service_role;
+grant select on public.payroll_entries to anon;
 
 -- ═══════════════════════════════════════════════════════
 -- INDEXES for performance
