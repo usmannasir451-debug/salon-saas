@@ -34,7 +34,22 @@
       "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\Tesla Laptops\\\\salon-saas\" -Force | Select-Object Name, @{Name=\"Type\";Expression={if\\($_.PSIsContainer\\){\"DIR\"}else{\"FILE\"}}} | Format-Table -AutoSize)",
       "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\Tesla Laptops\\\\salon-saas\\\\supabase\" -File | Select-Object Name, @{Name=\"Size\";Expression={$_.Length}} | Sort-Object Name)",
       "Bash(Select-Object Name, PSIsContainer)",
-      "Bash(Format-Table)"
+      "Bash(Format-Table)",
+      "Bash(GIT_EDITOR=true git rebase --continue)",
+      "Bash(git -c core.editor=true rebase --continue)",
+      "Bash(git rebase *)",
+      "Bash(echo \"exit: $?\")",
+      "PowerShell(git rebase *)",
+      "Bash(git version *)",
+      "Bash(GIT_SEQUENCE_EDITOR=true git rebase --continue)",
+      "Bash(GIT_EDITOR=: git rebase --continue)",
+      "Bash(git grep *)",
+      "Bash(git commit *)",
+      "Bash(GIT_EDITOR=\"echo\" git rebase --continue)",
+      "Bash(GIT_TRACE=1 git rebase --continue)",
+      "Bash(GIT_TRACE2=1 git rebase --continue)",
+      "Bash(git update-ref *)",
+      "Bash(git checkout *)"
     ]
   }
 }

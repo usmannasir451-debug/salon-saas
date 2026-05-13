@@ -14,7 +14,7 @@ export default async function AdminPage() {
   const adminSupabase = createAdminClient()
   const { data: salonsRaw } = await adminSupabase
     .from('profiles')
-    .select('id, email, salon_name, subscription_status, created_at, last_set_password, salon_members(count)')
+    .select('id, email, salon_name, subscription_status, created_at, last_set_password, max_branches, max_staff, salon_members(count)')
     .order('created_at', { ascending: false })
 
   const salons = (salonsRaw ?? []).map((s) => ({

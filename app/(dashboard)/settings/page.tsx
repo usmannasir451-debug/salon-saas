@@ -106,6 +106,9 @@ export default function SettingsPage() {
   const [logoPreview, setLogoPreview] = useState('')
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethodConfig[]>(DEFAULT_PAYMENT_METHODS)
   const [newMethodName, setNewMethodName] = useState('')
+  const [planLimits, setPlanLimits] = useState<{
+    maxBranches: number; maxStaff: number; branchCount: number; staffCount: number
+  } | null>(null)
 
   useEffect(() => {
     if (role !== 'owner') {
@@ -113,7 +116,23 @@ export default function SettingsPage() {
       return
     }
     loadProfile()
+    loadPlanLimits()
   }, [role, router]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function loadPlanLimits() {
+    const supabase = createClient()
+    const [profileRes, branchRes, staffRes] = await Promise.all([
+      supabase.from('profiles').select('max_branches, max_staff').eq('id', ownerId).single(),
+      supabase.from('branches').select('id', { count: 'exact', head: true }).eq('user_id', ownerId),
+      supabase.from('staff').select('id', { count: 'exact', head: true }).eq('user_id', ownerId).eq('is_active', true),
+    ])
+    setPlanLimits({
+      maxBranches: profileRes.data?.max_branches ?? 1,
+      maxStaff: profileRes.data?.max_staff ?? 10,
+      branchCount: branchRes.count ?? 0,
+      staffCount: staffRes.count ?? 0,
+    })
+  }
 
   async function loadProfile() {
     const supabase = createClient()
@@ -251,6 +270,53 @@ export default function SettingsPage() {
         </h1>
         <p className="text-sm text-gray-500 mt-0.5">Configure your salon branding and preferences</p>
       </div>
+
+      {/* ── Plan Limits ── */}
+      {planLimits && (
+        <Card className="border-gray-100">
+          <CardHeader className="pb-3 border-b border-gray-50">
+            <CardTitle className="text-base flex items-center gap-2">
+              <CreditCard className="w-4 h-4 text-primary" />
+              Plan Limits
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {[
+                { label: 'Branches', count: planLimits.branchCount, max: planLimits.maxBranches },
+                { label: 'Staff', count: planLimits.staffCount, max: planLimits.maxStaff },
+              ].map(({ label, count, max }) => {
+                const pct = Math.round((count / max) * 100)
+                const isAtLimit = count >= max
+                const isNear = count >= max * 0.8
+                return (
+                  <div key={label} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-700">{label}</span>
+                      <span className={`text-sm font-semibold ${isAtLimit ? 'text-red-600' : isNear ? 'text-yellow-600' : 'text-gray-900'}`}>
+                        {count}/{max}
+                      </span>
+                    </div>
+                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${isAtLimit ? 'bg-red-500' : isNear ? 'bg-yellow-500' : 'bg-primary'}`}
+                        style={{ width: `${Math.min(pct, 100)}%` }}
+                      />
+                    </div>
+                    {isNear && !isAtLimit && (
+                      <p className="text-xs text-yellow-600">You are approaching your {label.toLowerCase()} limit ({count}/{max})</p>
+                    )}
+                    {isAtLimit && (
+                      <p className="text-xs text-red-600">Limit reached. Contact support to upgrade.</p>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+            <p className="text-xs text-gray-400 mt-4">Contact support to change your plan limits.</p>
+          </CardContent>
+        </Card>
+      )}
 
       <form onSubmit={handleSave} className="space-y-6">
 

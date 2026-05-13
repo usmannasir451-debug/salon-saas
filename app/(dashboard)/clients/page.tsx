@@ -344,7 +344,7 @@ export default function ClientsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50">
-                  {['Client', 'Segment', 'Visits', 'Total Spend', 'Avg Bill', 'Fav Service', 'Last Visit', ''].map((h) => (
+                  {['Client', 'Segment', 'Visits', 'Total Spend', 'Avg Bill', 'Last Visit', ''].map((h) => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500">{h}</th>
                   ))}
                 </tr>
@@ -389,7 +389,6 @@ export default function ClientsPage() {
                       </td>
                       <td className="px-4 py-3 font-medium text-gray-900">{formatAmount(c.totalSpend)}</td>
                       <td className="px-4 py-3 text-gray-700">{formatAmount(c.avgBill)}</td>
-                      <td className="px-4 py-3 text-gray-500 text-xs">{c.favoriteService ?? '—'}</td>
                       <td className="px-4 py-3 text-gray-500 text-xs">
                         {c.lastVisit ? format(parseISO(c.lastVisit), 'MMM d, yyyy') : '—'}
                       </td>
@@ -420,7 +419,7 @@ export default function ClientsPage() {
                 })}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-4 py-12 text-center">
+                    <td colSpan={7} className="px-4 py-12 text-center">
                       <UserSearch className="w-8 h-8 text-gray-200 mx-auto mb-2" />
                       <p className="text-sm text-gray-400">
                         {clients.length === 0

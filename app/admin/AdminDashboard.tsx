@@ -12,6 +12,7 @@ import {
   getSalonDetails,
   getLeads,
   updateLead,
+  updateSalonLimits,
 } from './actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -68,6 +69,8 @@ type Salon = {
   created_at: string
   last_set_password: string | null
   member_count?: number
+  max_branches?: number | null
+  max_staff?: number | null
 }
 
 type CreatedCredentials = {
@@ -111,9 +114,18 @@ export default function AdminDashboard({ salons: initialSalons }: { salons: Salo
   const [newSalonName, setNewSalonName] = useState('')
   const [newEmail, setNewEmail] = useState('')
   const [newPassword, setNewPassword] = useState('')
+  const [newMaxBranches, setNewMaxBranches] = useState('1')
+  const [newMaxStaff, setNewMaxStaff] = useState('10')
   const [creating, setCreating] = useState(false)
   const [credentials, setCredentials] = useState<CreatedCredentials | null>(null)
   const [copied, setCopied] = useState(false)
+
+  // Edit limits
+  const [limitsOpen, setLimitsOpen] = useState(false)
+  const [limitsSalonId, setLimitsSalonId] = useState<string | null>(null)
+  const [limitsMaxBranches, setLimitsMaxBranches] = useState('1')
+  const [limitsMaxStaff, setLimitsMaxStaff] = useState('10')
+  const [savingLimits, setSavingLimits] = useState(false)
 
   // Per-salon inline state
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set())
@@ -218,7 +230,11 @@ export default function AdminDashboard({ salons: initialSalons }: { salons: Salo
     e.preventDefault()
     setCreating(true)
     try {
-      const res = await createSalonAccount(newSalonName, newEmail, newPassword)
+      const res = await createSalonAccount(
+        newSalonName, newEmail, newPassword,
+        parseInt(newMaxBranches) || 1,
+        parseInt(newMaxStaff) || 10,
+      )
       if ('error' in res) {
         toast.error(res.error)
       } else {
@@ -226,12 +242,44 @@ export default function AdminDashboard({ salons: initialSalons }: { salons: Salo
         setNewSalonName('')
         setNewEmail('')
         setNewPassword('')
+        setNewMaxBranches('1')
+        setNewMaxStaff('10')
         router.refresh()
       }
     } catch {
       toast.error('Failed to create account')
     } finally {
       setCreating(false)
+    }
+  }
+
+  function openEditLimits(salon: Salon) {
+    setLimitsSalonId(salon.id)
+    setLimitsMaxBranches(String(salon.max_branches ?? 1))
+    setLimitsMaxStaff(String(salon.max_staff ?? 10))
+    setLimitsOpen(true)
+  }
+
+  async function handleSaveLimits(e: React.FormEvent) {
+    e.preventDefault()
+    if (!limitsSalonId) return
+    setSavingLimits(true)
+    try {
+      const res = await updateSalonLimits(limitsSalonId, parseInt(limitsMaxBranches) || 1, parseInt(limitsMaxStaff) || 10)
+      if ('error' in res) {
+        toast.error(res.error)
+      } else {
+        toast.success('Limits updated')
+        setSalons(prev => prev.map(s => s.id === limitsSalonId
+          ? { ...s, max_branches: parseInt(limitsMaxBranches) || 1, max_staff: parseInt(limitsMaxStaff) || 10 }
+          : s
+        ))
+        setLimitsOpen(false)
+      }
+    } catch {
+      toast.error('Failed to update limits')
+    } finally {
+      setSavingLimits(false)
     }
   }
 
@@ -536,7 +584,7 @@ export default function AdminDashboard({ salons: initialSalons }: { salons: Salo
                                 )}
                               </button>
                             </div>
-                            <div className="flex items-center gap-2 mt-0.5">
+                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                               <p className="text-xs text-gray-400">
                                 Joined{' '}
                                 {new Date(salon.created_at).toLocaleDateString('en-US', {
@@ -550,6 +598,14 @@ export default function AdminDashboard({ salons: initialSalons }: { salons: Salo
                                   <Users className="w-3 h-3" />
                                   {salon.member_count} sub-user{salon.member_count !== 1 ? 's' : ''}
                                 </span>
+                              )}
+                              {(salon.max_branches != null || salon.max_staff != null) && (
+                                <button
+                                  onClick={() => openEditLimits(salon)}
+                                  className="inline-flex items-center gap-1 text-xs text-gray-500 bg-gray-50 border border-gray-200 px-1.5 py-0.5 rounded-full hover:bg-gray-100 transition-colors"
+                                >
+                                  Limits: {salon.max_branches ?? 1}B / {salon.max_staff ?? 10}S
+                                </button>
                               )}
                             </div>
                             {salon.last_set_password && (
@@ -830,6 +886,16 @@ export default function AdminDashboard({ salons: initialSalons }: { salons: Salo
                 <Label>Temporary Password</Label>
                 <Input type="text" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Min. 6 characters" minLength={6} required />
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Max Branches Allowed</Label>
+                  <Input type="number" min="1" value={newMaxBranches} onChange={(e) => setNewMaxBranches(e.target.value)} placeholder="1" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Max Staff Allowed</Label>
+                  <Input type="number" min="1" value={newMaxStaff} onChange={(e) => setNewMaxStaff(e.target.value)} placeholder="10" />
+                </div>
+              </div>
               <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={creating}>
                 {creating ? 'Creating...' : 'Create Account'}
               </Button>
@@ -936,6 +1002,40 @@ export default function AdminDashboard({ salons: initialSalons }: { salons: Salo
             </div>
             <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={changingEmail}>
               {changingEmail ? 'Updating...' : 'Update Email'}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Edit Limits Dialog ── */}
+      <Dialog open={limitsOpen} onOpenChange={(open) => { if (!open) setLimitsOpen(false) }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Edit Plan Limits</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSaveLimits} className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Max Branches</Label>
+                <Input
+                  type="number" min="1"
+                  value={limitsMaxBranches}
+                  onChange={(e) => setLimitsMaxBranches(e.target.value)}
+                  placeholder="1" required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Max Staff</Label>
+                <Input
+                  type="number" min="1"
+                  value={limitsMaxStaff}
+                  onChange={(e) => setLimitsMaxStaff(e.target.value)}
+                  placeholder="10" required
+                />
+              </div>
+            </div>
+            <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={savingLimits}>
+              {savingLimits ? 'Saving...' : 'Save Limits'}
             </Button>
           </form>
         </DialogContent>

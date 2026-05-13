@@ -154,7 +154,7 @@ export default function CalendarPage() {
 
   function navigate(dir: -1 | 1) {
     if (view === 'day') setCurrentDate((d) => (dir === 1 ? addDays(d, 1) : subDays(d, 1)))
-    else setCurrentDate((d) => (dir === 1 ? addDays(d, 7) : subDays(d, -7)))
+    else setCurrentDate((d) => (dir === 1 ? addDays(d, 7) : subDays(d, 7)))
   }
 
   function openAppt(appt: ApptRow) {

@@ -27,6 +27,7 @@ export type StaffMember = {
   salary_type?: SalaryType | null
   fixed_amount?: number | null
   commission_percentage?: number | null
+  leave_allowance?: number | null
   is_active: boolean
   created_at: string
 }
@@ -79,6 +80,8 @@ export type Profile = {
   subscription_status?: 'active' | 'suspended'
   expense_categories?: string[] | null
   expense_budgets?: Record<string, number> | null
+  max_branches?: number | null
+  max_staff?: number | null
   created_at: string
 }
 
@@ -204,12 +207,30 @@ export type PayrollEntry = {
   total_payable: number
   prorata_pct?: number | null
   prorata_detail?: string | null
+  attendance_present_days?: number | null
+  attendance_working_days?: number | null
+  attendance_deduction?: number | null
+  attendance_detail?: string | null
   is_paid: boolean
   paid_date?: string
   paid_method?: string
   notes?: string
   created_at: string
   staff?: StaffMember
+}
+
+export type AttendanceStatus = 'present' | 'half_day' | 'absent' | 'leave' | 'holiday'
+
+export type AttendanceRecord = {
+  id?: string
+  owner_id: string
+  staff_id: string
+  date: string
+  status: AttendanceStatus
+  branch_id?: string | null
+  notes?: string | null
+  created_at?: string
+  staff?: Pick<StaffMember, 'id' | 'name'>
 }
 
 export type Deal = {

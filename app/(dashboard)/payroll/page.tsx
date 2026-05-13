@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
-import { format, startOfMonth, endOfMonth, subMonths, parseISO } from 'date-fns'
+import { format, startOfMonth, endOfMonth, subMonths, parseISO, getDaysInMonth } from 'date-fns'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { useUserContext } from '@/components/RoleContext'
@@ -28,6 +28,15 @@ const PAYMENT_METHODS = ['Cash', 'Bank Transfer', 'Other']
 
 function formatCurrency(n: number, currency = 'USD') {
   return `${currency} ${Math.round(n).toLocaleString()}`
+}
+
+function getWorkingDaysInMonth(year: number, month: number): number {
+  const days = getDaysInMonth(new Date(year, month, 1))
+  let count = 0
+  for (let d = 1; d <= days; d++) {
+    if (new Date(year, month, d).getDay() !== 0) count++
+  }
+  return count
 }
 
 export default function PayrollPage() {
@@ -95,8 +104,8 @@ export default function PayrollPage() {
     const monthStr   = format(selectedMonth, 'yyyy-MM-01')
     const totalDays  = endOfMonth(selectedMonth).getDate()
 
-    // Revenue per staff from appointments + walk-ins
-    const [apptRes, walkinRes] = await Promise.all([
+    // Revenue per staff and attendance for the month
+    const [apptRes, walkinRes, attendanceRes] = await Promise.all([
       supabase.from('appointments')
         .select('staff_id, services(price)')
         .eq('user_id', ownerId).eq('status', 'completed')
@@ -105,6 +114,10 @@ export default function PayrollPage() {
         .select('staff_id, total')
         .eq('user_id', ownerId)
         .gte('created_at', monthStart + 'T00:00:00').lte('created_at', monthEnd + 'T23:59:59'),
+      supabase.from('attendance')
+        .select('staff_id, status')
+        .eq('owner_id', ownerId)
+        .gte('date', monthStart).lte('date', monthEnd),
     ])
 
     const revenueMap: Record<string, number> = {}
@@ -117,40 +130,81 @@ export default function PayrollPage() {
       if (w.staff_id) revenueMap[w.staff_id] = (revenueMap[w.staff_id] ?? 0) + Number(w.total ?? 0)
     })
 
+    // Build attendance map per staff
+    type AttStatus = 'present' | 'half_day' | 'absent' | 'leave' | 'holiday'
+    const attMap: Record<string, Record<AttStatus, number>> = {}
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(attendanceRes.data ?? []).forEach((r: any) => {
+      if (!attMap[r.staff_id]) attMap[r.staff_id] = { present: 0, half_day: 0, absent: 0, leave: 0, holiday: 0 }
+      attMap[r.staff_id][r.status as AttStatus]++
+    })
+    const workingDays = getWorkingDaysInMonth(selectedMonth.getFullYear(), selectedMonth.getMonth())
+
     const entries = staffWithSalary.map(staff => {
       const revenue   = revenueMap[staff.id] ?? 0
       const fixedBase = ['fixed', 'both'].includes(staff.salary_type ?? '') ? Number(staff.fixed_amount ?? 0) : 0
       const commission = ['commission', 'both'].includes(staff.salary_type ?? '')
         ? Math.round((revenue * Number(staff.commission_percentage ?? 0)) / 100) : 0
 
-      // Pro-rata calculation for joining month
       let prorataPct: number | null = null
       let prorataDetail: string | null = null
+      let attendancePresentDays: number | null = null
+      let attendanceWorkingDays: number | null = null
+      let attendanceDeduction: number | null = null
+      let attendanceDetail: string | null = null
+
+      // Check attendance records for this staff
+      const att = attMap[staff.id]
+      if (att && Object.values(att).some(v => v > 0)) {
+        const effectiveDays = att.present + att.leave + att.holiday + att.half_day * 0.5
+        const staffWorkingDays = workingDays
+        if (fixedBase > 0 && staffWorkingDays > 0) {
+          const dailySalary = fixedBase / staffWorkingDays
+          const adjustedFixed = Math.round(dailySalary * Math.min(effectiveDays, staffWorkingDays))
+          const deduction = Math.max(0, fixedBase - adjustedFixed)
+          attendancePresentDays = Math.round(effectiveDays)
+          attendanceWorkingDays = staffWorkingDays
+          attendanceDeduction = deduction > 0 ? deduction : null
+          attendanceDetail = `Present: ${att.present} + Leave: ${att.leave} + Holiday: ${att.holiday} + Half Day: ${att.half_day}×½ = ${effectiveDays}/${staffWorkingDays} days`
+          const fixed2 = adjustedFixed
+          const total = fixed2 + commission
+          return {
+            user_id: ownerId, staff_id: staff.id, month: monthStr,
+            fixed_salary: fixed2, revenue_generated: revenue, commission_earned: commission, total_payable: total,
+            prorata_pct: null, prorata_detail: null,
+            attendance_present_days: attendancePresentDays,
+            attendance_working_days: attendanceWorkingDays,
+            attendance_deduction: attendanceDeduction,
+            attendance_detail: attendanceDetail,
+            is_paid: false,
+          }
+        }
+      }
+
+      // Fall back to prorata calculation for joining month
       if (staff.joining_date) {
         const joiningDate = parseISO(staff.joining_date)
         const isJoinedThisMonth =
           joiningDate.getFullYear() === selectedMonth.getFullYear() &&
           joiningDate.getMonth() === selectedMonth.getMonth()
         if (isJoinedThisMonth) {
-          const joiningDay  = joiningDate.getDate()
-          const daysWorked  = totalDays - joiningDay + 1
-          prorataPct        = Math.round((daysWorked / totalDays) * 1000) / 10
-          prorataDetail     = `Joined: ${format(joiningDate, 'dd MMM')}, Days worked: ${daysWorked}/${totalDays}, Pro-rata: ${prorataPct}%`
+          const joiningDay = joiningDate.getDate()
+          const daysWorked = totalDays - joiningDay + 1
+          prorataPct = Math.round((daysWorked / totalDays) * 1000) / 10
+          prorataDetail = `Joined: ${format(joiningDate, 'dd MMM')}, Days worked: ${daysWorked}/${totalDays}, Pro-rata: ${prorataPct}%`
         }
       }
 
       const fixed = prorataPct != null ? Math.round(fixedBase * prorataPct / 100) : fixedBase
       return {
-        user_id:        ownerId,
-        staff_id:       staff.id,
-        month:          monthStr,
-        fixed_salary:   fixed,
-        revenue_generated: revenue,
-        commission_earned: commission,
-        total_payable:  fixed + commission,
-        prorata_pct:    prorataPct,
-        prorata_detail: prorataDetail,
-        is_paid:        false,
+        user_id: ownerId, staff_id: staff.id, month: monthStr,
+        fixed_salary: fixed, revenue_generated: revenue, commission_earned: commission, total_payable: fixed + commission,
+        prorata_pct: prorataPct, prorata_detail: prorataDetail,
+        attendance_present_days: attendancePresentDays,
+        attendance_working_days: attendanceWorkingDays,
+        attendance_deduction: attendanceDeduction,
+        attendance_detail: attendanceDetail,
+        is_paid: false,
       }
     })
 
@@ -361,8 +415,19 @@ export default function PayrollPage() {
                           )}
                         </div>
 
+                        {/* Attendance detail */}
+                        {entry.attendance_detail && (
+                          <div className="text-xs text-indigo-600 font-medium mt-1">
+                            {entry.attendance_detail}
+                          </div>
+                        )}
+                        {Number(entry.attendance_deduction ?? 0) > 0 && (
+                          <div className="text-xs text-red-500 font-medium">
+                            Attendance deduction: -{formatCurrency(Number(entry.attendance_deduction), currency)}
+                          </div>
+                        )}
                         {/* Pro-rata detail */}
-                        {entry.prorata_detail && (
+                        {entry.prorata_detail && !entry.attendance_detail && (
                           <p className="text-xs text-orange-500 font-medium mt-1">{entry.prorata_detail}</p>
                         )}
                       </div>

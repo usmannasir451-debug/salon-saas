@@ -18,7 +18,13 @@ export async function toggleSalonStatus(userId: string, newStatus: 'active' | 's
   return { success: true }
 }
 
-export async function createSalonAccount(salonName: string, email: string, password: string) {
+export async function createSalonAccount(
+  salonName: string,
+  email: string,
+  password: string,
+  maxBranches = 1,
+  maxStaff = 10,
+) {
   const supabase = createAdminClient()
 
   const { data: authData, error: authError } = await supabase.auth.admin.createUser({
@@ -39,6 +45,8 @@ export async function createSalonAccount(salonName: string, email: string, passw
     salon_name: salonName,
     subscription_status: 'active',
     last_set_password: password,
+    max_branches: maxBranches,
+    max_staff: maxStaff,
   })
 
   if (profileError) {
@@ -48,6 +56,21 @@ export async function createSalonAccount(salonName: string, email: string, passw
 
   revalidatePath('/admin')
   return { data: { userId: authData.user.id, email, salonName } }
+}
+
+export async function updateSalonLimits(userId: string, maxBranches: number, maxStaff: number) {
+  const supabase = createAdminClient()
+  const { error } = await supabase
+    .from('profiles')
+    .update({ max_branches: maxBranches, max_staff: maxStaff })
+    .eq('id', userId)
+
+  if (error) {
+    console.error('[updateSalonLimits]', error)
+    return { error: error.message }
+  }
+  revalidatePath('/admin')
+  return { success: true }
 }
 
 export async function resetSalonPassword(userId: string, newPassword: string) {

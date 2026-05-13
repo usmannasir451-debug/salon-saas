@@ -33,6 +33,7 @@ import {
   Download,
   Sun,
   Moon,
+  ClipboardList,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -52,6 +53,7 @@ const PERM_TO_HREF: Record<string, string> = {
   inventory: '/inventory',
   expenses: '/expenses',
   payroll: '/payroll',
+  attendance: '/attendance',
   reports: '/reports/pnl',
   team: '/team',
   settings: '/settings',
@@ -72,6 +74,7 @@ const allNavItems = [
   { href: '/expenses', label: 'Expenses', icon: DollarSign },
   { href: '/inventory', label: 'Inventory', icon: Package },
   { href: '/payroll', label: 'Payroll', icon: Wallet },
+  { href: '/attendance', label: 'Attendance', icon: ClipboardList },
   { href: '/reports/pnl', label: 'P&L Report', icon: BarChart2 },
   { href: '/export', label: 'Export Data', icon: Download },
   { href: '/settings', label: 'Settings', icon: Settings },

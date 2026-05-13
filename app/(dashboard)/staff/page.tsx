@@ -40,6 +40,7 @@ export default function StaffPage() {
   const router = useRouter()
 
   const [staff, setStaff] = useState<StaffMember[]>([])
+  const [staffLimit, setStaffLimit] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
@@ -57,8 +58,12 @@ export default function StaffPage() {
 
   async function loadStaff() {
     const supabase = createClient()
-    const { data } = await supabase.from('staff').select('*').eq('user_id', ownerId).order('name')
-    setStaff(data ?? [])
+    const [staffRes, profileRes] = await Promise.all([
+      supabase.from('staff').select('*').eq('user_id', ownerId).order('name'),
+      supabase.from('profiles').select('max_staff').eq('id', ownerId).single(),
+    ])
+    setStaff((staffRes.data as StaffMember[]) ?? [])
+    setStaffLimit(profileRes.data?.max_staff ?? null)
     setLoading(false)
   }
 
@@ -117,6 +122,13 @@ export default function StaffPage() {
       if (error) { toast.error(error.message); setSaving(false); return }
       toast.success('Staff member updated')
     } else {
+      const activeCount = staff.filter(s => s.is_active).length
+      const limit = staffLimit ?? 999
+      if (activeCount >= limit) {
+        toast.error(`You have reached your staff limit (${activeCount}/${limit}). Please contact support to upgrade your plan.`)
+        setSaving(false)
+        return
+      }
       const { error } = await supabase.from('staff').insert(payload)
       if (error) { toast.error(error.message); setSaving(false); return }
       toast.success('Staff member added')
@@ -186,6 +198,20 @@ export default function StaffPage() {
             <Users className="w-6 h-6 text-primary" /> Staff
           </h1>
           <p className="text-sm text-gray-500 mt-0.5">Manage your salon team</p>
+          {staffLimit != null && (() => {
+            const activeCount = staff.filter(s => s.is_active).length
+            const isAtLimit = activeCount >= staffLimit
+            const isNearLimit = activeCount >= staffLimit * 0.8
+            return (
+              <div className="flex items-center gap-1.5 mt-1">
+                <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${isAtLimit ? 'bg-red-50 text-red-600 border-red-200' : isNearLimit ? 'bg-yellow-50 text-yellow-700 border-yellow-200' : 'bg-gray-50 text-gray-600 border-gray-200'}`}>
+                  {activeCount}/{staffLimit} staff
+                </span>
+                {isNearLimit && !isAtLimit && <span className="text-xs text-yellow-600">Approaching limit</span>}
+                {isAtLimit && <span className="text-xs text-red-600">Limit reached</span>}
+              </div>
+            )
+          })()}
         </div>
         <div className="flex items-center gap-2">
           {inactiveCount > 0 && (

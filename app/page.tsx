@@ -468,9 +468,9 @@ export default function LandingPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
             {[
-              { name: 'Starter', price: '$29', period: '/month', highlight: false, features: ['1 location', 'Up to 5 staff', 'Appointments & walk-ins', 'Basic reports', 'Email support'] },
-              { name: 'Growth', price: '$59', period: '/month', highlight: true, features: ['3 locations', 'Up to 15 staff', 'Everything in Starter', 'Advanced analytics', 'Loyalty program', 'Priority support'] },
-              { name: 'Enterprise', price: '$99', period: '/month', highlight: false, features: ['Unlimited locations', 'Unlimited staff', 'Everything in Growth', 'Custom branding', 'API access', 'Dedicated support'] },
+              { name: 'Starter', price: '$49', period: '/month', highlight: false, features: ['1 Branch', 'Up to 10 Staff', 'Appointments & walk-ins', 'Payroll & expenses', 'All core features included'] },
+              { name: 'Growth', price: '$99', period: '/month', highlight: true, features: ['Up to 3 Branches', 'Up to 30 Staff', 'Everything in Starter', 'Multi-branch dashboard', 'Advanced analytics', 'Priority support'] },
+              { name: 'Enterprise', price: '$199', period: '/month', highlight: false, features: ['Unlimited Branches', 'Unlimited Staff', 'Everything in Growth', 'Priority support', 'Custom setup', 'Dedicated account manager'] },
             ].map(({ name, price, period, highlight, features }, idx) => (
               <div key={name} className={`sf-reveal sf-d${idx + 1} rounded-2xl p-6 relative ${highlight ? 'sf-pricing-pop' : 'sf-glass'}`} style={{ zIndex: 0 }}>
                 {highlight && (

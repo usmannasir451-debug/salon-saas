@@ -1,90 +1,120 @@
-You are an expert SaaS developer working on "Snipforce". Make these important fixes and improvements:
+You are an expert SaaS developer working on "Snipforce". Make these fixes and improvements:
 
-PART 1 - FIX HISTORICAL PRICING BUG (Critical)
+PART 1 - FIX CALENDAR PREVIOUS/NEXT WEEK NAVIGATION
 
-Problem: When service prices are updated, past appointment/walk-in revenue changes automatically. This is wrong - historical records must never change.
-
-Root cause and fix:
-- Check appointments table and walk_ins table - they likely store service_id reference instead of actual price paid
-- Add price snapshot columns to appointments: total_amount (actual amount charged at time of booking)
-- Add price snapshot to walk_ins: total_amount (actual amount charged at time of service)
-- When a new appointment is created: store the actual price at that moment in total_amount column
-- When a new walk-in is created: store the actual price at that moment in total_amount column
-- Dashboard revenue calculations must use total_amount from appointments/walk_ins tables - NOT recalculate from current service prices
-- P&L report must use stored total_amount - NOT live service prices
-- All revenue KPIs must use stored amounts
-- Check if discount_amount is also stored correctly and not recalculated
-- Fix appointment and walk-in forms to save total_amount at time of creation
-- Existing records: for any records missing total_amount, calculate from current service price as one-time migration only
-- Generate SQL migration to add total_amount column where missing
-
-PART 2 - REMOVE DASHBOARD QUICK ACTION TILES
-
-- Remove the 4 quick action buttons/tiles from dashboard top: "New Appointment", "New Walk-in", "Add Expense", "Add Client"
-- Keep the floating Walk-in button at bottom right - do not touch it
-- Clean up any unused imports after removal
-
-PART 3 - REMOVE ALL URDU TEXT
-
-- Search entire codebase for any Urdu or Arabic script text
-- Remove ALL Urdu text completely - replace with English equivalents
-- Check all components, pages, layouts, modals, tooltips, placeholders
-- Common places to check: login page, dashboard, walk-in page, appointments, onboarding wizard
-- Make sure no Urdu characters remain anywhere in the UI
-
-PART 4 - DYNAMIC CURRENCY SYSTEM
-
-Problem: Currency symbol is hardcoded as $ or PKR in various places instead of using the salon's selected currency from settings.
+Bug: Both "Previous Week" and "Next Week" buttons move calendar forward to next week. Previous button is not working correctly.
 
 Fix:
-- Salon owner sets currency in Settings page (e.g. PKR, USD, AED, SAR, GBP, EUR)
-- Create a useCurrency() hook that:
-  * Reads currency setting from profiles table
-  * Returns currency symbol and formatter function
-  * Can be used across all pages
-- Replace ALL hardcoded currency symbols throughout the app:
-  * Dashboard KPI cards
-  * Appointments total
-  * Walk-in total
-  * Invoice generation
-  * P&L report
-  * Payroll/salary fields
-  * Staff salary input fields
-  * Expense amounts
-  * Inventory cost fields
-  * Client total spend
-  * All charts and reports
-- Currency symbols to support: PKR (₨), USD ($), AED (د.إ), SAR (﷼), GBP (£), EUR (€), CAD ($), AUD ($)
-- Format numbers correctly based on currency (e.g. PKR shows no decimals, USD shows 2 decimals)
-- Default currency: PKR if not set
+- Find the week navigation logic in app/(dashboard)/calendar/page.tsx
+- Previous week button must subtract 7 days from current week start date
+- Next week button must add 7 days from current week start date
+- Test both directions work correctly
+- Also check day view previous/next navigation for same bug
 
-PART 5 - DARK MODE / NIGHT MODE
+PART 2 - STAFF ATTENDANCE SYSTEM
 
-- Add dark mode toggle button in the top header/navigation bar
-- Use a sun/moon icon toggle
-- Implement using CSS variables and Tailwind dark: classes
-- Save user preference in localStorage so it persists across sessions
-- Dark mode colors:
-  * Background: #0f172a (dark navy)
-  * Card background: #1e293b
-  * Text: #f1f5f9
-  * Border: #334155
-  * Accent/primary: keep pink/rose (#e11d48)
-- Apply dark mode consistently to:
-  * Sidebar navigation
-  * Dashboard and all KPI cards
-  * All forms and modals
-  * Tables and lists
-  * Charts (dark background)
-  * Login page
-  * Settings page
-  * All other pages
-- Toggle should be smooth transition (CSS transition 200ms)
-- Mobile responsive dark mode
+Add a complete attendance tracking system connected to payroll:
+
+ATTENDANCE PAGE (/attendance):
+- Add "Attendance" to sidebar navigation under Staff section
+- Daily attendance marking: for each working day, mark each staff member as:
+  * Present (full day)
+  * Half Day
+  * Absent
+  * On Leave (paid)
+  * Holiday
+- Monthly attendance calendar view per staff member
+- Bulk mark attendance for all staff at once for a day
+- Edit past attendance (owner only)
+- Show attendance summary per staff: total present days, absent days, leaves taken this month
+
+ATTENDANCE CONNECTED TO PAYROLL:
+- When generating monthly payroll, calculate salary based on actual attendance:
+  * Full attendance = full salary
+  * If absent days exist = deduct proportionally (absent days / working days in month)
+  * Half day = deduct half day salary
+  * On Leave (paid) = no deduction
+  * Formula: (Fixed Salary / Total Working Days) x Days Present
+- Show attendance breakdown in payroll: "Present: 22/26 days, Deduction: PKR X, Net Salary: PKR X"
+- Working days in month = all days minus Sundays (or configurable in settings)
+- If staff joined mid-month: only count working days from joining date
+
+LEAVE MANAGEMENT:
+- Each staff gets configurable leave allowance per month (set in staff profile)
+- Track leaves taken vs remaining
+- Show leave balance on staff profile
+
+DATABASE:
+- New table: attendance (id, owner_id, staff_id, date, status, branch_id, notes, created_at)
+- Add leave_allowance column to staff table
+- RLS policies on attendance table
+
+PART 3 - REMOVE FAVOURITE SERVICE COLUMN FROM CLIENTS
+
+- Remove the "Favourite Service" column from clients list/table view
+- It shows dashes everywhere and provides no value currently
+- Keep the data in database but just remove from UI display
+- Check if it appears anywhere else and remove from those views too
+
+PART 4 - SUBSCRIPTION LIMITS SYSTEM
+
+Add branch and staff limits per account:
+
+ADMIN PANEL - ACCOUNT CREATION:
+- Add two new fields when creating salon account:
+  * Max Branches Allowed (number input, default 1)
+  * Max Staff Allowed (number input, default 10)
+- Show these limits on each salon row in admin panel
+- Admin can edit limits anytime from salon detail view
+- Store in profiles table: max_branches, max_staff
+
+ENFORCEMENT IN PRODUCT:
+- Branches: when salon tries to add a new branch and they are at their limit, show error: "You have reached your branch limit (X/X). Please contact support to upgrade your plan."
+- Staff: when salon tries to add a new staff member and they are at their limit, show error: "You have reached your staff limit (X/X). Please contact support to upgrade your plan."
+- Show current usage vs limit on settings page: "Branches: 2/3" and "Staff: 8/10"
+- Show warning when at 80% of limit: "You are approaching your staff limit (8/10)"
+
+PART 5 - ARCHITECTURE REVIEW AND BUG PREVENTION
+
+Review the complete codebase for these common issues and fix them:
+
+1. DATA ISOLATION: Ensure every database query filters by owner_id - no data leakage between salons
+2. REVENUE CALCULATIONS: Confirm all revenue uses stored total_amount, never recalculates from current service prices
+3. BRANCH CALCULATIONS: Confirm branch-wise and all-branches calculations are consistent and dont double count
+4. NULL HANDLING: Check all places where null values could cause NaN or undefined to appear in UI - replace with 0 or appropriate defaults
+5. RLS POLICIES: Verify all tables have proper RLS policies
+6. SUB-USER DATA ACCESS: Confirm sub-users see owner salon data correctly using effective owner_id
+7. LOADING STATES: All data fetching should show loading spinner, not blank screen
+8. ERROR BOUNDARIES: Add proper error handling so one failed query doesnt break entire page
+9. CURRENCY: Confirm useCurrency hook is used everywhere, no hardcoded symbols remain
+10. DATE HANDLING: Confirm timezone handling is consistent - use salon timezone from settings
+
+PART 6 - LANDING PAGE PRICING UPDATE
+
+Update the pricing section on the landing page (app/page.tsx):
+
+STARTER PLAN:
+- Price: $49/month
+- Features: 1 Branch, Up to 10 Staff, All core features included
+
+GROWTH PLAN:
+- Price: $99/month  
+- Features: Up to 3 Branches, Up to 30 Staff, All features including multi-branch dashboard
+
+ENTERPRISE PLAN:
+- Price: $199/month
+- Features: Unlimited Branches, Unlimited Staff, Priority support, Custom setup
+
+- Update plan descriptions to match exactly: branch limit and staff limit as described
+- Keep "Contact us to get started" CTA on each plan
+- Make sure pricing cards look professional
 
 TECHNICAL REQUIREMENTS:
-- Generate SQL migration for total_amount columns
-- RLS policies maintained
-- No breaking changes to existing data
+- Add max_branches, max_staff columns to profiles table
+- Add attendance table with proper RLS
+- Add leave_allowance to staff table
+- Generate complete SQL migration for all new tables and columns
 - Mobile responsive throughout
-- Test that revenue numbers do not change when service prices are updated after fix
+- Maintain dark mode support
+- Pink/rose theme
+- No breaking changes to existing data

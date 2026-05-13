@@ -36,6 +36,7 @@ export default function BranchesPage() {
 
   const [branches, setBranches] = useState<Branch[]>([])
   const [apptCounts, setApptCounts] = useState<Record<string, number>>({})
+  const [branchLimit, setBranchLimit] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
@@ -53,12 +54,14 @@ export default function BranchesPage() {
   async function loadData() {
     const supabase = createClient()
 
-    const [branchRes, apptRes] = await Promise.all([
+    const [branchRes, apptRes, profileRes] = await Promise.all([
       supabase.from('branches').select('*').eq('user_id', ownerId).order('created_at', { ascending: true }),
       supabase.from('appointments').select('branch_id').eq('user_id', ownerId).not('branch_id', 'is', null),
+      supabase.from('profiles').select('max_branches').eq('id', ownerId).single(),
     ])
 
     setBranches((branchRes.data as Branch[]) ?? [])
+    setBranchLimit(profileRes.data?.max_branches ?? null)
 
     const counts: Record<string, number> = {}
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -99,6 +102,13 @@ export default function BranchesPage() {
       if (error) { toast.error(error.message); setSaving(false); return }
       toast.success('Branch updated')
     } else {
+      const { data: profile } = await supabase.from('profiles').select('max_branches').eq('id', ownerId).single()
+      const limit = profile?.max_branches ?? 999
+      if (branches.length >= limit) {
+        toast.error(`You have reached your branch limit (${branches.length}/${limit}). Please contact support to upgrade your plan.`)
+        setSaving(false)
+        return
+      }
       const { error } = await supabase.from('branches').insert(payload)
       if (error) { toast.error(error.message); setSaving(false); return }
       toast.success('Branch added')
@@ -137,6 +147,16 @@ export default function BranchesPage() {
             Branches
           </h1>
           <p className="text-sm text-gray-500 mt-0.5">Manage your salon locations</p>
+          {branchLimit != null && (
+            <div className="flex items-center gap-1.5 mt-1">
+              <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${branches.length >= branchLimit ? 'bg-red-50 text-red-600 border-red-200' : branches.length >= branchLimit * 0.8 ? 'bg-yellow-50 text-yellow-700 border-yellow-200' : 'bg-gray-50 text-gray-600 border-gray-200'}`}>
+                {branches.length}/{branchLimit} branches used
+              </span>
+              {branches.length >= branchLimit * 0.8 && branches.length < branchLimit && (
+                <span className="text-xs text-yellow-600">Approaching limit</span>
+              )}
+            </div>
+          )}
         </div>
         <Button onClick={openCreate} className="bg-primary hover:bg-primary/90 gap-2">
           <Plus className="w-4 h-4" />
