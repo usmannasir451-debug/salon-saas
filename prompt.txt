@@ -1,12 +1,61 @@
-Supabase is changing their security policy. Starting October 30 2026, all tables need explicit GRANT statements to be accessible via the Data API. 
+You are an expert SaaS developer working on "Snipforce". Add CSV bulk upload and export functionality for Services, Deals, and Staff:
 
-Please update all our SQL migration files and future table creation to include proper grants. Also generate a one-time SQL script that adds the required grants to ALL existing tables in our Snipforce project so we are compliant before the October 30 deadline.
+PART 1 - SERVICES BULK UPLOAD/EDIT
 
-The grants needed for each table are:
-grant select, insert, update, delete on public.TABLE_NAME to authenticated;
-grant select, insert, update, delete on public.TABLE_NAME to service_role;
-grant select on public.TABLE_NAME to anon;
+EXPORT:
+- Add "Download Template" button on Services page
+- Downloads a CSV with columns: name, category, duration_minutes, price, description
+- Also add "Export Current Services" button that downloads all existing services as CSV
 
-Generate this for all our existing tables: profiles, appointments, walk_ins, staff, services, clients, expenses, inventory, inventory_items, stock_adjustments, staff_salaries, payroll_entries, reviews, deals, deal_services, branches, salon_members, leads, notifications, audit_logs, loyalty_transactions
+IMPORT:
+- Add "Upload CSV" button on Services page
+- User downloads template, fills it, uploads it back
+- On upload: preview the data in a table before saving
+- Validate each row: name required, price must be number, duration must be number
+- Show errors row by row if any validation fails
+- Two modes:
+  * "Add New Only" - only adds services that dont exist yet (match by name)
+  * "Add & Update" - adds new services AND updates existing ones (match by name, update price/duration/category)
+- Show summary after import: "X services added, Y services updated, Z rows had errors"
+- All imported services belong to the logged-in owner
 
-Also make sure all future migrations we create include these grants automatically.
+PART 2 - DEALS BULK UPLOAD/EDIT
+
+EXPORT:
+- "Download Template" - CSV with columns: deal_name, description, price, validity_days, included_services (comma separated service names)
+- "Export Current Deals" - downloads all existing deals
+
+IMPORT:
+- Upload CSV for deals
+- Preview before saving
+- Validate: deal_name required, price must be number, included_services must match existing service names
+- Create deals with their service relationships
+- Update existing deals by name match
+- Show import summary
+
+PART 3 - STAFF BULK UPLOAD/EDIT
+
+EXPORT:
+- "Download Template" - CSV with columns: full_name, phone, email, designation, gender, date_of_joining, salary_type (fixed/commission/both), fixed_amount, commission_percentage, leave_allowance
+- "Export Current Staff" - downloads all existing staff
+
+IMPORT:
+- Upload CSV for staff
+- Preview before saving
+- Validate: full_name required, salary_type must be fixed/commission/both, date format must be YYYY-MM-DD
+- Add new staff OR update existing (match by phone number as unique identifier)
+- Show import summary
+
+GENERAL REQUIREMENTS FOR ALL:
+- Use papaparse library for CSV parsing (already available in the project)
+- Clean modal/drawer UI for the import flow:
+  * Step 1: Download template or upload file
+  * Step 2: Preview data with validation errors highlighted in red
+  * Step 3: Confirm and import
+- Show a progress indicator during import
+- All imports are owner-specific (use owner_id)
+- Mobile responsive
+- Only Owner role can access bulk upload - not sub-users
+- Add import/export buttons in a clean dropdown menu to keep UI clean
+- Maintain pink/rose theme with shadcn/ui
+- Dark mode compatible
