@@ -49,7 +49,8 @@
       "Bash(GIT_TRACE=1 git rebase --continue)",
       "Bash(GIT_TRACE2=1 git rebase --continue)",
       "Bash(git update-ref *)",
-      "Bash(git checkout *)"
+      "Bash(git checkout *)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\Tesla Laptops\\\\salon-saas\" -Force | Select-Object Name, @{Name=\"Type\";Expression={if \\($_.PSIsContainer\\) { \"Dir\" } else { \"File\" }}} | Sort-Object Type, Name)"
     ]
   }
 }
