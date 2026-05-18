@@ -7,17 +7,14 @@ import { createClient } from '@/lib/supabase/client'
 import { useUserContext } from '@/components/RoleContext'
 import { useCurrency } from '@/hooks/useCurrency'
 import type { Service, Deal } from '@/lib/types'
-import { Button, buttonVariants } from '@/components/ui/button'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Scissors, Plus, Pencil, Trash2, Loader2, Clock, Banknote, Tag, Gift, FileSpreadsheet, Download, Upload, ChevronDown } from 'lucide-react'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { ServicesBulkModal, downloadServiceTemplate, exportServices } from '@/components/ServicesBulkModal'
-import { DealsBulkModal, downloadDealTemplate, exportDeals } from '@/components/DealsBulkModal'
+import { Scissors, Plus, Pencil, Trash2, Loader2, Clock, Banknote, Tag, Gift } from 'lucide-react'
 
 const emptyServiceForm = { name: '', duration: '', price: '' }
 const emptyDealForm = { name: '', description: '', price: '', validity_days: '', service_ids: [] as string[] }
@@ -37,10 +34,6 @@ export default function ServicesPage() {
   const [serviceDialogOpen, setServiceDialogOpen] = useState(false)
   const [editingServiceId, setEditingServiceId] = useState<string | null>(null)
   const [serviceForm, setServiceForm] = useState(emptyServiceForm)
-
-  // Bulk modals
-  const [serviceBulkOpen, setServiceBulkOpen] = useState(false)
-  const [dealBulkOpen, setDealBulkOpen] = useState(false)
 
   // Deal dialog
   const [dealDialogOpen, setDealDialogOpen] = useState(false)
@@ -227,30 +220,6 @@ export default function ServicesPage() {
         {/* ── SERVICES TAB ── */}
         <TabsContent value="services">
           <div className="flex justify-end items-center gap-2 mb-4">
-            {isOwner && (
-              <DropdownMenu>
-                <DropdownMenuTrigger className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-                  <FileSpreadsheet className="w-4 h-4" />
-                  <span className="hidden sm:inline">CSV</span>
-                  <ChevronDown className="w-3 h-3" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={downloadServiceTemplate}>
-                    <Download className="w-3.5 h-3.5 mr-2" />
-                    Download Template
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => exportServices(services)}>
-                    <Download className="w-3.5 h-3.5 mr-2" />
-                    Export Current Services
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => setServiceBulkOpen(true)}>
-                    <Upload className="w-3.5 h-3.5 mr-2" />
-                    Upload CSV
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
             <Button onClick={openCreateService} className="bg-primary hover:bg-primary/90 gap-2">
               <Plus className="w-4 h-4" />
               <span className="hidden sm:inline">Add Service</span>
@@ -314,30 +283,6 @@ export default function ServicesPage() {
         {/* ── DEALS TAB ── */}
         <TabsContent value="deals">
           <div className="flex justify-end items-center gap-2 mb-4">
-            {isOwner && (
-              <DropdownMenu>
-                <DropdownMenuTrigger className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-                  <FileSpreadsheet className="w-4 h-4" />
-                  <span className="hidden sm:inline">CSV</span>
-                  <ChevronDown className="w-3 h-3" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={downloadDealTemplate}>
-                    <Download className="w-3.5 h-3.5 mr-2" />
-                    Download Template
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => exportDeals(deals)}>
-                    <Download className="w-3.5 h-3.5 mr-2" />
-                    Export Current Deals
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => setDealBulkOpen(true)}>
-                    <Upload className="w-3.5 h-3.5 mr-2" />
-                    Upload CSV
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
             <Button onClick={openCreateDeal} className="bg-primary hover:bg-primary/90 gap-2">
               <Plus className="w-4 h-4" />
               Create Deal
@@ -451,23 +396,6 @@ export default function ServicesPage() {
           </form>
         </DialogContent>
       </Dialog>
-
-      {/* Bulk Import/Export Modals */}
-      <ServicesBulkModal
-        open={serviceBulkOpen}
-        onClose={() => setServiceBulkOpen(false)}
-        ownerId={ownerId}
-        existingServices={services}
-        onSuccess={loadAll}
-      />
-      <DealsBulkModal
-        open={dealBulkOpen}
-        onClose={() => setDealBulkOpen(false)}
-        ownerId={ownerId}
-        existingDeals={deals}
-        existingServices={services}
-        onSuccess={loadAll}
-      />
 
       {/* Deal Add/Edit Dialog */}
       <Dialog open={dealDialogOpen} onOpenChange={setDealDialogOpen}>

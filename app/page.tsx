@@ -1,8 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
-import { Scissors, Star, Check, Calendar, Zap, Package, BarChart3, Gift, Users, X, Loader2 } from 'lucide-react'
+import {
+  Scissors, Star, Check, Calendar, Zap, Package, TrendingUp,
+  Heart, Users, X, Loader2, ChevronDown, ArrowRight,
+  BarChart2, DollarSign, Clock, Shield, Smartphone, Globe
+} from 'lucide-react'
 
 type DemoForm = {
   name: string
@@ -11,18 +15,200 @@ type DemoForm = {
   branches: string
   city: string
   source: string
-  message: string
 }
 
 const emptyForm: DemoForm = {
-  name: '',
-  phone: '',
-  salonName: '',
-  branches: '',
-  city: '',
-  source: '',
-  message: '',
+  name: '', phone: '', salonName: '', branches: '', city: '', source: '',
 }
+
+const FEATURES = [
+  {
+    Icon: Calendar,
+    title: 'Appointment Management',
+    desc: 'Google Calendar-style booking with staff scheduling',
+    color: '#f43f5e',
+    mockup: (
+      <div style={{ padding: 12, fontSize: 9 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <span style={{ color: '#fff', fontWeight: 700, fontSize: 10 }}>May 2026</span>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {['Day', 'Week'].map((v, i) => (
+              <span key={v} style={{ padding: '2px 7px', borderRadius: 4, background: i === 0 ? '#f43f5e' : 'rgba(255,255,255,0.08)', color: i === 0 ? '#fff' : '#666', fontSize: 8 }}>{v}</span>
+            ))}
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3, marginBottom: 8 }}>
+          {['M','T','W','T','F','S','S'].map((d, i) => (
+            <div key={i} style={{ textAlign: 'center', color: '#555', fontSize: 7 }}>{d}</div>
+          ))}
+          {[18,19,20,21,22,23,24].map((d) => (
+            <div key={d} style={{ textAlign: 'center', padding: '3px 0', borderRadius: 4, background: d === 20 ? '#f43f5e' : 'transparent', color: d === 20 ? '#fff' : '#888', fontSize: 8, fontWeight: d === 20 ? 700 : 400 }}>{d}</div>
+          ))}
+        </div>
+        {[
+          { time: '10:00', name: 'Emma J.', service: 'Hair Cut', color: '#f43f5e' },
+          { time: '11:30', name: 'Sara W.', service: 'Facial', color: '#a855f7' },
+          { time: '2:00', name: 'Alex C.', service: 'Manicure', color: '#3b82f6' },
+        ].map((a) => (
+          <div key={a.time} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 7px', borderRadius: 5, marginBottom: 3, background: 'rgba(255,255,255,0.04)', borderLeft: `2px solid ${a.color}` }}>
+            <span style={{ color: '#555', width: 28, fontSize: 8, flexShrink: 0 }}>{a.time}</span>
+            <span style={{ color: '#ccc', fontSize: 8, flex: 1 }}>{a.name}</span>
+            <span style={{ padding: '1px 5px', background: `${a.color}20`, color: a.color, borderRadius: 20, fontSize: 7 }}>{a.service}</span>
+          </div>
+        ))}
+      </div>
+    ),
+  },
+  {
+    Icon: Zap,
+    title: 'Walk-In POS',
+    desc: 'Instant walk-in processing with one-click payments',
+    color: '#a855f7',
+    mockup: (
+      <div style={{ padding: 12 }}>
+        <div style={{ color: '#fff', fontWeight: 700, fontSize: 10, marginBottom: 8 }}>Walk-In Checkout</div>
+        {['Hair Cut — $45', 'Beard Trim — $20'].map((s) => (
+          <div key={s} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 8px', background: 'rgba(168,85,247,0.12)', borderRadius: 5, marginBottom: 4, border: '1px solid rgba(168,85,247,0.2)' }}>
+            <span style={{ color: '#ccc', fontSize: 8 }}>{s.split('—')[0]}</span>
+            <span style={{ color: '#a855f7', fontSize: 9, fontWeight: 700 }}>{s.split('—')[1]}</span>
+          </div>
+        ))}
+        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'rgba(255,255,255,0.04)', borderRadius: 5, marginBottom: 8 }}>
+          <span style={{ color: '#888', fontSize: 8 }}>Total</span>
+          <span style={{ color: '#fff', fontSize: 11, fontWeight: 800 }}>$65</span>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+          {['Cash', 'Card'].map((m, i) => (
+            <div key={m} style={{ padding: '6px', textAlign: 'center', borderRadius: 5, background: i === 1 ? '#a855f7' : 'rgba(255,255,255,0.06)', color: i === 1 ? '#fff' : '#888', fontSize: 9, fontWeight: i === 1 ? 700 : 400 }}>{m}</div>
+          ))}
+        </div>
+      </div>
+    ),
+  },
+  {
+    Icon: TrendingUp,
+    title: 'P&L & Financial Reports',
+    desc: 'Real-time profit and loss with expense tracking',
+    color: '#22c55e',
+    mockup: (
+      <div style={{ padding: 12 }}>
+        <div style={{ color: '#fff', fontWeight: 700, fontSize: 10, marginBottom: 8 }}>P&L — May 2026</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+          <span style={{ color: '#888', fontSize: 8 }}>Revenue</span>
+          <span style={{ color: '#22c55e', fontWeight: 700, fontSize: 9 }}>$24,500</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+          <span style={{ color: '#888', fontSize: 8 }}>Expenses</span>
+          <span style={{ color: '#f43f5e', fontWeight: 700, fontSize: 9 }}>$8,200</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'rgba(34,197,94,0.12)', borderRadius: 5, marginBottom: 8, border: '1px solid rgba(34,197,94,0.2)' }}>
+          <span style={{ color: '#22c55e', fontSize: 9, fontWeight: 700 }}>Net Profit</span>
+          <span style={{ color: '#22c55e', fontSize: 11, fontWeight: 800 }}>$16,300</span>
+        </div>
+        <div style={{ display: 'flex', gap: 2, alignItems: 'flex-end', height: 36 }}>
+          {[65, 45, 80, 55, 90, 100].map((h, i) => (
+            <div key={i} style={{ flex: 1, background: i === 5 ? '#22c55e' : 'rgba(34,197,94,0.3)', borderRadius: '2px 2px 0 0', height: `${h}%` }} />
+          ))}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
+          {['Dec','Jan','Feb','Mar','Apr','May'].map((m) => (
+            <span key={m} style={{ fontSize: 6.5, color: '#555' }}>{m}</span>
+          ))}
+        </div>
+      </div>
+    ),
+  },
+  {
+    Icon: Users,
+    title: 'Staff & Performance',
+    desc: 'Track performance, attendance, commissions and payroll',
+    color: '#3b82f6',
+    mockup: (
+      <div style={{ padding: 12 }}>
+        <div style={{ color: '#fff', fontWeight: 700, fontSize: 10, marginBottom: 8 }}>Staff Performance</div>
+        {[
+          { name: 'Sarah J.', rev: '$5,200', pct: 82 },
+          { name: 'Mike R.', rev: '$4,100', pct: 65 },
+          { name: 'Emma L.', rev: '$3,800', pct: 60 },
+        ].map((s) => (
+          <div key={s.name} style={{ marginBottom: 7 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+              <span style={{ color: '#ccc', fontSize: 8 }}>{s.name}</span>
+              <span style={{ color: '#3b82f6', fontSize: 8, fontWeight: 700 }}>{s.rev}</span>
+            </div>
+            <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 20, height: 4 }}>
+              <div style={{ background: '#3b82f6', borderRadius: 20, height: 4, width: `${s.pct}%` }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    ),
+  },
+  {
+    Icon: Heart,
+    title: 'Client & Loyalty System',
+    desc: 'Build loyalty with points system and client history',
+    color: '#f59e0b',
+    mockup: (
+      <div style={{ padding: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+          <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(245,158,11,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>E</div>
+          <div>
+            <div style={{ color: '#fff', fontWeight: 700, fontSize: 9 }}>Emma Clarke</div>
+            <div style={{ color: '#f59e0b', fontSize: 8 }}>★ 1,240 points</div>
+          </div>
+        </div>
+        <div style={{ padding: '5px 8px', background: 'rgba(245,158,11,0.12)', borderRadius: 5, marginBottom: 6, border: '1px solid rgba(245,158,11,0.2)' }}>
+          <span style={{ color: '#f59e0b', fontSize: 8 }}>Loyalty Balance: </span>
+          <span style={{ color: '#fff', fontWeight: 700, fontSize: 9 }}>$12.40 redeemable</span>
+        </div>
+        {['Hair Cut — Mar 15', 'Facial — Feb 28', 'Manicure — Feb 10'].map((v) => (
+          <div key={v} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+            <span style={{ color: '#888', fontSize: 7.5 }}>{v.split('—')[0]}</span>
+            <span style={{ color: '#666', fontSize: 7.5 }}>{v.split('—')[1]}</span>
+          </div>
+        ))}
+      </div>
+    ),
+  },
+  {
+    Icon: Package,
+    title: 'Inventory Management',
+    desc: 'Track stock levels, get low stock alerts',
+    color: '#ec4899',
+    mockup: (
+      <div style={{ padding: 12 }}>
+        <div style={{ color: '#fff', fontWeight: 700, fontSize: 10, marginBottom: 8 }}>Inventory</div>
+        {[
+          { name: 'Hair Color #5', qty: 12, status: 'ok' },
+          { name: 'Shampoo Pro', qty: 3, status: 'low' },
+          { name: 'Conditioner', qty: 8, status: 'ok' },
+        ].map((item) => (
+          <div key={item.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 7px', borderRadius: 5, marginBottom: 3, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+            <span style={{ color: '#ccc', fontSize: 8 }}>{item.name}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span style={{ color: '#888', fontSize: 8 }}>Qty: {item.qty}</span>
+              {item.status === 'low' && (
+                <span style={{ padding: '1px 5px', background: 'rgba(239,68,68,0.15)', color: '#ef4444', borderRadius: 20, fontSize: 7 }}>Low</span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    ),
+  },
+]
+
+const ALL_FEATURES_LIST = [
+  ['Appointment booking', 'Walk-in POS', 'Calendar view', 'Client management', 'Loyalty points system', 'Multi-branch support', 'Role-based team access', 'Attendance tracking'],
+  ['Inventory management', 'Expense tracking', 'Payroll & commissions', 'P&L reports', 'PDF invoice export', 'Dark mode', 'White-label branding', 'Custom payment methods', 'Demo request system'],
+]
+
+const TESTIMONIALS = [
+  { name: 'Emma Clarke', salon: 'Bloom Beauty Studio, London', quote: 'Snipforce completely transformed how we manage appointments. No more double-bookings and our staff absolutely love it!', stars: 5 },
+  { name: 'Sarah Williams', salon: 'Luxe Hair & Spa, New York', quote: 'The walk-in module and calendar view are game-changers. We can see the whole day at a glance and serve clients faster than ever.', stars: 5 },
+  { name: 'Nadia Hassan', salon: 'Serenity Spa, Dubai', quote: 'The white-label branding makes our salon stand out. Clients see our logo everywhere — it feels truly professional.', stars: 5 },
+]
 
 export default function LandingPage() {
   const [scrolled, setScrolled] = useState(false)
@@ -31,6 +217,8 @@ export default function LandingPage() {
   const [form, setForm] = useState<DemoForm>(emptyForm)
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [hoveredFeature, setHoveredFeature] = useState<number | null>(null)
+  const revealRefs = useRef<HTMLElement[]>([])
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20)
@@ -40,11 +228,7 @@ export default function LandingPage() {
 
   useEffect(() => {
     const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) entry.target.classList.add('sf-visible')
-        })
-      },
+      (entries) => entries.forEach((e) => { if (e.isIntersecting) e.target.classList.add('sf-visible') }),
       { threshold: 0.1 }
     )
     document.querySelectorAll('.sf-reveal').forEach((el) => observer.observe(el))
@@ -53,7 +237,7 @@ export default function LandingPage() {
 
   useEffect(() => {
     const counters = document.querySelectorAll<HTMLElement>('[data-sf-count]')
-    const counterObserver = new IntersectionObserver(
+    const obs = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
@@ -67,43 +251,16 @@ export default function LandingPage() {
               el.textContent = count.toLocaleString() + suffix
               if (count >= target) clearInterval(timer)
             }, 20)
-            counterObserver.unobserve(el)
+            obs.unobserve(el)
           }
         })
       },
       { threshold: 0.5 }
     )
-    counters.forEach((el) => counterObserver.observe(el))
-    return () => counterObserver.disconnect()
+    counters.forEach((el) => obs.observe(el))
+    return () => obs.disconnect()
   }, [])
 
-  useEffect(() => {
-    const cards = document.querySelectorAll<HTMLElement>('.sf-tilt')
-    const onMove = (e: Event) => {
-      const me = e as MouseEvent
-      const card = me.currentTarget as HTMLElement
-      const rect = card.getBoundingClientRect()
-      const rx = ((me.clientY - rect.top) / rect.height - 0.5) * -12
-      const ry = ((me.clientX - rect.left) / rect.width - 0.5) * 12
-      card.style.transform = `perspective(900px) rotateX(${rx}deg) rotateY(${ry}deg) translateZ(8px)`
-    }
-    const onLeave = (e: Event) => {
-      ;(e.currentTarget as HTMLElement).style.transform =
-        'perspective(900px) rotateX(0deg) rotateY(0deg) translateZ(0px)'
-    }
-    cards.forEach((c) => {
-      c.addEventListener('mousemove', onMove)
-      c.addEventListener('mouseleave', onLeave)
-    })
-    return () => {
-      cards.forEach((c) => {
-        c.removeEventListener('mousemove', onMove)
-        c.removeEventListener('mouseleave', onLeave)
-      })
-    }
-  }, [])
-
-  // Lock body scroll when modal is open
   useEffect(() => {
     document.body.style.overflow = demoOpen ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
@@ -123,18 +280,11 @@ export default function LandingPage() {
           branches: form.branches,
           city: form.city,
           source: form.source,
-          message: form.message || undefined,
         }),
       })
-      if (res.ok) {
-        setSubmitted(true)
-      } else {
-        const d = await res.json()
-        alert(d.error ?? 'Something went wrong. Please try again.')
-      }
-    } catch {
-      alert('Network error. Please try again.')
-    }
+      if (res.ok) { setSubmitted(true) }
+      else { const d = await res.json(); alert(d.error ?? 'Something went wrong.') }
+    } catch { alert('Network error. Please try again.') }
     setSubmitting(false)
   }
 
@@ -145,66 +295,49 @@ export default function LandingPage() {
   }
 
   return (
-    <div style={{ background: '#0a0f1e', minHeight: '100vh', color: '#fff' }}>
+    <div style={{ background: '#0a0f1e', minHeight: '100vh', color: '#fff', fontFamily: "'Inter', system-ui, sans-serif" }}>
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
         @keyframes sf-float {
-          0%,100% { transform: perspective(1200px) rotateY(-12deg) rotateX(4deg) translateY(0px); }
-          50%      { transform: perspective(1200px) rotateY(-12deg) rotateX(4deg) translateY(-20px); }
+          0%,100% { transform: perspective(1200px) rotateY(-8deg) rotateX(3deg) translateY(0px); }
+          50%      { transform: perspective(1200px) rotateY(-8deg) rotateX(3deg) translateY(-18px); }
         }
         @keyframes sf-pulse-glow {
-          0%,100% { box-shadow: 0 0 20px rgba(244,63,94,0.4), 0 4px 24px rgba(244,63,94,0.3); }
-          50%      { box-shadow: 0 0 40px rgba(244,63,94,0.8), 0 4px 36px rgba(244,63,94,0.5); }
+          0%,100% { box-shadow: 0 0 20px rgba(244,63,94,0.5), 0 4px 24px rgba(244,63,94,0.35); }
+          50%      { box-shadow: 0 0 44px rgba(244,63,94,0.9), 0 4px 40px rgba(244,63,94,0.6); }
         }
-        .sf-reveal {
-          opacity: 0;
-          transform: translateY(36px);
-          transition: opacity 0.65s ease, transform 0.65s ease;
-        }
-        .sf-reveal.sf-visible { opacity: 1; transform: translateY(0); }
-        .sf-d1 { transition-delay: 0.1s; }
-        .sf-d2 { transition-delay: 0.2s; }
-        .sf-d3 { transition-delay: 0.3s; }
-        .sf-glass {
-          background: rgba(255,255,255,0.05);
-          backdrop-filter: blur(12px);
-          border: 1px solid rgba(255,255,255,0.08);
-        }
-        .sf-grad-text {
-          background: linear-gradient(135deg, #f43f5e 0%, #a855f7 100%);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
-        }
-        .sf-mockup { animation: sf-float 3s ease-in-out infinite; }
-        .sf-cta-btn { animation: sf-pulse-glow 3s ease-in-out infinite; }
-        .sf-tilt { transition: transform 0.12s ease; }
-        .sf-grid-bg {
-          background-image:
-            linear-gradient(rgba(244,63,94,0.04) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(244,63,94,0.04) 1px, transparent 1px);
-          background-size: 48px 48px;
-        }
-        .sf-nav-blur {
-          background: rgba(10,15,30,0.88);
-          backdrop-filter: blur(20px);
-          border-bottom: 1px solid rgba(255,255,255,0.06);
-        }
-        .sf-pricing-pop {
-          position: relative;
-          background: rgba(244,63,94,0.06);
-          border-radius: 16px;
-        }
-        .sf-pricing-pop::before {
-          content: '';
-          position: absolute;
-          inset: -1px;
-          border-radius: 17px;
-          background: linear-gradient(135deg, #f43f5e, #a855f7);
-          z-index: -1;
-        }
-        @media (max-width: 768px) {
-          .sf-mockup { animation: none; }
-          .sf-tilt { transform: none !important; }
+        @keyframes sf-spin-slow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes sf-badge-in { from { opacity:0; transform: translateY(12px); } to { opacity:1; transform: translateY(0); } }
+        .sf-reveal { opacity:0; transform:translateY(36px); transition:opacity 0.65s ease, transform 0.65s ease; }
+        .sf-reveal.sf-visible { opacity:1; transform:translateY(0); }
+        .sf-d1 { transition-delay:0.1s; } .sf-d2 { transition-delay:0.2s; } .sf-d3 { transition-delay:0.3s; }
+        .sf-d4 { transition-delay:0.4s; } .sf-d5 { transition-delay:0.5s; } .sf-d6 { transition-delay:0.6s; }
+        .sf-glass { background:rgba(255,255,255,0.04); backdrop-filter:blur(14px); border:1px solid rgba(255,255,255,0.07); }
+        .sf-glass-strong { background:rgba(255,255,255,0.07); backdrop-filter:blur(20px); border:1px solid rgba(255,255,255,0.1); }
+        .sf-grad-text { background:linear-gradient(135deg,#f43f5e 0%,#a855f7 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+        .sf-mockup { animation:sf-float 4s ease-in-out infinite; }
+        .sf-cta-btn { animation:sf-pulse-glow 3s ease-in-out infinite; }
+        .sf-grid-bg { background-image:linear-gradient(rgba(244,63,94,0.03) 1px, transparent 1px),linear-gradient(90deg, rgba(244,63,94,0.03) 1px, transparent 1px); background-size:52px 52px; }
+        .sf-nav-blur { background:rgba(10,15,30,0.9); backdrop-filter:blur(20px); border-bottom:1px solid rgba(255,255,255,0.06); }
+        .sf-feature-card { position:relative; overflow:hidden; cursor:default; transition:transform 0.3s ease, box-shadow 0.3s ease; }
+        .sf-feature-card:hover { transform:translateY(-4px); box-shadow:0 20px 60px rgba(0,0,0,0.4); }
+        .sf-feature-front { transition: opacity 0.3s ease, transform 0.3s ease; }
+        .sf-feature-back { position:absolute; inset:0; opacity:0; transform:scale(0.96); transition: opacity 0.3s ease, transform 0.3s ease; }
+        .sf-feature-card:hover .sf-feature-front { opacity:0; transform:scale(0.95); }
+        .sf-feature-card:hover .sf-feature-back { opacity:1; transform:scale(1); }
+        .sf-pricing-pop { position:relative; }
+        .sf-pricing-pop::before { content:''; position:absolute; inset:-1px; border-radius:17px; background:linear-gradient(135deg,#f43f5e,#a855f7); z-index:-1; }
+        .sf-input { background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); color:#fff; border-radius:10px; padding:10px 14px; font-size:14px; width:100%; outline:none; transition:border-color 0.2s; }
+        .sf-input::placeholder { color:#4b5563; }
+        .sf-input:focus { border-color:rgba(244,63,94,0.5); box-shadow:0 0 0 3px rgba(244,63,94,0.1); }
+        .sf-select { background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); color:#fff; border-radius:10px; padding:10px 14px; font-size:14px; width:100%; outline:none; appearance:none; cursor:pointer; }
+        .sf-select:focus { border-color:rgba(244,63,94,0.5); }
+        .sf-select option { background:#111827; color:#fff; }
+        @media (max-width:768px) {
+          .sf-mockup { animation:none; }
+          .sf-feature-card:hover { transform:none; }
+          .sf-feature-card:hover .sf-feature-front { opacity:1; transform:none; }
+          .sf-feature-card:hover .sf-feature-back { opacity:0; }
         }
       `}</style>
 
@@ -213,28 +346,30 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 bg-rose-500 rounded-lg flex items-center justify-center shadow-lg shadow-rose-500/30">
-                <Scissors className="w-4 h-4 text-white" />
+              <div style={{ width: 34, height: 34, background: 'linear-gradient(135deg,#f43f5e,#db2777)', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(244,63,94,0.4)' }}>
+                <Scissors style={{ width: 16, height: 16, color: '#fff' }} />
               </div>
-              <span className="font-bold text-lg text-white tracking-tight">Snipforce</span>
+              <span style={{ fontWeight: 800, fontSize: 18, color: '#fff', letterSpacing: '-0.02em' }}>Snipforce</span>
             </div>
 
             <div className="hidden md:flex items-center gap-8">
-              <a href="#features" className="text-sm text-gray-400 hover:text-white transition-colors">Features</a>
-              <a href="#pricing" className="text-sm text-gray-400 hover:text-white transition-colors">Pricing</a>
-              <a href="#about" className="text-sm text-gray-400 hover:text-white transition-colors">About</a>
+              {['Features', 'How It Works', 'Pricing', 'Contact'].map((item) => (
+                <a key={item} href={`#${item.toLowerCase().replace(/ /g, '-')}`} style={{ fontSize: 14, color: '#9ca3af', textDecoration: 'none', transition: 'color 0.2s' }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = '#fff')}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = '#9ca3af')}>
+                  {item}
+                </a>
+              ))}
               <Link href="/login">
-                <button className="px-5 py-2 text-sm bg-rose-500 hover:bg-rose-600 text-white rounded-lg font-medium transition-colors shadow-lg shadow-rose-500/25">
+                <button style={{ padding: '8px 20px', background: 'linear-gradient(135deg,#f43f5e,#db2777)', color: '#fff', borderRadius: 9, fontWeight: 600, fontSize: 14, border: 'none', cursor: 'pointer', boxShadow: '0 4px 14px rgba(244,63,94,0.3)', transition: 'opacity 0.2s' }}
+                  onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.85')}
+                  onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}>
                   Login
                 </button>
               </Link>
             </div>
 
-            <button
-              onClick={() => setMobileOpen(!mobileOpen)}
-              className="md:hidden p-2 text-gray-400 hover:text-white transition-colors"
-              aria-label="Toggle menu"
-            >
+            <button onClick={() => setMobileOpen(!mobileOpen)} className="md:hidden" style={{ padding: 8, color: '#9ca3af', background: 'none', border: 'none', cursor: 'pointer' }}>
               <div style={{ width: 20, height: 2, background: 'currentColor', marginBottom: 5, borderRadius: 2 }} />
               <div style={{ width: 20, height: 2, background: 'currentColor', marginBottom: 5, borderRadius: 2 }} />
               <div style={{ width: 20, height: 2, background: 'currentColor', borderRadius: 2 }} />
@@ -243,129 +378,148 @@ export default function LandingPage() {
         </div>
 
         {mobileOpen && (
-          <div style={{ background: 'rgba(10,15,30,0.97)', borderTop: '1px solid rgba(255,255,255,0.06)' }} className="md:hidden px-4 py-4 space-y-3">
-            <a href="#features" className="block text-sm text-gray-300 py-2" onClick={() => setMobileOpen(false)}>Features</a>
-            <a href="#pricing" className="block text-sm text-gray-300 py-2" onClick={() => setMobileOpen(false)}>Pricing</a>
-            <a href="#about" className="block text-sm text-gray-300 py-2" onClick={() => setMobileOpen(false)}>About</a>
-            <Link href="/login" className="block">
-              <button className="w-full py-2.5 bg-rose-500 text-white rounded-lg text-sm font-medium">Login</button>
-            </Link>
+          <div style={{ background: 'rgba(10,15,30,0.97)', borderTop: '1px solid rgba(255,255,255,0.06)', padding: '12px 20px 16px' }}>
+            {['Features', 'How It Works', 'Pricing', 'Contact'].map((item) => (
+              <a key={item} href={`#${item.toLowerCase().replace(/ /g, '-')}`} onClick={() => setMobileOpen(false)}
+                style={{ display: 'block', padding: '10px 0', color: '#9ca3af', fontSize: 14, textDecoration: 'none', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                {item}
+              </a>
+            ))}
+            <Link href="/login"><button onClick={() => setMobileOpen(false)} style={{ marginTop: 12, width: '100%', padding: '12px', background: 'linear-gradient(135deg,#f43f5e,#db2777)', color: '#fff', borderRadius: 10, fontWeight: 600, fontSize: 14, border: 'none', cursor: 'pointer' }}>Login</button></Link>
           </div>
         )}
       </nav>
 
       {/* ── HERO ── */}
-      <section className="relative min-h-screen flex items-center pt-16 overflow-hidden sf-grid-bg">
-        <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] rounded-full" style={{ background: 'radial-gradient(circle, rgba(244,63,94,0.18) 0%, transparent 70%)', pointerEvents: 'none' }} />
-        <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] rounded-full" style={{ background: 'radial-gradient(circle, rgba(168,85,247,0.15) 0%, transparent 70%)', pointerEvents: 'none' }} />
+      <section className="sf-grid-bg" style={{ position: 'relative', minHeight: '100vh', display: 'flex', alignItems: 'center', paddingTop: 64, overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', top: '20%', left: '15%', width: 600, height: 600, borderRadius: '50%', background: 'radial-gradient(circle, rgba(244,63,94,0.14) 0%, transparent 70%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', bottom: '15%', right: '10%', width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle, rgba(168,85,247,0.12) 0%, transparent 70%)', pointerEvents: 'none' }} />
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 w-full">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
-
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" style={{ width: '100%', paddingTop: 80, paddingBottom: 80 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 64, alignItems: 'center' }} className="lg-two-col">
             {/* Left */}
             <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full sf-glass text-xs text-rose-400 mb-6">
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse" />
-                All-in-one Salon Management Platform
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 14px', borderRadius: 100, background: 'rgba(244,63,94,0.1)', border: '1px solid rgba(244,63,94,0.2)', marginBottom: 24 }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#f43f5e', display: 'inline-block', animation: 'pulse 2s infinite' }} />
+                <span style={{ fontSize: 12, color: '#f43f5e', fontWeight: 500 }}>All-in-one Salon Management Platform</span>
               </div>
 
-              <h1 className="text-5xl lg:text-[3.6rem] font-bold leading-[1.1] mb-6">
-                Run Your Salon.{' '}
-                <span className="sf-grad-text">Not Your Spreadsheets.</span>
+              <h1 style={{ fontSize: 'clamp(36px, 5vw, 60px)', fontWeight: 900, lineHeight: 1.08, marginBottom: 20, letterSpacing: '-0.03em' }}>
+                The Complete Operating System{' '}
+                <span className="sf-grad-text">for Modern Salons</span>
               </h1>
 
-              <p className="text-lg text-gray-400 mb-8 leading-relaxed max-w-lg">
-                Snipforce is the all-in-one platform for modern salons and spas — appointments, staff, inventory, and financials in one place.
+              <p style={{ fontSize: 18, color: '#9ca3af', marginBottom: 32, lineHeight: 1.7, maxWidth: 480 }}>
+                Appointments, walk-ins, staff, inventory, payroll, and financial reports — all in one beautifully designed platform.
               </p>
 
-              <div className="flex flex-wrap gap-4">
-                <button
-                  onClick={openDemo}
-                  className="sf-cta-btn px-8 py-4 rounded-xl font-semibold text-base text-white"
-                  style={{ background: 'linear-gradient(135deg, #f43f5e, #db2777)' }}
-                >
+              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 48 }}>
+                <button onClick={openDemo} className="sf-cta-btn" style={{ padding: '16px 32px', background: 'linear-gradient(135deg,#f43f5e,#db2777)', color: '#fff', borderRadius: 12, fontWeight: 700, fontSize: 16, border: 'none', cursor: 'pointer' }}>
                   Request a Demo
                 </button>
-                <a href="#features">
-                  <button className="sf-glass px-8 py-4 rounded-xl font-semibold text-base text-white hover:bg-white/10 transition-colors">
-                    See Features
-                  </button>
+                <a href="#features" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '16px 28px', borderRadius: 12, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: 15, fontWeight: 600, textDecoration: 'none', transition: 'background 0.2s' }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}>
+                  See it in action <ChevronDown style={{ width: 16, height: 16 }} />
                 </a>
               </div>
 
-              {/* Stats */}
-              <div className="grid grid-cols-3 gap-6 mt-12 pt-8" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+              {/* Stat badges */}
+              <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
                 {[
-                  { count: 500, suffix: '+', label: 'Salons' },
-                  { count: 98, suffix: '%', label: 'Satisfaction' },
+                  { count: 500, suffix: '+', label: 'Salons Active' },
+                  { count: 99, suffix: '%', label: 'Uptime' },
                   { count: 30, suffix: '+', label: 'Countries' },
                 ].map((s) => (
-                  <div key={s.label}>
-                    <p className="text-3xl font-bold text-white">
+                  <div key={s.label} style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 32, fontWeight: 800, color: '#fff', lineHeight: 1 }}>
                       <span data-sf-count={s.count} data-sf-suffix={s.suffix}>{s.count}{s.suffix}</span>
-                    </p>
-                    <p className="text-sm text-gray-500 mt-0.5">{s.label}</p>
+                    </div>
+                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{s.label}</div>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Right — 3D floating mockup */}
+            {/* Right — floating dashboard mockup */}
             <div className="hidden lg:block">
               <div className="sf-mockup">
-                <div style={{ borderRadius: 16, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 0 60px rgba(244,63,94,0.15), 0 40px 80px rgba(0,0,0,0.6)', background: 'rgba(255,255,255,0.02)' }}>
+                <div style={{ borderRadius: 16, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 0 80px rgba(244,63,94,0.18), 0 60px 120px rgba(0,0,0,0.7)', background: '#111827' }}>
                   {/* Browser chrome */}
-                  <div style={{ background: 'rgba(255,255,255,0.04)', padding: '10px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#ff5f57' }} />
-                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#febc2e' }} />
-                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#28c840' }} />
-                    <div style={{ flex: 1, margin: '0 12px', background: 'rgba(255,255,255,0.04)', borderRadius: 6, padding: '3px 10px', fontSize: 10, color: '#555', textAlign: 'center' }}>
-                      app.snipforce.com/dashboard
+                  <div style={{ background: '#1f2937', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 7, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                    {['#ef4444','#f59e0b','#22c55e'].map((c) => <div key={c} style={{ width: 10, height: 10, borderRadius: '50%', background: c }} />)}
+                    <div style={{ flex: 1, margin: '0 10px', background: 'rgba(255,255,255,0.05)', borderRadius: 5, padding: '3px 10px', fontSize: 10, color: '#4b5563', textAlign: 'center' }}>
+                      app.snip-force.com/dashboard
                     </div>
                   </div>
-                  {/* App UI */}
-                  <div style={{ display: 'flex', minHeight: 290 }}>
-                    <div style={{ width: 156, borderRight: '1px solid rgba(255,255,255,0.04)', padding: 14, flexShrink: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 14 }}>
-                        <div style={{ width: 22, height: 22, background: '#f43f5e', borderRadius: 5, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {/* App */}
+                  <div style={{ display: 'flex', minHeight: 340 }}>
+                    {/* Sidebar */}
+                    <div style={{ width: 148, background: '#0f172a', borderRight: '1px solid rgba(255,255,255,0.05)', padding: '14px 10px', flexShrink: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 18 }}>
+                        <div style={{ width: 22, height: 22, background: 'linear-gradient(135deg,#f43f5e,#db2777)', borderRadius: 5, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           <Scissors style={{ width: 11, height: 11, color: '#fff' }} />
                         </div>
-                        <span style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>Snipforce</span>
+                        <span style={{ fontSize: 10, fontWeight: 800, color: '#fff' }}>Snipforce</span>
                       </div>
-                      {['Dashboard', 'Appointments', 'Calendar', 'Walk-In', 'Staff'].map((item, i) => (
-                        <div key={item} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '5px 7px', borderRadius: 5, marginBottom: 2, background: i === 0 ? 'rgba(244,63,94,0.15)' : 'transparent' }}>
-                          <div style={{ width: 5, height: 5, borderRadius: '50%', background: i === 0 ? '#f43f5e' : '#333', flexShrink: 0 }} />
-                          <span style={{ fontSize: 9.5, color: i === 0 ? '#f43f5e' : '#555' }}>{item}</span>
+                      {[
+                        { label: 'Dashboard', active: true },
+                        { label: 'Appointments', active: false },
+                        { label: 'Calendar', active: false },
+                        { label: 'Walk-In', active: false },
+                        { label: 'Staff', active: false },
+                        { label: 'Clients', active: false },
+                        { label: 'Reports', active: false },
+                      ].map(({ label, active }) => (
+                        <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 7px', borderRadius: 5, marginBottom: 2, background: active ? 'rgba(244,63,94,0.15)' : 'transparent' }}>
+                          <div style={{ width: 4, height: 4, borderRadius: '50%', background: active ? '#f43f5e' : '#374151', flexShrink: 0 }} />
+                          <span style={{ fontSize: 9, color: active ? '#f43f5e' : '#6b7280' }}>{label}</span>
                         </div>
                       ))}
                     </div>
-                    <div style={{ flex: 1, padding: 18 }}>
+                    {/* Main */}
+                    <div style={{ flex: 1, padding: 16, background: '#111827' }}>
                       <div style={{ marginBottom: 14 }}>
-                        <div style={{ height: 13, width: 110, background: '#fff', borderRadius: 3, marginBottom: 5 }} />
-                        <div style={{ height: 9, width: 150, background: '#1e2740', borderRadius: 3 }} />
+                        <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 2 }}>Good morning, Sarah</div>
+                        <div style={{ fontSize: 9, color: '#6b7280' }}>Monday, May 18, 2026</div>
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 14 }}>
+                      {/* KPI cards */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6, marginBottom: 12 }}>
                         {[
-                          { label: "Appts", value: '14', bg: 'rgba(244,63,94,0.12)', c: '#f43f5e' },
-                          { label: 'Revenue', value: '$2,840', bg: 'rgba(34,197,94,0.12)', c: '#22c55e' },
-                          { label: 'Services', value: '12', bg: 'rgba(59,130,246,0.12)', c: '#3b82f6' },
-                          { label: 'Staff', value: '8', bg: 'rgba(168,85,247,0.12)', c: '#a855f7' },
-                        ].map((s) => (
-                          <div key={s.label} style={{ background: s.bg, borderRadius: 7, padding: 9 }}>
-                            <p style={{ fontSize: 8, color: '#555', marginBottom: 3 }}>{s.label}</p>
-                            <p style={{ fontSize: 11, fontWeight: 700, color: s.c }}>{s.value}</p>
+                          { label: 'Revenue', value: '$24,500', color: '#22c55e', bg: 'rgba(34,197,94,0.1)' },
+                          { label: 'Appointments', value: '47', color: '#3b82f6', bg: 'rgba(59,130,246,0.1)' },
+                          { label: 'Walk-Ins', value: '23', color: '#a855f7', bg: 'rgba(168,85,247,0.1)' },
+                          { label: 'Net Profit', value: '$8,200', color: '#f43f5e', bg: 'rgba(244,63,94,0.1)' },
+                        ].map((k) => (
+                          <div key={k.label} style={{ background: k.bg, borderRadius: 7, padding: '8px 8px 6px' }}>
+                            <div style={{ fontSize: 7.5, color: '#6b7280', marginBottom: 3 }}>{k.label}</div>
+                            <div style={{ fontSize: 11, fontWeight: 800, color: k.color }}>{k.value}</div>
                           </div>
                         ))}
                       </div>
-                      <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: 7, padding: 10, border: '1px solid rgba(255,255,255,0.04)' }}>
-                        {['Emma J. — Hair Cut — 10:00 AM', 'Sara W. — Facial — 11:30 AM', 'Alex C. — Manicure — 2:00 PM'].map((a) => (
-                          <div key={a} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '5px 7px', borderRadius: 5, marginBottom: 3, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
-                            <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#f43f5e', flexShrink: 0 }} />
-                            <span style={{ fontSize: 8.5, color: '#666', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a}</span>
-                            <span style={{ fontSize: 7.5, padding: '1px 5px', background: 'rgba(34,197,94,0.12)', color: '#22c55e', borderRadius: 20, flexShrink: 0 }}>Confirmed</span>
-                          </div>
-                        ))}
+                      {/* Chart */}
+                      <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 7, padding: '8px 10px', marginBottom: 8, border: '1px solid rgba(255,255,255,0.04)' }}>
+                        <div style={{ fontSize: 8, color: '#6b7280', marginBottom: 6 }}>Revenue Trend — Last 6 Months</div>
+                        <div style={{ display: 'flex', gap: 4, alignItems: 'flex-end', height: 40 }}>
+                          {[55, 72, 61, 88, 78, 100].map((h, i) => (
+                            <div key={i} style={{ flex: 1, background: i === 5 ? '#f43f5e' : 'rgba(244,63,94,0.25)', borderRadius: '2px 2px 0 0', height: `${h}%` }} />
+                          ))}
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 3 }}>
+                          {['Dec','Jan','Feb','Mar','Apr','May'].map((m) => (
+                            <span key={m} style={{ fontSize: 7, color: '#4b5563' }}>{m}</span>
+                          ))}
+                        </div>
                       </div>
+                      {/* Appointments list */}
+                      <div style={{ fontSize: 8, color: '#6b7280', marginBottom: 5 }}>Today&apos;s Appointments</div>
+                      {['Emma J. — Hair Cut — 10:00 AM', 'Sara W. — Facial — 11:30 AM'].map((a) => (
+                        <div key={a} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 7px', borderRadius: 5, marginBottom: 3, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.04)' }}>
+                          <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#f43f5e', flexShrink: 0 }} />
+                          <span style={{ fontSize: 8, color: '#9ca3af', flex: 1 }}>{a}</span>
+                          <span style={{ fontSize: 7, padding: '1px 5px', background: 'rgba(34,197,94,0.12)', color: '#22c55e', borderRadius: 20 }}>Done</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -375,83 +529,192 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── FEATURES ── */}
-      <section id="features" className="py-24" style={{ background: 'rgba(255,255,255,0.015)' }}>
+      {/* ── FEATURES (Interactive) ── */}
+      <section id="features" style={{ padding: '96px 0', background: 'rgba(255,255,255,0.015)' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16 sf-reveal">
-            <p className="text-rose-400 font-semibold text-sm uppercase tracking-widest mb-3">Features</p>
-            <h2 className="text-4xl md:text-5xl font-bold mb-4">Everything your salon needs</h2>
-            <p className="text-gray-400 text-lg max-w-2xl mx-auto">A complete platform to run your salon efficiently from day one.</p>
+          <div className="sf-reveal text-center" style={{ marginBottom: 64 }}>
+            <p style={{ color: '#f43f5e', fontWeight: 600, fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 12 }}>Product</p>
+            <h2 style={{ fontSize: 'clamp(28px,4vw,48px)', fontWeight: 800, marginBottom: 16, letterSpacing: '-0.02em' }}>Everything your salon needs,<br />nothing it doesn&apos;t</h2>
+            <p style={{ color: '#6b7280', fontSize: 16, maxWidth: 500, margin: '0 auto' }}>Hover each card to see a live product preview</p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {[
-              { Icon: Calendar, title: 'Smart Appointments', desc: 'Calendar-based booking with staff scheduling and client history', color: '#f43f5e' },
-              { Icon: Zap, title: 'Walk-In POS', desc: 'Instant walk-in processing with one-click payments and receipts', color: '#a855f7' },
-              { Icon: Package, title: 'Inventory Control', desc: 'Track products, get low-stock alerts, manage suppliers', color: '#3b82f6' },
-              { Icon: BarChart3, title: 'Financial Reports', desc: 'Real-time P&L, expense tracking, payroll and salary management', color: '#22c55e' },
-              { Icon: Gift, title: 'Client Loyalty', desc: 'Built-in loyalty points system to retain and reward your best clients', color: '#f59e0b' },
-              { Icon: Users, title: 'Team Management', desc: 'Staff profiles, performance tracking, commission and payroll', color: '#ec4899' },
-            ].map(({ Icon, title, desc, color }, idx) => (
-              <div key={title} className={`sf-glass sf-tilt rounded-2xl p-6 sf-reveal sf-d${(idx % 3) + 1} cursor-default`}>
-                <div style={{ width: 48, height: 48, background: `${color}20`, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-                  <Icon style={{ width: 24, height: 24, color }} />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px,1fr))', gap: 20 }}>
+            {FEATURES.map(({ Icon, title, desc, color, mockup }, idx) => (
+              <div key={title} className={`sf-glass sf-feature-card sf-reveal sf-d${(idx % 3) + 1}`} style={{ borderRadius: 16, minHeight: 200 }}
+                onMouseEnter={() => setHoveredFeature(idx)}
+                onMouseLeave={() => setHoveredFeature(null)}>
+                {/* Front */}
+                <div className="sf-feature-front" style={{ padding: 24 }}>
+                  <div style={{ width: 48, height: 48, background: `${color}18`, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16, border: `1px solid ${color}25` }}>
+                    <Icon style={{ width: 22, height: 22, color }} />
+                  </div>
+                  <h3 style={{ fontSize: 17, fontWeight: 700, color: '#fff', marginBottom: 8 }}>{title}</h3>
+                  <p style={{ color: '#6b7280', fontSize: 14, lineHeight: 1.6 }}>{desc}</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 16, color, fontSize: 12, fontWeight: 600 }}>
+                    <span>Hover to preview</span>
+                    <ArrowRight style={{ width: 14, height: 14 }} />
+                  </div>
                 </div>
-                <h3 className="text-lg font-semibold text-white mb-2">{title}</h3>
-                <p className="text-gray-400 text-sm leading-relaxed">{desc}</p>
+                {/* Back */}
+                <div className="sf-feature-back" style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', borderRadius: 16, border: `1px solid ${color}30` }}>
+                  <div style={{ padding: '8px 12px', borderBottom: `1px solid ${color}20`, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Icon style={{ width: 12, height: 12, color }} />
+                    <span style={{ fontSize: 10, color, fontWeight: 600 }}>{title}</span>
+                  </div>
+                  {mockup}
+                </div>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── DASHBOARD PREVIEW ── */}
+      <section id="how-it-works" style={{ padding: '96px 0' }}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="sf-reveal text-center" style={{ marginBottom: 64 }}>
+            <p style={{ color: '#f43f5e', fontWeight: 600, fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 12 }}>Dashboard</p>
+            <h2 style={{ fontSize: 'clamp(28px,4vw,48px)', fontWeight: 800, marginBottom: 16, letterSpacing: '-0.02em' }}>A dashboard that tells you<br />everything at a glance</h2>
+          </div>
+          <div className="sf-reveal sf-d1 sf-mockup" style={{ maxWidth: 900, margin: '0 auto' }}>
+            <div style={{ borderRadius: 16, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 0 80px rgba(244,63,94,0.12), 0 40px 100px rgba(0,0,0,0.7)', background: '#111827' }}>
+              {/* Browser chrome */}
+              <div style={{ background: '#1f2937', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                {['#ef4444','#f59e0b','#22c55e'].map((c) => <div key={c} style={{ width: 12, height: 12, borderRadius: '50%', background: c }} />)}
+                <div style={{ flex: 1, margin: '0 14px', background: 'rgba(255,255,255,0.05)', borderRadius: 7, padding: '5px 14px', fontSize: 12, color: '#4b5563', textAlign: 'center' }}>
+                  snip-force.com/dashboard
+                </div>
+              </div>
+              <div style={{ display: 'flex', minHeight: 420 }}>
+                {/* Sidebar */}
+                <div style={{ width: 200, background: '#0f172a', borderRight: '1px solid rgba(255,255,255,0.05)', padding: '20px 14px', flexShrink: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 24 }}>
+                    <div style={{ width: 28, height: 28, background: 'linear-gradient(135deg,#f43f5e,#db2777)', borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Scissors style={{ width: 13, height: 13, color: '#fff' }} />
+                    </div>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>Snipforce</span>
+                  </div>
+                  {[
+                    { label: 'Dashboard', active: true, Icon: BarChart2 },
+                    { label: 'Appointments', active: false, Icon: Calendar },
+                    { label: 'Walk-Ins', active: false, Icon: Zap },
+                    { label: 'Staff', active: false, Icon: Users },
+                    { label: 'Clients', active: false, Icon: Heart },
+                    { label: 'Inventory', active: false, Icon: Package },
+                    { label: 'Reports', active: false, Icon: TrendingUp },
+                    { label: 'Settings', active: false, Icon: Shield },
+                  ].map(({ label, active, Icon: NavIcon }) => (
+                    <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 9px', borderRadius: 7, marginBottom: 3, background: active ? 'rgba(244,63,94,0.15)' : 'transparent', cursor: 'default' }}>
+                      <NavIcon style={{ width: 14, height: 14, color: active ? '#f43f5e' : '#374151', flexShrink: 0 }} />
+                      <span style={{ fontSize: 12, color: active ? '#f43f5e' : '#6b7280' }}>{label}</span>
+                    </div>
+                  ))}
+                </div>
+                {/* Main */}
+                <div style={{ flex: 1, padding: '24px 20px', background: '#111827', overflow: 'hidden' }}>
+                  <div style={{ marginBottom: 20 }}>
+                    <h2 style={{ fontSize: 18, fontWeight: 800, color: '#fff', marginBottom: 4 }}>Dashboard Overview</h2>
+                    <p style={{ fontSize: 12, color: '#6b7280' }}>Monday, May 18, 2026 · Lahore Branch</p>
+                  </div>
+                  {/* KPI row */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 16 }}>
+                    {[
+                      { label: 'Revenue', value: '$24,500', sub: '+12% vs last month', color: '#22c55e', Icon: DollarSign },
+                      { label: 'Appointments', value: '47', sub: '8 pending', color: '#3b82f6', Icon: Calendar },
+                      { label: 'Walk-Ins', value: '23', sub: 'Today', color: '#a855f7', Icon: Zap },
+                      { label: 'Net Profit', value: '$8,200', sub: '+8% margin', color: '#f43f5e', Icon: TrendingUp },
+                    ].map((k) => (
+                      <div key={k.label} style={{ background: `${k.color}0d`, borderRadius: 10, padding: '12px 12px 10px', border: `1px solid ${k.color}20` }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                          <span style={{ fontSize: 11, color: '#6b7280' }}>{k.label}</span>
+                          <k.Icon style={{ width: 14, height: 14, color: k.color }} />
+                        </div>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: k.color, marginBottom: 3 }}>{k.value}</div>
+                        <div style={{ fontSize: 10, color: '#4b5563' }}>{k.sub}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Charts row */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10 }}>
+                    <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 10, padding: '12px 14px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                      <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 12, fontWeight: 600 }}>Revenue — Last 6 Months</div>
+                      <div style={{ display: 'flex', gap: 5, alignItems: 'flex-end', height: 70, marginBottom: 6 }}>
+                        {[55, 72, 61, 88, 78, 100].map((h, i) => (
+                          <div key={i} style={{ flex: 1, background: i === 5 ? 'linear-gradient(180deg,#f43f5e,#db2777)' : 'rgba(244,63,94,0.2)', borderRadius: '3px 3px 0 0', height: `${h}%` }} />
+                        ))}
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        {['Dec','Jan','Feb','Mar','Apr','May'].map((m) => (
+                          <span key={m} style={{ fontSize: 9, color: '#4b5563' }}>{m}</span>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 10, padding: '12px 14px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                      <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 12, fontWeight: 600 }}>Top Services</div>
+                      {[{ name: 'Hair Cut', pct: 82, color: '#f43f5e' }, { name: 'Facial', pct: 64, color: '#a855f7' }, { name: 'Manicure', pct: 48, color: '#3b82f6' }].map((s) => (
+                        <div key={s.name} style={{ marginBottom: 8 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                            <span style={{ fontSize: 9, color: '#9ca3af' }}>{s.name}</span>
+                            <span style={{ fontSize: 9, color: s.color }}>{s.pct}%</span>
+                          </div>
+                          <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 20, height: 4 }}>
+                            <div style={{ background: s.color, borderRadius: 20, height: 4, width: `${s.pct}%` }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
       {/* ── HOW IT WORKS ── */}
-      <section className="py-24">
+      <section id="how-it-works-steps" style={{ padding: '96px 0', background: 'rgba(255,255,255,0.015)' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16 sf-reveal">
-            <p className="text-rose-400 font-semibold text-sm uppercase tracking-widest mb-3">Process</p>
-            <h2 className="text-4xl md:text-5xl font-bold">How it works</h2>
+          <div className="sf-reveal text-center" style={{ marginBottom: 64 }}>
+            <p style={{ color: '#f43f5e', fontWeight: 600, fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 12 }}>Process</p>
+            <h2 style={{ fontSize: 'clamp(28px,4vw,48px)', fontWeight: 800, letterSpacing: '-0.02em' }}>Up and running in minutes</h2>
           </div>
-          <div className="relative grid grid-cols-1 md:grid-cols-3 gap-10 md:gap-8">
-            <div className="hidden md:block absolute top-9 left-[22%] right-[22%] h-px" style={{ background: 'linear-gradient(90deg, #f43f5e, #a855f7, #f43f5e)', opacity: 0.25 }} />
+          <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 32 }} className="md-three-col">
+            <div style={{ display: 'none' }} className="md:block absolute top-9 left-[22%] right-[22%] h-px" />
             {[
-              { step: '01', title: 'We set up your account', desc: 'We configure Snipforce for your salon — branding, staff, services, all ready to go.', color: '#f43f5e' },
-              { step: '02', title: 'Your team gets access', desc: 'Assign roles to your staff instantly. Receptionists, managers, and stylists all get the right permissions.', color: '#a855f7' },
-              { step: '03', title: 'Watch your business grow', desc: 'Real-time insights, happy clients, and a team that runs like clockwork.', color: '#f43f5e' },
-            ].map(({ step, title, desc, color }, idx) => (
-              <div key={step} className={`text-center sf-reveal sf-d${idx + 1}`}>
-                <div className="inline-flex items-center justify-center mb-6" style={{ width: 72, height: 72, borderRadius: '50%', background: `${color}15`, border: `2px solid ${color}35` }}>
-                  <span style={{ fontSize: 22, fontWeight: 800, color }}>{step}</span>
+              { num: '01', title: 'We set up your account', desc: 'We configure Snipforce with your salon branding, logo, and settings. Nothing for you to install.', color: '#f43f5e', Icon: Shield },
+              { num: '02', title: 'Add your team and services', desc: 'Set up staff roles, services, pricing, and branches in minutes with our guided setup.', color: '#a855f7', Icon: Users },
+              { num: '03', title: 'Start managing and growing', desc: 'Real-time insights, happy clients, and a business that practically runs itself.', color: '#22c55e', Icon: TrendingUp },
+            ].map(({ num, title, desc, color, Icon: StepIcon }, i) => (
+              <div key={num} className={`sf-reveal sf-d${i + 1} text-center`}>
+                <div style={{ width: 72, height: 72, borderRadius: '50%', background: `${color}12`, border: `2px solid ${color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', position: 'relative' }}>
+                  <StepIcon style={{ width: 28, height: 28, color }} />
+                  <div style={{ position: 'absolute', top: -4, right: -4, width: 22, height: 22, borderRadius: '50%', background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, color: '#fff' }}>{num}</div>
                 </div>
-                <h3 className="text-xl font-bold text-white mb-3">{title}</h3>
-                <p className="text-gray-400 text-sm leading-relaxed max-w-xs mx-auto">{desc}</p>
+                <h3 style={{ fontSize: 18, fontWeight: 700, color: '#fff', marginBottom: 10 }}>{title}</h3>
+                <p style={{ color: '#6b7280', fontSize: 14, lineHeight: 1.7, maxWidth: 260, margin: '0 auto' }}>{desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── TESTIMONIALS ── */}
-      <section id="about" className="py-24" style={{ background: 'rgba(255,255,255,0.015)' }}>
+      {/* ── FEATURE LIST ── */}
+      <section id="contact" style={{ padding: '96px 0' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16 sf-reveal">
-            <p className="text-rose-400 font-semibold text-sm uppercase tracking-widest mb-3">Testimonials</p>
-            <h2 className="text-4xl md:text-5xl font-bold">Loved by salon owners</h2>
+          <div className="sf-reveal text-center" style={{ marginBottom: 64 }}>
+            <p style={{ color: '#f43f5e', fontWeight: 600, fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 12 }}>Included</p>
+            <h2 style={{ fontSize: 'clamp(28px,4vw,48px)', fontWeight: 800, letterSpacing: '-0.02em' }}>Everything included,<br />no hidden extras</h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[
-              { name: 'Emma Clarke', salon: 'Bloom Beauty Studio, London', quote: 'Snipforce completely transformed how we manage appointments. No more double bookings and our staff absolutely love it!', stars: 5 },
-              { name: 'Sarah Williams', salon: 'Luxe Hair & Spa, New York', quote: 'The walk-in module and calendar view are game-changers. We can see the whole day at a glance and serve clients faster than ever.', stars: 5 },
-              { name: 'Nadia Hassan', salon: 'Serenity Spa, Dubai', quote: 'The white-label branding makes our salon stand out. Clients see our logo and brand colors everywhere — it feels truly professional.', stars: 5 },
-            ].map(({ name, salon, quote, stars }, idx) => (
-              <div key={name} className={`sf-glass rounded-2xl p-6 sf-reveal sf-d${idx + 1}`}>
-                <div className="flex gap-0.5 mb-4">
-                  {Array.from({ length: stars }).map((_, i) => (
-                    <Star key={i} style={{ width: 15, height: 15, fill: '#fbbf24', color: '#fbbf24' }} />
-                  ))}
-                </div>
-                <p className="text-gray-300 text-sm mb-5 italic leading-relaxed">&quot;{quote}&quot;</p>
-                <p className="font-semibold text-white text-sm">{name}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{salon}</p>
+          <div className="sf-reveal" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, maxWidth: 840, margin: '0 auto' }}>
+            {ALL_FEATURES_LIST.map((col, colIdx) => (
+              <div key={colIdx}>
+                {col.map((feat) => (
+                  <div key={feat} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'rgba(244,63,94,0.15)', border: '1px solid rgba(244,63,94,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Check style={{ width: 11, height: 11, color: '#f43f5e' }} />
+                    </div>
+                    <span style={{ color: '#d1d5db', fontSize: 14 }}>{feat}</span>
+                  </div>
+                ))}
               </div>
             ))}
           </div>
@@ -459,44 +722,42 @@ export default function LandingPage() {
       </section>
 
       {/* ── PRICING ── */}
-      <section id="pricing" className="py-24">
+      <section id="pricing" style={{ padding: '96px 0', background: 'rgba(255,255,255,0.015)' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16 sf-reveal">
-            <p className="text-rose-400 font-semibold text-sm uppercase tracking-widest mb-3">Pricing</p>
-            <h2 className="text-4xl md:text-5xl font-bold">Simple, transparent pricing</h2>
-            <p className="text-gray-400 mt-4">Contact us to get started — we will set everything up for you.</p>
+          <div className="sf-reveal text-center" style={{ marginBottom: 64 }}>
+            <p style={{ color: '#f43f5e', fontWeight: 600, fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 12 }}>Pricing</p>
+            <h2 style={{ fontSize: 'clamp(28px,4vw,48px)', fontWeight: 800, marginBottom: 16, letterSpacing: '-0.02em' }}>Simple, transparent pricing</h2>
+            <p style={{ color: '#6b7280', fontSize: 16 }}>Contact us to get started with the right plan for your salon</p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 24, maxWidth: 960, margin: '0 auto' }} className="md-three-col">
             {[
-              { name: 'Starter', price: '$49', period: '/month', highlight: false, features: ['1 Branch', 'Up to 10 Staff', 'Appointments & walk-ins', 'Payroll & expenses', 'All core features included'] },
-              { name: 'Growth', price: '$99', period: '/month', highlight: true, features: ['Up to 3 Branches', 'Up to 30 Staff', 'Everything in Starter', 'Multi-branch dashboard', 'Advanced analytics', 'Priority support'] },
-              { name: 'Enterprise', price: '$199', period: '/month', highlight: false, features: ['Unlimited Branches', 'Unlimited Staff', 'Everything in Growth', 'Priority support', 'Custom setup', 'Dedicated account manager'] },
-            ].map(({ name, price, period, highlight, features }, idx) => (
-              <div key={name} className={`sf-reveal sf-d${idx + 1} rounded-2xl p-6 relative ${highlight ? 'sf-pricing-pop' : 'sf-glass'}`} style={{ zIndex: 0 }}>
-                {highlight && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-xs font-semibold text-white whitespace-nowrap" style={{ background: 'linear-gradient(135deg, #f43f5e, #a855f7)' }}>
+              { name: 'Starter', price: '$49', period: '/month', popular: false, features: ['1 Branch', 'Up to 10 Staff', 'Appointments & walk-ins', 'Payroll & expenses', 'All core features'] },
+              { name: 'Growth', price: '$100', period: '/month', popular: true, features: ['Up to 3 Branches', 'Up to 30 Staff', 'Everything in Starter', 'Multi-branch dashboard', 'Advanced analytics', 'Priority support'] },
+              { name: 'Enterprise', price: '$200', period: '/month', popular: false, features: ['Unlimited Branches', 'Unlimited Staff', 'Everything in Growth', 'Custom setup', 'Dedicated account manager'] },
+            ].map(({ name, price, period, popular, features }, i) => (
+              <div key={name} className={`sf-reveal sf-d${i + 1} ${popular ? 'sf-pricing-pop' : 'sf-glass'}`} style={{ borderRadius: 16, padding: 28, position: 'relative', zIndex: 0, background: popular ? 'rgba(244,63,94,0.06)' : undefined }}>
+                {popular && (
+                  <div style={{ position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)', padding: '4px 14px', borderRadius: 100, background: 'linear-gradient(135deg,#f43f5e,#a855f7)', fontSize: 11, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap' }}>
                     Most Popular
                   </div>
                 )}
-                <h3 className="text-xl font-bold text-white mb-1">{name}</h3>
-                <div className="flex items-baseline gap-1 mb-5">
-                  <span className="text-4xl font-bold sf-grad-text">{price}</span>
-                  <span className="text-gray-400 text-sm">{period}</span>
+                <h3 style={{ fontSize: 20, fontWeight: 800, color: '#fff', marginBottom: 4 }}>{name}</h3>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 24 }}>
+                  <span className="sf-grad-text" style={{ fontSize: 40, fontWeight: 900 }}>{price}</span>
+                  <span style={{ color: '#6b7280', fontSize: 14 }}>{period}</span>
                 </div>
-                <ul className="space-y-3 mb-6">
+                <ul style={{ listStyle: 'none', padding: 0, marginBottom: 24 }}>
                   {features.map((f) => (
-                    <li key={f} className="flex items-center gap-2 text-sm text-gray-300">
+                    <li key={f} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 14, color: '#d1d5db' }}>
                       <Check style={{ width: 15, height: 15, color: '#f43f5e', flexShrink: 0 }} />
                       {f}
                     </li>
                   ))}
                 </ul>
-                <button
-                  onClick={openDemo}
-                  className="w-full py-3 rounded-xl text-sm font-semibold transition-all hover:opacity-90"
-                  style={highlight ? { background: 'linear-gradient(135deg, #f43f5e, #a855f7)', color: '#fff' } : { background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}
-                >
-                  Contact us to get started
+                <button onClick={openDemo} style={{ width: '100%', padding: '13px', borderRadius: 10, fontWeight: 700, fontSize: 14, border: 'none', cursor: 'pointer', transition: 'opacity 0.2s', ...(popular ? { background: 'linear-gradient(135deg,#f43f5e,#a855f7)', color: '#fff' } : { background: 'rgba(255,255,255,0.07)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)' }) }}
+                  onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.85')}
+                  onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}>
+                  Get Started
                 </button>
               </div>
             ))}
@@ -504,211 +765,164 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── FOOTER ── */}
-      <footer style={{ background: 'rgba(0,0,0,0.45)', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
-            <div className="md:col-span-2">
-              <div className="flex items-center gap-2.5 mb-4">
-                <div className="w-8 h-8 bg-rose-500 rounded-lg flex items-center justify-center shadow-lg shadow-rose-500/25">
-                  <Scissors className="w-4 h-4 text-white" />
+      {/* ── TESTIMONIALS ── */}
+      <section style={{ padding: '96px 0' }}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="sf-reveal text-center" style={{ marginBottom: 64 }}>
+            <p style={{ color: '#f43f5e', fontWeight: 600, fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 12 }}>Testimonials</p>
+            <h2 style={{ fontSize: 'clamp(28px,4vw,48px)', fontWeight: 800, letterSpacing: '-0.02em' }}>Loved by salon owners</h2>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 20 }} className="md-three-col">
+            {TESTIMONIALS.map(({ name, salon, quote, stars }, i) => (
+              <div key={name} className={`sf-glass sf-reveal sf-d${i + 1}`} style={{ borderRadius: 16, padding: 28 }}>
+                <div style={{ display: 'flex', gap: 3, marginBottom: 16 }}>
+                  {Array.from({ length: stars }).map((_, j) => (
+                    <Star key={j} style={{ width: 16, height: 16, fill: '#fbbf24', color: '#fbbf24' }} />
+                  ))}
                 </div>
-                <span className="font-bold text-white text-lg">Snipforce</span>
+                <p style={{ color: '#9ca3af', fontSize: 14, lineHeight: 1.7, marginBottom: 20, fontStyle: 'italic' }}>&ldquo;{quote}&rdquo;</p>
+                <p style={{ fontWeight: 700, color: '#fff', fontSize: 14 }}>{name}</p>
+                <p style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{salon}</p>
               </div>
-              <p className="text-sm text-gray-500 max-w-xs leading-relaxed">
-                The all-in-one platform for modern salons and spas. Appointments, staff, inventory, and financials in one place.
-              </p>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── FOOTER ── */}
+      <footer style={{ background: 'rgba(0,0,0,0.5)', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" style={{ padding: '48px 0 32px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 32, marginBottom: 32 }} className="md-three-col">
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <div style={{ width: 32, height: 32, background: 'linear-gradient(135deg,#f43f5e,#db2777)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Scissors style={{ width: 15, height: 15, color: '#fff' }} />
+                </div>
+                <span style={{ fontWeight: 800, fontSize: 18, color: '#fff' }}>Snipforce</span>
+              </div>
+              <p style={{ color: '#4b5563', fontSize: 13, lineHeight: 1.7, maxWidth: 280 }}>The all-in-one platform for modern salons and spas. Appointments, staff, inventory, and financials in one place.</p>
             </div>
             <div>
-              <h4 className="text-white font-semibold text-sm mb-4">Product</h4>
-              <ul className="space-y-2.5">
-                <li><a href="#features" className="text-sm text-gray-500 hover:text-white transition-colors">Features</a></li>
-                <li><a href="#pricing" className="text-sm text-gray-500 hover:text-white transition-colors">Pricing</a></li>
-                <li><Link href="/login" className="text-sm text-gray-500 hover:text-white transition-colors">Login</Link></li>
-              </ul>
+              <h4 style={{ color: '#fff', fontWeight: 600, fontSize: 13, marginBottom: 14 }}>Product</h4>
+              {['Features', 'Pricing', 'Login'].map((item) => (
+                <div key={item} style={{ marginBottom: 10 }}>
+                  {item === 'Login' ? (
+                    <Link href="/login" style={{ color: '#4b5563', fontSize: 13, textDecoration: 'none', transition: 'color 0.2s' }}
+                      onMouseEnter={(e) => (e.currentTarget.style.color = '#fff')}
+                      onMouseLeave={(e) => (e.currentTarget.style.color = '#4b5563')}>
+                      {item}
+                    </Link>
+                  ) : (
+                    <a href={`#${item.toLowerCase()}`} style={{ color: '#4b5563', fontSize: 13, textDecoration: 'none', transition: 'color 0.2s' }}
+                      onMouseEnter={(e) => (e.currentTarget.style.color = '#fff')}
+                      onMouseLeave={(e) => (e.currentTarget.style.color = '#4b5563')}>
+                      {item}
+                    </a>
+                  )}
+                </div>
+              ))}
             </div>
             <div>
-              <h4 className="text-white font-semibold text-sm mb-4">Contact</h4>
-              <ul className="space-y-2.5">
-                <li>
-                  <button onClick={openDemo} className="text-sm text-gray-500 hover:text-white transition-colors">
-                    Request a Demo
-                  </button>
-                </li>
-                <li>
-                  <Link href="/login" className="text-sm text-gray-500 hover:text-white transition-colors">
-                    Client Login
-                  </Link>
-                </li>
-              </ul>
+              <h4 style={{ color: '#fff', fontWeight: 600, fontSize: 13, marginBottom: 14 }}>Contact</h4>
+              <button onClick={openDemo} style={{ display: 'block', marginBottom: 10, color: '#4b5563', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer', padding: 0, transition: 'color 0.2s' }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = '#fff')}
+                onMouseLeave={(e) => (e.currentTarget.style.color = '#4b5563')}>
+                Request a Demo
+              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#4b5563', fontSize: 13 }}>
+                <Globe style={{ width: 13, height: 13 }} />
+                <span>snip-force.com</span>
+              </div>
             </div>
           </div>
-          <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 24 }} className="flex flex-col md:flex-row items-center justify-between gap-2">
-            <p className="text-xs text-gray-600">© 2026 Snipforce. All rights reserved.</p>
-            <p className="text-xs text-gray-600">Powered by Snipforce</p>
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+            <p style={{ fontSize: 12, color: '#374151' }}>© 2026 Snipforce. All rights reserved.</p>
+            <p style={{ fontSize: 12, color: '#374151' }}>Powered by Snipforce</p>
           </div>
         </div>
       </footer>
 
-      {/* ── DEMO REQUEST MODAL ── */}
+      {/* ── DEMO MODAL ── */}
       {demoOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-            onClick={() => setDemoOpen(false)}
-          />
-          {/* Modal */}
-          <div
-            className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl"
-            style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 0 60px rgba(244,63,94,0.15), 0 40px 80px rgba(0,0,0,0.8)' }}
-          >
-            <button
-              onClick={() => setDemoOpen(false)}
-              className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors z-10"
-            >
-              <X className="w-5 h-5" />
+        <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)' }} onClick={() => setDemoOpen(false)} />
+          <div style={{ position: 'relative', width: '100%', maxWidth: 520, maxHeight: '92vh', overflowY: 'auto', borderRadius: 20, background: '#111827', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 0 80px rgba(244,63,94,0.2), 0 40px 100px rgba(0,0,0,0.9)' }}>
+            <button onClick={() => setDemoOpen(false)} style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', zIndex: 10, padding: 4, transition: 'color 0.2s' }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = '#fff')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = '#6b7280')}>
+              <X style={{ width: 20, height: 20 }} />
             </button>
 
-            <div className="p-6 sm:p-8">
+            <div style={{ padding: '32px 32px 28px' }}>
               {submitted ? (
-                <div className="text-center py-8">
-                  <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ background: 'rgba(34,197,94,0.15)', border: '2px solid rgba(34,197,94,0.3)' }}>
-                    <Check className="w-8 h-8 text-green-400" />
+                <div style={{ textAlign: 'center', padding: '32px 0' }}>
+                  <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(34,197,94,0.12)', border: '2px solid rgba(34,197,94,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+                    <Check style={{ width: 32, height: 32, color: '#22c55e' }} />
                   </div>
-                  <h3 className="text-2xl font-bold text-white mb-2">Thank you!</h3>
-                  <p className="text-gray-400 mb-6">
-                    We will contact you within 24 hours to schedule your demo.
-                  </p>
-                  <button
-                    onClick={() => setDemoOpen(false)}
-                    className="px-6 py-2.5 rounded-lg text-sm font-medium text-white transition-colors"
-                    style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}
-                  >
-                    Close
-                  </button>
+                  <h3 style={{ fontSize: 24, fontWeight: 800, color: '#fff', marginBottom: 8 }}>Thank you!</h3>
+                  <p style={{ color: '#6b7280', marginBottom: 24 }}>We will contact you within 24 hours to schedule your demo.</p>
+                  <button onClick={() => setDemoOpen(false)} style={{ padding: '10px 24px', borderRadius: 10, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Close</button>
                 </div>
               ) : (
                 <>
-                  <div className="mb-6">
-                    <div className="flex items-center gap-2.5 mb-3">
-                      <div className="w-8 h-8 bg-rose-500 rounded-lg flex items-center justify-center">
-                        <Scissors className="w-4 h-4 text-white" />
+                  <div style={{ marginBottom: 24 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+                      <div style={{ width: 32, height: 32, background: 'linear-gradient(135deg,#f43f5e,#db2777)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Scissors style={{ width: 15, height: 15, color: '#fff' }} />
                       </div>
-                      <span className="font-bold text-white">Snipforce</span>
+                      <span style={{ fontWeight: 800, color: '#fff' }}>Snipforce</span>
                     </div>
-                    <h2 className="text-2xl font-bold text-white">Request a Demo</h2>
-                    <p className="text-gray-400 text-sm mt-1">Fill in your details and we will reach out within 24 hours.</p>
+                    <h2 style={{ fontSize: 24, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Request a Demo</h2>
+                    <p style={{ color: '#6b7280', fontSize: 14 }}>Fill in your details and we&apos;ll reach out within 24 hours.</p>
                   </div>
 
-                  <form onSubmit={handleDemoSubmit} className="space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <form onSubmit={handleDemoSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                       <div>
-                        <label className="block text-xs font-medium text-gray-400 mb-1.5">Full Name *</label>
-                        <input
-                          type="text"
-                          required
-                          value={form.name}
-                          onChange={(e) => setForm({ ...form, name: e.target.value })}
-                          placeholder="Your name"
-                          className="w-full rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-600 outline-none focus:ring-1 focus:ring-rose-500"
-                          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
-                        />
+                        <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#9ca3af', marginBottom: 6 }}>Full Name *</label>
+                        <input className="sf-input" type="text" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Your name" />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-400 mb-1.5">Phone Number *</label>
-                        <input
-                          type="tel"
-                          required
-                          value={form.phone}
-                          onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                          placeholder="+1 234 567 8900"
-                          className="w-full rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-600 outline-none focus:ring-1 focus:ring-rose-500"
-                          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
-                        />
+                        <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#9ca3af', marginBottom: 6 }}>Phone *</label>
+                        <input className="sf-input" type="tel" required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+1 234 567 8900" />
                       </div>
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-gray-400 mb-1.5">Salon / Business Name *</label>
-                      <input
-                        type="text"
-                        required
-                        value={form.salonName}
-                        onChange={(e) => setForm({ ...form, salonName: e.target.value })}
-                        placeholder="e.g. Glamour Beauty Studio"
-                        className="w-full rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-600 outline-none focus:ring-1 focus:ring-rose-500"
-                        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
-                      />
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#9ca3af', marginBottom: 6 }}>Salon / Business Name *</label>
+                      <input className="sf-input" type="text" required value={form.salonName} onChange={(e) => setForm({ ...form, salonName: e.target.value })} placeholder="e.g. Glamour Beauty Studio" />
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                       <div>
-                        <label className="block text-xs font-medium text-gray-400 mb-1.5">Number of Branches *</label>
-                        <select
-                          required
-                          value={form.branches}
-                          onChange={(e) => setForm({ ...form, branches: e.target.value })}
-                          className="w-full rounded-lg px-3 py-2.5 text-sm text-white outline-none focus:ring-1 focus:ring-rose-500 appearance-none cursor-pointer"
-                          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
-                        >
-                          <option value="" style={{ background: '#111827' }}>Select...</option>
-                          <option value="1" style={{ background: '#111827' }}>1 branch</option>
-                          <option value="2-5" style={{ background: '#111827' }}>2–5 branches</option>
-                          <option value="5-10" style={{ background: '#111827' }}>5–10 branches</option>
-                          <option value="10+" style={{ background: '#111827' }}>10+ branches</option>
+                        <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#9ca3af', marginBottom: 6 }}>Number of Branches *</label>
+                        <select className="sf-select" required value={form.branches} onChange={(e) => setForm({ ...form, branches: e.target.value })}>
+                          <option value="">Select...</option>
+                          <option value="1">1 branch</option>
+                          <option value="2-5">2–5 branches</option>
+                          <option value="5-10">5–10 branches</option>
+                          <option value="10+">10+ branches</option>
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-400 mb-1.5">City *</label>
-                        <input
-                          type="text"
-                          required
-                          value={form.city}
-                          onChange={(e) => setForm({ ...form, city: e.target.value })}
-                          placeholder="e.g. Dubai"
-                          className="w-full rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-600 outline-none focus:ring-1 focus:ring-rose-500"
-                          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
-                        />
+                        <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#9ca3af', marginBottom: 6 }}>City *</label>
+                        <input className="sf-input" type="text" required value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} placeholder="e.g. Dubai" />
                       </div>
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-gray-400 mb-1.5">How did you hear about us? *</label>
-                      <select
-                        required
-                        value={form.source}
-                        onChange={(e) => setForm({ ...form, source: e.target.value })}
-                        className="w-full rounded-lg px-3 py-2.5 text-sm text-white outline-none focus:ring-1 focus:ring-rose-500 appearance-none cursor-pointer"
-                        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
-                      >
-                        <option value="" style={{ background: '#111827' }}>Select...</option>
-                        <option value="Social Media" style={{ background: '#111827' }}>Social Media</option>
-                        <option value="Friend/Referral" style={{ background: '#111827' }}>Friend / Referral</option>
-                        <option value="Google Search" style={{ background: '#111827' }}>Google Search</option>
-                        <option value="Other" style={{ background: '#111827' }}>Other</option>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#9ca3af', marginBottom: 6 }}>How did you hear about us? *</label>
+                      <select className="sf-select" required value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })}>
+                        <option value="">Select...</option>
+                        <option value="Social Media">Social Media</option>
+                        <option value="Friend/Referral">Friend / Referral</option>
+                        <option value="Google Search">Google Search</option>
+                        <option value="Other">Other</option>
                       </select>
                     </div>
 
-                    <div>
-                      <label className="block text-xs font-medium text-gray-400 mb-1.5">Message (optional)</label>
-                      <textarea
-                        rows={3}
-                        value={form.message}
-                        onChange={(e) => setForm({ ...form, message: e.target.value })}
-                        placeholder="Tell us about your salon..."
-                        className="w-full rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-600 outline-none focus:ring-1 focus:ring-rose-500 resize-none"
-                        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={submitting}
-                      className="w-full py-3.5 rounded-xl font-semibold text-white text-sm flex items-center justify-center gap-2 transition-opacity hover:opacity-90 disabled:opacity-70"
-                      style={{ background: 'linear-gradient(135deg, #f43f5e, #db2777)' }}
-                    >
-                      {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                    <button type="submit" disabled={submitting} style={{ marginTop: 4, padding: '14px', borderRadius: 12, background: 'linear-gradient(135deg,#f43f5e,#db2777)', color: '#fff', fontWeight: 700, fontSize: 15, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: submitting ? 0.7 : 1, transition: 'opacity 0.2s' }}>
+                      {submitting && <Loader2 style={{ width: 18, height: 18, animation: 'spin 1s linear infinite' }} />}
                       {submitting ? 'Submitting...' : 'Request Demo'}
                     </button>
                   </form>
@@ -718,6 +932,18 @@ export default function LandingPage() {
           </div>
         </div>
       )}
+
+      {/* Mobile responsive overrides */}
+      <style>{`
+        @media (max-width: 900px) {
+          .lg-two-col { grid-template-columns: 1fr !important; }
+          .md-three-col { grid-template-columns: 1fr !important; }
+          .hidden.lg\\:block { display: none !important; }
+        }
+        @media (max-width: 640px) {
+          .md-three-col { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
     </div>
   )
 }
