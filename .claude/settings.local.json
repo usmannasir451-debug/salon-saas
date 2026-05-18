@@ -54,7 +54,8 @@
       "Bash(Remove-Item \"C:\\\\Users\\\\Tesla Laptops\\\\salon-saas\\\\components\\\\ServicesBulkModal.tsx\" -Force)",
       "Bash(Remove-Item \"C:\\\\Users\\\\Tesla Laptops\\\\salon-saas\\\\components\\\\DealsBulkModal.tsx\" -Force)",
       "Bash(Remove-Item \"C:\\\\Users\\\\Tesla Laptops\\\\salon-saas\\\\components\\\\StaffBulkModal.tsx\" -Force)",
-      "Bash(Write-Output \"Deleted\")"
+      "Bash(Write-Output \"Deleted\")",
+      "Bash(npx eslint *)"
     ]
   }
 }

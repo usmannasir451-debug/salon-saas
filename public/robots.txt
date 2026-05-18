@@ -1,0 +1,27 @@
+User-agent: *
+Allow: /
+Allow: /login
+
+Disallow: /dashboard
+Disallow: /appointments
+Disallow: /calendar
+Disallow: /walkin
+Disallow: /staff
+Disallow: /clients
+Disallow: /services
+Disallow: /expenses
+Disallow: /inventory
+Disallow: /payroll
+Disallow: /reports
+Disallow: /attendance
+Disallow: /branches
+Disallow: /settings
+Disallow: /team
+Disallow: /reviews
+Disallow: /export
+Disallow: /onboarding
+Disallow: /admin
+Disallow: /suspended
+Disallow: /api/
+
+Sitemap: https://snip-force.com/sitemap.xml

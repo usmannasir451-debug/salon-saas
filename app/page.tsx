@@ -210,6 +210,120 @@ const TESTIMONIALS = [
   { name: 'Nadia Hassan', salon: 'Serenity Spa, Dubai', quote: 'The white-label branding makes our salon stand out. Clients see our logo everywhere — it feels truly professional.', stars: 5 },
 ]
 
+const FAQS = [
+  {
+    q: 'What is Snipforce?',
+    a: 'Snipforce is an all-in-one salon and spa management platform. It covers appointments, walk-in POS, staff management, inventory, payroll, expense tracking, loyalty points, and financial reporting — all in a single beautifully designed dashboard.',
+  },
+  {
+    q: 'How do I get started with Snipforce?',
+    a: 'Simply request a demo using the form on this page. Our team sets up your account, configures your salon branding, and walks you through onboarding. You can be up and running within 24 hours — no installation required.',
+  },
+  {
+    q: 'Does Snipforce support multiple branches?',
+    a: 'Yes. Snipforce is built for multi-location salons. You can manage unlimited branches, filter reports by branch, track per-branch attendance and expenses, and give staff access to specific locations.',
+  },
+  {
+    q: 'Can I customize the branding for my salon?',
+    a: 'Absolutely. Snipforce is a white-label platform. You can upload your salon logo, set your primary brand color, and configure your salon name, currency, and timezone. Clients and staff see your brand throughout the platform.',
+  },
+  {
+    q: 'What payment methods does Snipforce support?',
+    a: 'Snipforce supports multiple payment methods including cash, card, and bank transfer at the point of sale. You can configure custom payment methods to match how your salon operates.',
+  },
+  {
+    q: 'Is my salon data secure?',
+    a: 'Yes. Snipforce uses Supabase (PostgreSQL) with Row Level Security (RLS) on every table. Each salon\'s data is completely isolated. All data is encrypted in transit and at rest. Role-based access ensures staff only see what they need to.',
+  },
+  {
+    q: 'Does Snipforce work on mobile?',
+    a: 'Yes. The Snipforce dashboard is fully responsive and works on smartphones and tablets. Receptionists can book appointments, process walk-ins, and check schedules from any device with a browser.',
+  },
+]
+
+const ORG_SCHEMA = {
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  name: 'Snipforce',
+  url: 'https://snip-force.com',
+  logo: 'https://snip-force.com/favicon.svg',
+  description: 'All-in-one salon and spa management software platform.',
+  contactPoint: {
+    '@type': 'ContactPoint',
+    contactType: 'sales',
+    url: 'https://snip-force.com',
+  },
+  areaServed: ['PK', 'AE', 'GB', 'US', 'Global'],
+  address: {
+    '@type': 'PostalAddress',
+    addressCountry: 'PK',
+  },
+}
+
+const SOFTWARE_SCHEMA = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: 'Snipforce',
+  applicationCategory: 'BusinessApplication',
+  operatingSystem: 'Web',
+  url: 'https://snip-force.com',
+  description:
+    'All-in-one salon and spa management platform. Manage appointments, walk-ins, staff, inventory, payroll and finances.',
+  offers: {
+    '@type': 'AggregateOffer',
+    lowPrice: '49',
+    highPrice: '200',
+    priceCurrency: 'USD',
+    offerCount: 3,
+  },
+  featureList: [
+    'Appointment Management',
+    'Walk-In POS',
+    'Staff Management',
+    'Inventory Management',
+    'Payroll & Commissions',
+    'P&L Reports',
+    'Multi-branch Support',
+    'Loyalty Points System',
+    'White-label Branding',
+    'Role-based Access Control',
+  ],
+}
+
+const WEBSITE_SCHEMA = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: 'Snipforce',
+  url: 'https://snip-force.com',
+  description: 'All-in-one salon management platform',
+  potentialAction: {
+    '@type': 'SearchAction',
+    target: {
+      '@type': 'EntryPoint',
+      urlTemplate: 'https://snip-force.com/?q={search_term_string}',
+    },
+    'query-input': 'required name=search_term_string',
+  },
+}
+
+const BUSINESS_SCHEMA = {
+  '@context': 'https://schema.org',
+  '@type': 'LocalBusiness',
+  name: 'Snipforce',
+  url: 'https://snip-force.com',
+  description: 'Salon management software serving Pakistan and global markets',
+  address: {
+    '@type': 'PostalAddress',
+    addressCountry: 'PK',
+  },
+  areaServed: [
+    { '@type': 'Country', name: 'Pakistan' },
+    { '@type': 'Country', name: 'United Arab Emirates' },
+    { '@type': 'Country', name: 'United Kingdom' },
+    { '@type': 'Country', name: 'United States' },
+  ],
+}
+
 export default function LandingPage() {
   const [scrolled, setScrolled] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -218,6 +332,7 @@ export default function LandingPage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [hoveredFeature, setHoveredFeature] = useState<number | null>(null)
+  const [openFaq, setOpenFaq] = useState<number | null>(null)
   const revealRefs = useRef<HTMLElement[]>([])
 
   useEffect(() => {
@@ -296,8 +411,20 @@ export default function LandingPage() {
 
   return (
     <div style={{ background: '#0a0f1e', minHeight: '100vh', color: '#fff', fontFamily: "'Inter', system-ui, sans-serif" }}>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ORG_SCHEMA) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(SOFTWARE_SCHEMA) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(WEBSITE_SCHEMA) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(BUSINESS_SCHEMA) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'FAQPage',
+        mainEntity: FAQS.map(({ q, a }) => ({
+          '@type': 'Question',
+          name: q,
+          acceptedAnswer: { '@type': 'Answer', text: a },
+        })),
+      }) }} />
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
         @keyframes sf-float {
           0%,100% { transform: perspective(1200px) rotateY(-8deg) rotateX(3deg) translateY(0px); }
           50%      { transform: perspective(1200px) rotateY(-8deg) rotateX(3deg) translateY(-18px); }
@@ -342,7 +469,7 @@ export default function LandingPage() {
       `}</style>
 
       {/* ── NAVBAR ── */}
-      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'sf-nav-blur' : ''}`}>
+      <nav aria-label="Main navigation" className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'sf-nav-blur' : ''}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-2.5">
@@ -390,8 +517,11 @@ export default function LandingPage() {
         )}
       </nav>
 
+      {/* ── MAIN CONTENT ── */}
+      <main id="main-content">
+
       {/* ── HERO ── */}
-      <section className="sf-grid-bg" style={{ position: 'relative', minHeight: '100vh', display: 'flex', alignItems: 'center', paddingTop: 64, overflow: 'hidden' }}>
+      <section aria-label="Hero" className="sf-grid-bg" style={{ position: 'relative', minHeight: '100vh', display: 'flex', alignItems: 'center', paddingTop: 64, overflow: 'hidden' }}>
         <div style={{ position: 'absolute', top: '20%', left: '15%', width: 600, height: 600, borderRadius: '50%', background: 'radial-gradient(circle, rgba(244,63,94,0.14) 0%, transparent 70%)', pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', bottom: '15%', right: '10%', width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle, rgba(168,85,247,0.12) 0%, transparent 70%)', pointerEvents: 'none' }} />
 
@@ -414,7 +544,7 @@ export default function LandingPage() {
               </p>
 
               <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 48 }}>
-                <button onClick={openDemo} className="sf-cta-btn" style={{ padding: '16px 32px', background: 'linear-gradient(135deg,#f43f5e,#db2777)', color: '#fff', borderRadius: 12, fontWeight: 700, fontSize: 16, border: 'none', cursor: 'pointer' }}>
+                <button onClick={openDemo} aria-label="Request a Snipforce demo" className="sf-cta-btn" style={{ padding: '16px 32px', background: 'linear-gradient(135deg,#f43f5e,#db2777)', color: '#fff', borderRadius: 12, fontWeight: 700, fontSize: 16, border: 'none', cursor: 'pointer' }}>
                   Request a Demo
                 </button>
                 <a href="#features" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '16px 28px', borderRadius: 12, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: 15, fontWeight: 600, textDecoration: 'none', transition: 'background 0.2s' }}
@@ -530,7 +660,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── FEATURES (Interactive) ── */}
-      <section id="features" style={{ padding: '96px 0', background: 'rgba(255,255,255,0.015)' }}>
+      <section id="features" aria-label="Product Features" style={{ padding: '96px 0', background: 'rgba(255,255,255,0.015)' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="sf-reveal text-center" style={{ marginBottom: 64 }}>
             <p style={{ color: '#f43f5e', fontWeight: 600, fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 12 }}>Product</p>
@@ -722,7 +852,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── PRICING ── */}
-      <section id="pricing" style={{ padding: '96px 0', background: 'rgba(255,255,255,0.015)' }}>
+      <section id="pricing" aria-label="Pricing Plans" style={{ padding: '96px 0', background: 'rgba(255,255,255,0.015)' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="sf-reveal text-center" style={{ marginBottom: 64 }}>
             <p style={{ color: '#f43f5e', fontWeight: 600, fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 12 }}>Pricing</p>
@@ -788,6 +918,44 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* ── FAQ ── */}
+      <section id="faq" aria-label="Frequently Asked Questions" style={{ padding: '96px 0', background: 'rgba(255,255,255,0.015)' }}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="sf-reveal text-center" style={{ marginBottom: 64 }}>
+            <p style={{ color: '#f43f5e', fontWeight: 600, fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 12 }}>FAQ</p>
+            <h2 style={{ fontSize: 'clamp(28px,4vw,48px)', fontWeight: 800, letterSpacing: '-0.02em' }}>Frequently Asked Questions</h2>
+          </div>
+          <div style={{ maxWidth: 720, margin: '0 auto' }}>
+            {FAQS.map(({ q, a }, i) => (
+              <div key={i} className="sf-reveal" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                <button
+                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                  aria-expanded={openFaq === i}
+                  aria-controls={`faq-answer-${i}`}
+                  id={`faq-question-${i}`}
+                  style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 0', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', gap: 16 }}
+                >
+                  <h3 style={{ fontSize: 16, fontWeight: 600, color: openFaq === i ? '#f43f5e' : '#fff', margin: 0, flex: 1, transition: 'color 0.2s' }}>{q}</h3>
+                  <div style={{ width: 24, height: 24, borderRadius: '50%', background: openFaq === i ? 'rgba(244,63,94,0.15)' : 'rgba(255,255,255,0.06)', border: `1px solid ${openFaq === i ? 'rgba(244,63,94,0.3)' : 'rgba(255,255,255,0.1)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'background 0.2s, border 0.2s, transform 0.3s', transform: openFaq === i ? 'rotate(45deg)' : 'rotate(0deg)' }}>
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 1v8M1 5h8" stroke={openFaq === i ? '#f43f5e' : '#9ca3af'} strokeWidth="1.5" strokeLinecap="round"/></svg>
+                  </div>
+                </button>
+                <div
+                  id={`faq-answer-${i}`}
+                  role="region"
+                  aria-labelledby={`faq-question-${i}`}
+                  style={{ maxHeight: openFaq === i ? 300 : 0, overflow: 'hidden', transition: 'max-height 0.35s ease' }}
+                >
+                  <p style={{ color: '#9ca3af', fontSize: 15, lineHeight: 1.7, paddingBottom: 20, margin: 0 }}>{a}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      </main>
 
       {/* ── FOOTER ── */}
       <footer style={{ background: 'rgba(0,0,0,0.5)', borderTop: '1px solid rgba(255,255,255,0.05)' }}>

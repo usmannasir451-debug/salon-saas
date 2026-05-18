@@ -1,168 +1,82 @@
-You are an expert SaaS developer and UI/UX designer working on "Snipforce". Make these changes:
+You are an expert SaaS developer and SEO specialist working on "Snipforce". Implement comprehensive SEO optimization for the entire Next.js application:
 
-PART 1 - REMOVE BULK CSV UPLOAD FEATURE
+PART 1 - METADATA AND TITLE TAGS
 
-- Completely remove the bulk CSV upload and export feature from:
-  * Services page - remove the CSV dropdown button and all related code
-  * Deals tab - remove CSV dropdown
-  * Staff page - remove CSV dropdown button
-- Delete these component files entirely:
-  * components/ServicesBulkModal.tsx
-  * components/DealsBulkModal.tsx
-  * components/StaffBulkModal.tsx
-- Remove all imports and references to these components
-- Make sure pages still work perfectly after removal
-- Clean up any unused imports
+- Update app/layout.tsx with comprehensive metadata:
+  * Title: "Snipforce - Salon & Spa Management Software"
+  * Description: "All-in-one salon management platform. Manage appointments, walk-ins, staff, inventory, payroll and finances in one place. White-label solution for modern salons."
+  * Keywords: salon management software, spa management system, appointment booking software, salon POS, staff management salon, salon inventory management
+  * Open Graph tags for social sharing
+  * Twitter card tags
+  * Canonical URL: https://snip-force.com
+  * Robots: index, follow
+  * Language: en
 
-PART 2 - COMPLETE LANDING PAGE REVAMP
+- Add page-specific metadata for:
+  * Landing page (app/page.tsx)
+  * Login page
 
-Create a world-class, stunning landing page that showcases the actual Snipforce product UI. This should be the best SaaS landing page possible.
+PART 2 - TECHNICAL SEO
 
-DESIGN THEME:
-- Match the product's dark theme: deep navy/slate background (#0f172a, #1e293b)
-- Pink/rose accent color (#e11d48, #f43f5e) throughout
-- Glassmorphism cards with backdrop blur
-- Smooth animations and 3D effects
-- Professional typography - Inter or similar clean font
-- Dollar sign ($) for currency displays - not PKR
+- Create public/sitemap.xml with all public pages:
+  * https://snip-force.com (priority 1.0)
+  * https://snip-force.com/login (priority 0.8)
+  
+- Create public/robots.txt:
+  * Allow all public pages
+  * Disallow all dashboard pages (/dashboard, /appointments, /admin etc)
+  * Sitemap location
 
-SECTION 1 - NAVBAR (sticky):
-- Snipforce logo with scissors icon in rose color
-- Nav links: Features, How It Works, Pricing, Contact
-- "Login" button (rose gradient)
-- Blur background on scroll
+- Add structured data (JSON-LD) to landing page:
+  * Organization schema
+  * SoftwareApplication schema
+  * WebSite schema with SearchAction
 
-SECTION 2 - HERO:
-- Large bold headline: "The Complete Operating System for Modern Salons"
-- Subheadline: "Appointments, walk-ins, staff, inventory, payroll, and financial reports — all in one beautifully designed platform."
-- "Request a Demo" CTA button (large, rose gradient, subtle glow pulse animation)
-- "See it in action ↓" secondary link
-- 3D floating dashboard mockup on right side showing actual dashboard UI elements:
-  * Dark card with revenue stat: "$24,500" with green up arrow
-  * Appointment calendar preview
-  * Staff performance mini chart
-  * Walk-in POS button
-- Background: animated gradient mesh or subtle grid pattern
-- Floating stat badges: "500+ Salons", "99.9% Uptime", "30+ Countries"
+PART 3 - PERFORMANCE SEO
 
-SECTION 3 - PRODUCT SHOWCASE (Interactive Features):
-Headline: "Everything your salon needs, nothing it doesn't"
+- Add next/image optimization for all images on landing page
+- Add loading="lazy" for below fold images
+- Ensure all images have alt text
+- Add preconnect links for Google Fonts in layout.tsx
+- Make sure Core Web Vitals are optimized:
+  * No layout shift from fonts
+  * Fast LCP (Largest Contentful Paint)
 
-Create 6 interactive feature cards in a grid. Each card:
-- Has an icon, title, short description
-- On HOVER: card expands or flips to show a detailed product screenshot mockup (CSS 3D flip or expand animation)
-- Cards use glassmorphism style
+PART 4 - LANDING PAGE SEO CONTENT
 
-Feature 1 - Smart Appointments:
-- Icon: Calendar
-- Title: "Appointment Management"
-- Description: "Google Calendar-style booking with staff scheduling"
-- On hover/click: Show a mockup of the calendar view with colored appointment blocks, staff filter dropdown, day/week toggle
+- Add semantic HTML throughout landing page:
+  * Proper h1, h2, h3 hierarchy
+  * Only ONE h1 on the page
+  * Section landmarks
+  * aria-labels on interactive elements
 
-Feature 2 - Walk-In POS:
-- Icon: Zap/Lightning
-- Title: "Walk-In POS"
-- Description: "Instant walk-in processing with one-click payments"
-- On hover/click: Show mockup of walk-in form with service selection, payment method buttons (Cash, Card), total calculation
+- Add FAQ section at bottom of landing page (above footer):
+  * "What is Snipforce?" 
+  * "How do I get started with Snipforce?"
+  * "Does Snipforce support multiple branches?"
+  * "Can I customize the branding for my salon?"
+  * "What payment methods does Snipforce support?"
+  * "Is my salon data secure?"
+  * "Does Snipforce work on mobile?"
+  * Add FAQ schema (JSON-LD) for Google rich results
 
-Feature 3 - Financial Reports:
-- Icon: TrendingUp
-- Title: "P&L & Financial Reports"
-- Description: "Real-time profit and loss with expense tracking"
-- On hover/click: Show mockup of P&L report with income/expense breakdown, net profit highlighted in green, 6-month trend chart
+PART 5 - LOCAL SEO (for Pakistan market)
 
-Feature 4 - Staff Management:
-- Icon: Users
-- Title: "Staff & Performance"
-- Description: "Track performance, attendance, commissions and payroll"
-- On hover/click: Show mockup of staff performance table with ratings, revenue generated, commission earned
+- Add location-based meta tags
+- Add hreflang tag for English
+- Add business schema with service areas
 
-Feature 5 - Client Loyalty:
-- Icon: Heart
-- Title: "Client & Loyalty System"
-- Description: "Build loyalty with points system and client history"
-- On hover/click: Show mockup of client profile with visit history, loyalty points balance, favorite services
+PART 6 - SOCIAL MEDIA META TAGS
 
-Feature 6 - Inventory Control:
-- Icon: Package
-- Title: "Inventory Management"
-- Description: "Track stock levels, get low stock alerts"
-- On hover/click: Show mockup of inventory list with stock levels, low stock warning badges
+- Open Graph image: create a simple og-image.png (1200x630) placeholder in public folder
+- Add all required OG tags:
+  * og:title, og:description, og:image, og:url, og:type
+- Twitter card tags:
+  * twitter:card, twitter:title, twitter:description, twitter:image
 
-SECTION 4 - LIVE DASHBOARD PREVIEW:
-Headline: "A dashboard that tells you everything at a glance"
-
-Create a realistic, detailed browser mockup showing the actual Snipforce dashboard:
-- Browser chrome (URL bar showing snip-force.com/dashboard)
-- Left sidebar with navigation items (same as real product)
-- Main dashboard area with:
-  * Top row: 4 KPI cards - Revenue ($24,500), Appointments (47), Walk-Ins (23), Net Profit ($8,200)
-  * Revenue trend line chart (last 6 months)
-  * Payment method donut chart
-  * Top services bar chart
-  * Staff performance progress bars
-- All using realistic fake data
-- Subtle floating animation on the entire browser mockup
-- Dark theme matching the actual product
-
-SECTION 5 - HOW IT WORKS:
-Headline: "Up and running in minutes"
-
-3 steps with connecting animated line:
-1. "We set up your account" - We configure Snipforce with your salon branding, logo, and settings
-2. "Add your team and services" - Set up staff roles, services, pricing, and branches
-3. "Start managing and growing" - Real-time insights, happy clients, and a business that runs itself
-
-SECTION 6 - FEATURE LIST (comprehensive):
-Headline: "Everything included, no hidden extras"
-
-Two column grid of all features with checkmarks:
-Left column: Appointment booking, Walk-in POS, Calendar view, Client management, Loyalty points system, Multi-branch support, Role-based team access
-Right column: Inventory management, Expense tracking, Payroll & commissions, P&L reports, PDF exports, Dark mode, White-label branding, Attendance tracking, Custom payment methods, Bulk data import, Demo request system
-
-SECTION 7 - PRICING:
-Headline: "Simple, transparent pricing"
-Subheadline: "Contact us to get started with the right plan for your salon"
-
-3 cards (glassmorphism):
-Starter - $49/month: 1 Branch, Up to 10 Staff, All core features
-Growth - $100/month (MOST POPULAR badge): Up to 3 Branches, Up to 30 Staff, All features + Multi-branch dashboard
-Enterprise - $200/month: Unlimited Branches, Unlimited Staff, Priority support, Custom setup
-
-Each card: "Get Started" button that opens demo request form
-
-SECTION 8 - TESTIMONIALS:
-3 glassmorphism cards with realistic salon owner testimonials
-Star ratings, name, salon name, city
-
-SECTION 9 - DEMO REQUEST FORM (modal):
-- Triggered by all CTA buttons
-- Clean modal matching dark theme
-- Fields: Full Name, Phone, Salon Name, Number of Branches, City, How did you hear about us
-- Submit saves to leads table in Supabase
-- Success message after submission
-
-SECTION 10 - FOOTER:
-- Snipforce logo
-- Links: Features, Pricing, Login, Contact
-- "Powered by Snipforce"
-- Copyright 2026 Snipforce. All rights reserved.
-
-ANIMATIONS TO IMPLEMENT:
-- Hero dashboard mockup: floating up/down (3s ease infinite)
-- Feature cards: 3D tilt on mouse move using JavaScript
-- Stats counter: count up animation when scrolled into view
-- All sections: fade in from bottom on scroll (Intersection Observer)
-- Navbar: blur appears on scroll
-- CTA buttons: subtle glow pulse
-
-TECHNICAL:
-- Replace app/page.tsx entirely
-- Pure Next.js with Tailwind CSS - no extra animation libraries needed
-- All animations: CSS keyframes and vanilla JS
-- Mobile responsive - simplified animations on mobile
-- Fast loading
-- Demo form connects to existing leads table in Supabase
-- Keep existing demo form submission logic
-
-IMPORTANT: Make this the absolute best SaaS landing page possible. It should look like it cost $50,000 to design. Every detail should be polished. The dashboard mockup should look like a real screenshot of the product.
+TECHNICAL REQUIREMENTS:
+- Use Next.js 16 Metadata API (not old Head component)
+- All changes in app/layout.tsx and app/page.tsx
+- No additional packages needed
+- Mobile responsive
+- Does not break existing functionality
