@@ -55,8 +55,32 @@ const PERM_TO_HREF: Record<string, string> = {
   payroll: '/payroll',
   attendance: '/attendance',
   reports: '/reports/pnl',
+  reports_pnl: '/reports/pnl',
   team: '/team',
+  team_members: '/team',
+  branches: '/branches',
   settings: '/settings',
+}
+
+// Maps module key → hrefs that module covers
+const MODULE_HREFS: Record<string, string[]> = {
+  dashboard: ['/dashboard'],
+  appointments: ['/appointments'],
+  calendar: ['/calendar'],
+  walkin: ['/walkin'],
+  services: ['/services'],
+  staff: ['/staff'],
+  performance: ['/staff/performance'],
+  reviews: ['/reviews'],
+  clients: ['/clients'],
+  inventory: ['/inventory'],
+  expenses: ['/expenses'],
+  payroll: ['/payroll'],
+  attendance: ['/attendance'],
+  reports_pnl: ['/reports/pnl'],
+  branches: ['/branches'],
+  team_members: ['/team'],
+  settings: ['/settings', '/settings/audit'],
 }
 
 const allNavItems = [
@@ -80,6 +104,18 @@ const allNavItems = [
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
 
+function getEnabledHrefs(enabledModules: string[] | null | undefined): Set<string> | null {
+  if (!enabledModules) return null
+  const hrefs = new Set<string>()
+  for (const mod of enabledModules) {
+    const paths = MODULE_HREFS[mod] ?? []
+    for (const p of paths) hrefs.add(p)
+  }
+  // Export is always available if any module is enabled
+  hrefs.add('/export')
+  return hrefs
+}
+
 interface SidebarProps {
   salonName?: string
   salonLogoUrl?: string
@@ -87,6 +123,7 @@ interface SidebarProps {
   role?: UserRole
   ownerId?: string
   permissions?: string[] | null
+  enabledModules?: string[] | null
   displayName?: string | null
 }
 
@@ -97,6 +134,7 @@ export default function Sidebar({
   role = 'owner',
   ownerId,
   permissions,
+  enabledModules,
   displayName,
 }: SidebarProps) {
   const pathname = usePathname()
@@ -119,6 +157,7 @@ export default function Sidebar({
     localStorage.setItem('theme', next ? 'dark' : 'light')
   }
 
+  // Step 1: role/permission-based allowed paths
   let allowedPaths: string[]
   if (role === 'owner') {
     allowedPaths = ROLE_NAV['owner']
@@ -129,6 +168,15 @@ export default function Sidebar({
       .map(([, href]) => href)
   } else {
     allowedPaths = ROLE_NAV[role]
+  }
+
+  // Step 2: intersect with salon-level enabled modules
+  const enabledHrefs = getEnabledHrefs(enabledModules)
+  if (enabledHrefs) {
+    allowedPaths = allowedPaths.filter((p) => {
+      // Check if this path is covered by an enabled module
+      return enabledHrefs.has(p) || p.startsWith('/export') || p.startsWith('/onboarding')
+    })
   }
 
   const navItems = allNavItems.filter((item) => allowedPaths.includes(item.href))

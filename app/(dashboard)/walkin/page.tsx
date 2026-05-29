@@ -1,12 +1,28 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import { format } from 'date-fns'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { useUserContext } from '@/components/RoleContext'
 import type { DiscountType, DiscountReason, PaymentMethod, WalkIn, Service, StaffMember } from '@/lib/types'
+import FeedbackModal from '@/components/FeedbackModal'
+import InvoiceModal, { type InvoiceData } from '@/components/InvoiceModal'
+import {
+  Zap, Loader2, X, Banknote, CreditCard, User, Phone, Search,
+  Star, ChevronDown, ChevronUp, CheckCircle2, Receipt, Printer,
+  MessageSquare, ShoppingCart, Trash2, Package, Clock,
+} from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { cn } from '@/lib/utils'
+
+// ──────────────── Types ────────────────
 
 type DealItem = {
   id: string
@@ -18,33 +34,14 @@ type DealItem = {
 }
 
 type PaymentMethodConfig = { value: string; label: string; enabled: boolean }
+type ServiceItem = Pick<Service, 'id' | 'name' | 'price' | 'duration'>
+type StaffItem = Pick<StaffMember, 'id' | 'name'>
+type ClientProfile = { name: string; loyalty_balance: number }
 
 const DEFAULT_PAYMENT_METHODS: PaymentMethodConfig[] = [
   { value: 'cash', label: 'Cash', enabled: true },
   { value: 'card', label: 'Card', enabled: true },
 ]
-
-const PAYMENT_ICON_MAP: Record<string, { icon: React.ElementType; color: string }> = {
-  cash: { icon: Banknote, color: 'bg-green-500 hover:bg-green-600' },
-  card: { icon: CreditCard, color: 'bg-blue-500 hover:bg-blue-600' },
-}
-import FeedbackModal from '@/components/FeedbackModal'
-import InvoiceModal, { type InvoiceData } from '@/components/InvoiceModal'
-import {
-  Zap, Plus, Loader2, Receipt, X, Printer, CheckCircle2, Clock, FileText,
-  Banknote, CreditCard, User, Phone, Search, Star,
-} from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-
-function formatCurrency(n: number, currency = 'USD') {
-  return `${currency} ${Math.round(n).toLocaleString()}`
-}
 
 const DISCOUNT_REASONS: { value: DiscountReason; label: string }[] = [
   { value: 'loyalty', label: 'Loyalty Reward' },
@@ -54,27 +51,16 @@ const DISCOUNT_REASONS: { value: DiscountReason; label: string }[] = [
   { value: 'other', label: 'Other' },
 ]
 
-type ServiceItem = Pick<Service, 'id' | 'name' | 'price' | 'duration'>
-type StaffItem = Pick<StaffMember, 'id' | 'name'>
-
-type ClientProfile = {
-  name: string
-  loyalty_balance: number
+const PM_COLORS: Record<string, string> = {
+  cash: 'bg-green-500 hover:bg-green-600',
+  card: 'bg-blue-500 hover:bg-blue-600',
 }
 
-const emptyForm = {
-  client_name: '',
-  client_phone: '',
-  service_ids: [] as string[],
-  deal_id: '',
-  staff_id: '',
-  payment_method: 'cash' as PaymentMethod,
-  discount_type: 'percentage' as DiscountType,
-  discount_value: '',
-  discount_reason: '' as DiscountReason | '',
-  loyalty_redeem: '',
-  notes: '',
+function formatCurrency(n: number, currency = 'USD') {
+  return `${currency} ${Math.round(n).toLocaleString()}`
 }
+
+// ──────────────── Receipt View ────────────────
 
 function ReceiptView({ walkin, currency, salonName, serviceNames }: {
   walkin: WalkIn; currency: string; salonName: string; serviceNames: string[]
@@ -103,7 +89,7 @@ function ReceiptView({ walkin, currency, salonName, serviceNames }: {
         {walkin.staff && (
           <div className="flex justify-between">
             <span className="text-gray-500">Staff</span>
-            <span className="font-medium">{walkin.staff.name}</span>
+            <span className="font-medium">{(walkin.staff as StaffMember).name}</span>
           </div>
         )}
         <div className="flex justify-between">
@@ -143,11 +129,13 @@ function ReceiptView({ walkin, currency, salonName, serviceNames }: {
   )
 }
 
+// ──────────────── Main Component ────────────────
+
 export default function WalkInPage() {
   const { role, ownerId, permissions } = useUserContext()
   const router = useRouter()
 
-  const [walkIns, setWalkIns] = useState<WalkIn[]>([])
+  // Data
   const [services, setServices] = useState<ServiceItem[]>([])
   const [staffList, setStaffList] = useState<StaffItem[]>([])
   const [deals, setDeals] = useState<DealItem[]>([])
@@ -159,17 +147,35 @@ export default function WalkInPage() {
   const [loyaltyEnabled, setLoyaltyEnabled] = useState(false)
   const [loyaltyEarnPct, setLoyaltyEarnPct] = useState(10)
   const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-  const [receiptWalkIn, setReceiptWalkIn] = useState<WalkIn | null>(null)
-  const [receiptServiceNames, setReceiptServiceNames] = useState<string[]>([])
-  const [feedbackWalkIn, setFeedbackWalkIn] = useState<WalkIn | null>(null)
-  const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(null)
-  const [form, setForm] = useState(emptyForm)
 
-  // Client lookup by phone
+  // Order form
+  const [clientPhone, setClientPhone] = useState('')
+  const [clientName, setClientName] = useState('')
+  const [staffId, setStaffId] = useState('')
+  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([])
+  const [selectedDealId, setSelectedDealId] = useState('')
+  const [discountType, setDiscountType] = useState<DiscountType>('percentage')
+  const [discountValue, setDiscountValue] = useState('')
+  const [discountReason, setDiscountReason] = useState<DiscountReason | ''>('')
+  const [loyaltyRedeem, setLoyaltyRedeem] = useState('')
+  const [notes, setNotes] = useState('')
+  const [showNotes, setShowNotes] = useState(false)
+
+  // UI
+  const [searchQuery, setSearchQuery] = useState('')
+  const [activeTab, setActiveTab] = useState<'all' | 'services' | 'deals'>('all')
+  const [showOrderSheet, setShowOrderSheet] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+
+  // Client lookup
   const [clientProfile, setClientProfile] = useState<ClientProfile | null>(null)
   const [lookingUp, setLookingUp] = useState(false)
+
+  // After completion
+  const [completedWalkIn, setCompletedWalkIn] = useState<WalkIn | null>(null)
+  const [completedServiceNames, setCompletedServiceNames] = useState<string[]>([])
+  const [feedbackWalkIn, setFeedbackWalkIn] = useState<WalkIn | null>(null)
+  const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(null)
 
   useEffect(() => {
     const hasAccess =
@@ -184,19 +190,12 @@ export default function WalkInPage() {
 
   async function loadData() {
     const supabase = createClient()
-    const [walkRes, svcRes, staffRes, profileRes, dealsRes] = await Promise.all([
-      supabase
-        .from('walk_ins')
-        .select('*, services(id, name, price, duration), staff(id, name), walk_in_services(services(id, name, price, duration))')
-        .eq('user_id', ownerId)
-        .order('created_at', { ascending: false })
-        .limit(50),
+    const [svcRes, staffRes, profileRes, dealsRes] = await Promise.all([
       supabase.from('services').select('id, name, price, duration').eq('user_id', ownerId).order('name'),
       supabase.from('staff').select('id, name').eq('user_id', ownerId).eq('is_active', true).order('name'),
       supabase.from('profiles').select('salon_currency, salon_name, salon_address, tax_percentage, loyalty_enabled, loyalty_earn_pct, payment_methods').eq('id', ownerId).single(),
       supabase.from('deals').select('id, name, description, price, is_active, deal_services(services(id, name, price, duration))').eq('user_id', ownerId).eq('is_active', true).order('name'),
     ])
-    setWalkIns((walkRes.data as unknown as WalkIn[]) ?? [])
     setServices((svcRes.data ?? []) as ServiceItem[])
     setStaffList((staffRes.data ?? []) as StaffItem[])
     setCurrency(profileRes.data?.salon_currency ?? 'PKR')
@@ -212,7 +211,7 @@ export default function WalkInPage() {
     setLoading(false)
   }
 
-  async function lookupClient(phone: string) {
+  const lookupClient = useCallback(async (phone: string) => {
     if (!phone || phone.length < 7) { setClientProfile(null); return }
     setLookingUp(true)
     const supabase = createClient()
@@ -223,29 +222,52 @@ export default function WalkInPage() {
       .eq('phone', phone)
       .maybeSingle()
     setClientProfile(data ? { name: data.name, loyalty_balance: data.loyalty_balance ?? 0 } : null)
-    if (data && !form.client_name) {
-      setForm(f => ({ ...f, client_name: data.name }))
-    }
+    if (data && !clientName) setClientName(data.name)
     setLookingUp(false)
-  }
+  }, [ownerId, clientName])
 
   function toggleService(id: string) {
-    setForm(f => ({
-      ...f,
-      service_ids: f.service_ids.includes(id)
-        ? f.service_ids.filter(sid => sid !== id)
-        : [...f.service_ids, id],
-    }))
+    setSelectedServiceIds(prev =>
+      prev.includes(id) ? prev.filter(sid => sid !== id) : [...prev, id]
+    )
   }
 
+  function selectDeal(id: string) {
+    if (selectedDealId === id) {
+      setSelectedDealId('')
+      setSelectedServiceIds([])
+    } else {
+      const deal = deals.find(d => d.id === id)
+      const svcIds = deal?.deal_services.map(ds => ds.services?.id).filter(Boolean) as string[] ?? []
+      setSelectedDealId(id)
+      setSelectedServiceIds(svcIds)
+    }
+  }
+
+  function clearOrder() {
+    setClientPhone('')
+    setClientName('')
+    setStaffId('')
+    setSelectedServiceIds([])
+    setSelectedDealId('')
+    setDiscountType('percentage')
+    setDiscountValue('')
+    setDiscountReason('')
+    setLoyaltyRedeem('')
+    setNotes('')
+    setClientProfile(null)
+    setShowNotes(false)
+  }
+
+  // Computed values
   const selectedServices = useMemo(
-    () => services.filter(s => form.service_ids.includes(s.id)),
-    [services, form.service_ids]
+    () => services.filter(s => selectedServiceIds.includes(s.id)),
+    [services, selectedServiceIds]
   )
 
   const selectedDeal = useMemo(
-    () => deals.find(d => d.id === form.deal_id) ?? null,
-    [deals, form.deal_id]
+    () => deals.find(d => d.id === selectedDealId) ?? null,
+    [deals, selectedDealId]
   )
 
   const dealServiceIds = useMemo(
@@ -264,16 +286,16 @@ export default function WalkInPage() {
   }, [selectedDeal, selectedServices, additionalServices])
 
   const discountAmount = useMemo(() => {
-    const val = parseFloat(form.discount_value) || 0
-    if (form.discount_type === 'percentage') return Math.min((subtotal * val) / 100, subtotal)
+    const val = parseFloat(discountValue) || 0
+    if (discountType === 'percentage') return Math.min((subtotal * val) / 100, subtotal)
     return Math.min(val, subtotal)
-  }, [subtotal, form.discount_type, form.discount_value])
+  }, [subtotal, discountType, discountValue])
 
   const loyaltyRedeemAmount = useMemo(() => {
     if (!loyaltyEnabled || !clientProfile) return 0
-    const redeem = parseFloat(form.loyalty_redeem) || 0
+    const redeem = parseFloat(loyaltyRedeem) || 0
     return Math.min(redeem, clientProfile.loyalty_balance, subtotal - discountAmount)
-  }, [loyaltyEnabled, clientProfile, form.loyalty_redeem, subtotal, discountAmount])
+  }, [loyaltyEnabled, clientProfile, loyaltyRedeem, subtotal, discountAmount])
 
   const total = Math.max(subtotal - discountAmount - loyaltyRedeemAmount, 0)
 
@@ -282,37 +304,49 @@ export default function WalkInPage() {
     return Math.round((total * loyaltyEarnPct) / 100)
   }, [loyaltyEnabled, total, loyaltyEarnPct])
 
-  async function handleSubmit(method: PaymentMethod) {
-    if (form.service_ids.length === 0 && !form.deal_id) {
+  const orderItemCount = selectedServiceIds.length + (selectedDealId ? 1 : 0)
+
+  const filteredServices = useMemo(() => {
+    const q = searchQuery.toLowerCase()
+    return services.filter(s => s.name.toLowerCase().includes(q))
+  }, [services, searchQuery])
+
+  const filteredDeals = useMemo(() => {
+    const q = searchQuery.toLowerCase()
+    return deals.filter(d => d.name.toLowerCase().includes(q))
+  }, [deals, searchQuery])
+
+  async function handleComplete(method: PaymentMethod) {
+    if (selectedServiceIds.length === 0 && !selectedDealId) {
       toast.error('Please select at least one service or deal')
       return
     }
     setSubmitting(true)
     const supabase = createClient()
 
-    const allServiceIds = form.deal_id && selectedDeal
-      ? [...dealServiceIds, ...form.service_ids.filter(id => !dealServiceIds.includes(id))]
-      : form.service_ids
+    const allServiceIds = selectedDealId && selectedDeal
+      ? [...dealServiceIds, ...selectedServiceIds.filter(id => !dealServiceIds.includes(id))]
+      : selectedServiceIds
 
     const { data, error } = await supabase
       .from('walk_ins')
       .insert({
         user_id: ownerId,
-        client_name: form.client_name.trim() || null,
-        client_phone: form.client_phone.trim() || null,
+        client_name: clientName.trim() || null,
+        client_phone: clientPhone.trim() || null,
         service_id: allServiceIds[0] || null,
-        staff_id: form.staff_id || null,
+        staff_id: staffId || null,
         payment_method: method,
         subtotal,
-        discount_type: form.discount_value ? form.discount_type : null,
-        discount_value: parseFloat(form.discount_value) || 0,
+        discount_type: discountValue ? discountType : null,
+        discount_value: parseFloat(discountValue) || 0,
         discount_amount: discountAmount,
-        discount_reason: form.discount_reason || null,
+        discount_reason: discountReason || null,
         loyalty_redeemed: loyaltyRedeemAmount,
-        deal_id: form.deal_id || null,
+        deal_id: selectedDealId || null,
         total,
         payment_status: 'paid',
-        notes: form.notes.trim() || null,
+        notes: notes.trim() || null,
       })
       .select('*, services(id, name, price, duration), staff(id, name)')
       .single()
@@ -325,91 +359,72 @@ export default function WalkInPage() {
 
     const walkinData = data as unknown as WalkIn
 
-    // Insert junction rows for all services (deal + individual)
     if (allServiceIds.length > 0) {
       await supabase.from('walk_in_services').insert(
         allServiceIds.map(sid => ({ walk_in_id: walkinData.id, service_id: sid, user_id: ownerId }))
       )
     }
 
-    // Loyalty: update client balance and log transaction
-    if (loyaltyEnabled && form.client_phone.trim()) {
-      const phone = form.client_phone.trim()
-      // Upsert client record
+    if (loyaltyEnabled && clientPhone.trim()) {
+      const phone = clientPhone.trim()
       await supabase.from('clients').upsert(
-        { user_id: ownerId, phone, name: form.client_name.trim() || phone },
+        { user_id: ownerId, phone, name: clientName.trim() || phone },
         { onConflict: 'user_id,phone' }
       )
 
-      const loyaltyUpdates: Promise<unknown>[] = []
-
+      const loyaltyTasks: Promise<unknown>[] = []
       if (loyaltyRedeemAmount > 0) {
-        const redeemTask = async () => {
-          await supabase.rpc('decrement_loyalty', { p_user_id: ownerId, p_phone: phone, p_amount: loyaltyRedeemAmount })
-          await supabase.from('loyalty_transactions').insert({
-            user_id: ownerId,
-            client_phone: phone,
-            client_name: form.client_name.trim() || null,
-            transaction_type: 'redeemed',
-            amount: loyaltyRedeemAmount,
-            reference_id: walkinData.id,
-            reference_type: 'walk_in',
-          })
-        }
-        loyaltyUpdates.push(redeemTask())
-      }
-
-      if (loyaltyEarned > 0) {
-        const earnTask = async () => {
-          await supabase.from('clients').update({ loyalty_balance: (clientProfile?.loyalty_balance ?? 0) - loyaltyRedeemAmount + loyaltyEarned })
-            .eq('user_id', ownerId).eq('phone', phone)
-          await supabase.from('loyalty_transactions').insert({
-            user_id: ownerId,
-            client_phone: phone,
-            client_name: form.client_name.trim() || null,
-            transaction_type: 'earned',
-            amount: loyaltyEarned,
-            reference_id: walkinData.id,
-            reference_type: 'walk_in',
-          })
-        }
-        loyaltyUpdates.push(earnTask()
+        loyaltyTasks.push(
+          Promise.resolve(supabase.rpc('decrement_loyalty', { p_user_id: ownerId, p_phone: phone, p_amount: loyaltyRedeemAmount })),
+          Promise.resolve(supabase.from('loyalty_transactions').insert({
+            user_id: ownerId, client_phone: phone,
+            client_name: clientName.trim() || null,
+            transaction_type: 'redeemed', amount: loyaltyRedeemAmount,
+            reference_id: walkinData.id, reference_type: 'walk_in',
+          }))
         )
       }
-
-      await Promise.all(loyaltyUpdates)
+      if (loyaltyEarned > 0) {
+        loyaltyTasks.push(
+          Promise.resolve(supabase.from('clients')
+            .update({ loyalty_balance: (clientProfile?.loyalty_balance ?? 0) - loyaltyRedeemAmount + loyaltyEarned })
+            .eq('user_id', ownerId).eq('phone', phone)),
+          Promise.resolve(supabase.from('loyalty_transactions').insert({
+            user_id: ownerId, client_phone: phone,
+            client_name: clientName.trim() || null,
+            transaction_type: 'earned', amount: loyaltyEarned,
+            reference_id: walkinData.id, reference_type: 'walk_in',
+          }))
+        )
+      }
+      await Promise.all(loyaltyTasks)
     }
-
-    toast.success('Walk-in recorded!')
 
     void Promise.all([
       supabase.from('notifications').insert({
-        user_id: ownerId,
-        type: 'payment_received',
+        user_id: ownerId, type: 'payment_received',
         title: 'Payment Received',
-        message: `${form.client_name || 'Walk-in client'} paid ${formatCurrency(total, currency)} via ${method}`,
+        message: `${clientName || 'Walk-in client'} paid ${formatCurrency(total, currency)} via ${method}`,
         link: '/walkin',
       }),
       supabase.from('audit_log').insert({
-        user_id: ownerId,
-        actor_role: role,
-        action: 'payment_walkin',
-        entity_type: 'walk_in',
+        user_id: ownerId, actor_role: role,
+        action: 'payment_walkin', entity_type: 'walk_in',
         entity_id: walkinData.id,
-        details: { client: form.client_name, amount: total, payment: method },
+        details: { client: clientName, amount: total, payment: method },
       }),
     ])
 
     const svcNames = selectedDeal
       ? [selectedDeal.name + ' (Deal)', ...additionalServices.map(s => s.name)]
       : selectedServices.map(s => s.name)
-    setReceiptServiceNames(svcNames)
-    setForm(emptyForm)
-    setClientProfile(null)
-    setShowForm(false)
-    setReceiptWalkIn(walkinData)
+
+    setCompletedServiceNames(svcNames)
+    setCompletedWalkIn(walkinData)
     if (walkinData.staff_id) setFeedbackWalkIn(walkinData)
-    await loadData()
+    setShowOrderSheet(false)
+    clearOrder()
+    toast.success('Walk-in recorded!')
     setSubmitting(false)
   }
 
@@ -421,103 +436,391 @@ export default function WalkInPage() {
     )
   }
 
-  const todayStr = format(new Date(), 'yyyy-MM-dd')
-  const todayWalkIns = walkIns.filter((w) => w.created_at.startsWith(todayStr))
-  const todayRevenue = todayWalkIns.reduce((s, w) => s + Number(w.total), 0)
-  const todayDiscounts = todayWalkIns.reduce((s, w) => s + Number(w.discount_amount), 0)
-
-  return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Zap className="w-6 h-6 text-primary" />
-            Walk-Ins
-          </h1>
-          <p className="text-sm text-gray-500 mt-0.5">Quick POS — tap to select services, choose payment</p>
-        </div>
-        <Button onClick={() => setShowForm(true)} className="bg-primary hover:bg-primary/90 gap-2 h-11 px-5">
-          <Plus className="w-4 h-4" />
-          New Walk-In
-        </Button>
+  // ──────────────── Order Panel Content ────────────────
+  const OrderPanel = ({ compact = false }: { compact?: boolean }) => (
+    <div className={cn('flex flex-col h-full', compact ? '' : '')}>
+      {/* Order items */}
+      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2 min-h-0">
+        {orderItemCount === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full py-12 text-center">
+            <ShoppingCart className="w-10 h-10 text-gray-200 mb-3" />
+            <p className="text-sm text-gray-400">No items yet</p>
+            <p className="text-xs text-gray-300 mt-1">Tap a service or deal to add</p>
+          </div>
+        ) : (
+          <>
+            {selectedDeal && (
+              <div className="flex items-center justify-between p-3 rounded-xl bg-primary/5 border border-primary/20">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Package className="w-4 h-4 text-primary flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 truncate">{selectedDeal.name}</p>
+                    <p className="text-xs text-gray-500">Deal package</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="text-sm font-bold text-primary">{formatCurrency(Number(selectedDeal.price), currency)}</span>
+                  <button onClick={() => selectDeal(selectedDeal.id)} className="text-gray-400 hover:text-red-500 p-0.5">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
+            {additionalServices.map(svc => (
+              <div key={svc.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Zap className="w-4 h-4 text-primary flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 truncate">{svc.name}</p>
+                    <p className="text-xs text-gray-400">{svc.duration} min</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="text-sm font-bold text-primary">{formatCurrency(Number(svc.price), currency)}</span>
+                  <button onClick={() => toggleService(svc.id)} className="text-gray-400 hover:text-red-500 p-0.5">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+            {!selectedDeal && selectedServices.map(svc => (
+              <div key={svc.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Zap className="w-4 h-4 text-primary flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 truncate">{svc.name}</p>
+                    <p className="text-xs text-gray-400">{svc.duration} min</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="text-sm font-bold text-primary">{formatCurrency(Number(svc.price), currency)}</span>
+                  <button onClick={() => toggleService(svc.id)} className="text-gray-400 hover:text-red-500 p-0.5">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </>
+        )}
       </div>
 
-      {/* Walk-In Form Dialog */}
-      <Dialog open={showForm} onOpenChange={(o) => { if (!o) { setShowForm(false); setClientProfile(null) } }}>
-        <DialogContent className="sm:max-w-2xl max-h-[95vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-lg">
-              <Zap className="w-5 h-5 text-primary" />
-              New Walk-In — POS
-            </DialogTitle>
-          </DialogHeader>
+      {/* Summary + checkout section */}
+      <div className="border-t border-gray-100 px-4 py-3 space-y-3 flex-shrink-0">
+        {/* Subtotal row */}
+        <div className="flex justify-between text-sm text-gray-600">
+          <span>Subtotal</span>
+          <span className="font-medium">{formatCurrency(subtotal, currency)}</span>
+        </div>
 
-          <div className="space-y-5">
-            {/* Client info row */}
+        {/* Discount section */}
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <select
+              value={discountType}
+              onChange={(e) => setDiscountType(e.target.value as DiscountType)}
+              className="h-9 rounded-lg border border-gray-200 bg-white px-2 text-sm text-gray-700 focus:outline-none focus:ring-1 focus:ring-primary/50 w-28 flex-shrink-0"
+            >
+              <option value="percentage">% Off</option>
+              <option value="fixed">Fixed</option>
+            </select>
+            <Input
+              type="number"
+              min="0"
+              value={discountValue}
+              onChange={(e) => setDiscountValue(e.target.value)}
+              placeholder={discountType === 'percentage' ? 'Discount %' : `Discount ${currency}`}
+              className="h-9 flex-1"
+            />
+            {discountValue && (
+              <button onClick={() => { setDiscountValue(''); setDiscountReason('') }} className="text-gray-400 hover:text-gray-600 p-1 flex-shrink-0">
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+          {discountValue && (
+            <Select value={discountReason} onValueChange={(v) => setDiscountReason(v as DiscountReason | '')}>
+              <SelectTrigger className="h-9 text-sm">
+                <SelectValue placeholder="Discount reason" />
+              </SelectTrigger>
+              <SelectContent>
+                {DISCOUNT_REASONS.map(r => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
+          {discountAmount > 0 && (
+            <div className="flex justify-between text-sm text-green-600">
+              <span>Discount applied</span>
+              <span>-{formatCurrency(discountAmount, currency)}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Loyalty */}
+        {loyaltyEnabled && clientProfile && clientProfile.loyalty_balance > 0 && (
+          <div className="rounded-xl bg-purple-50 border border-purple-200 p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <Star className="w-3.5 h-3.5 text-purple-500" />
+                <span className="text-xs font-semibold text-purple-800">Loyalty Points</span>
+              </div>
+              <span className="text-xs font-bold text-purple-700">Balance: {formatCurrency(clientProfile.loyalty_balance, currency)}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Input
+                type="number" min="0" max={clientProfile.loyalty_balance}
+                value={loyaltyRedeem}
+                onChange={(e) => setLoyaltyRedeem(e.target.value)}
+                placeholder="Redeem amount"
+                className="h-8 flex-1 text-sm"
+              />
+              <Button
+                type="button" size="sm" variant="outline"
+                onClick={() => setLoyaltyRedeem(String(Math.min(clientProfile.loyalty_balance, subtotal - discountAmount)))}
+                className="h-8 border-purple-300 text-purple-700 hover:bg-purple-100 text-xs px-2"
+              >
+                Max
+              </Button>
+            </div>
+            {loyaltyRedeemAmount > 0 && (
+              <div className="flex justify-between text-xs text-purple-600">
+                <span>Points redeemed</span>
+                <span>-{formatCurrency(loyaltyRedeemAmount, currency)}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Total */}
+        <div className="flex justify-between items-center py-2 border-t border-gray-100">
+          <span className="text-base font-bold text-gray-900">Total</span>
+          <span className="text-2xl font-black text-primary">{formatCurrency(total, currency)}</span>
+        </div>
+
+        {loyaltyEnabled && loyaltyEarned > 0 && (
+          <p className="text-xs text-purple-600 text-right -mt-1">+{formatCurrency(loyaltyEarned, currency)} loyalty earned</p>
+        )}
+
+        {/* Payment buttons */}
+        <div className="grid grid-cols-2 gap-2">
+          {paymentMethodConfig.filter(pm => pm.enabled).map(pm => {
+            const color = PM_COLORS[pm.value] ?? 'bg-gray-600 hover:bg-gray-700'
+            const disabled = submitting || orderItemCount === 0
+            return (
+              <button
+                key={pm.value}
+                type="button"
+                disabled={disabled}
+                onClick={() => handleComplete(pm.value as PaymentMethod)}
+                className={cn(
+                  'flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-white font-semibold text-sm transition-all',
+                  color, 'disabled:opacity-50 disabled:cursor-not-allowed shadow-sm'
+                )}
+              >
+                {submitting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : pm.value === 'cash' ? (
+                  <Banknote className="w-4 h-4" />
+                ) : pm.value === 'card' ? (
+                  <CreditCard className="w-4 h-4" />
+                ) : null}
+                {pm.label}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Notes toggle */}
+        <button
+          type="button"
+          onClick={() => setShowNotes(v => !v)}
+          className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors w-full"
+        >
+          <MessageSquare className="w-3.5 h-3.5" />
+          {showNotes ? 'Hide notes' : 'Add notes'}
+          {showNotes ? <ChevronUp className="w-3 h-3 ml-auto" /> : <ChevronDown className="w-3 h-3 ml-auto" />}
+        </button>
+        {showNotes && (
+          <Input
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Any special notes..."
+            className="h-9 text-sm"
+          />
+        )}
+
+        {/* Clear */}
+        {orderItemCount > 0 && (
+          <button
+            type="button"
+            onClick={clearOrder}
+            className="flex items-center justify-center gap-1.5 text-xs text-red-400 hover:text-red-600 w-full py-1"
+          >
+            <Trash2 className="w-3 h-3" /> Clear order
+          </button>
+        )}
+      </div>
+    </div>
+  )
+
+  // ──────────────── Full Page Layout ────────────────
+  return (
+    <div className="flex flex-col h-[calc(100vh-0px)] lg:h-screen overflow-hidden bg-gray-50">
+
+      {/* ── Page Header ── */}
+      <div className="flex-shrink-0 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
+            <Zap className="w-4 h-4 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-base font-bold text-gray-900">Walk-In POS</h1>
+            <p className="text-xs text-gray-400 hidden sm:block">Select services, choose payment</p>
+          </div>
+        </div>
+        {/* Mobile: order button in header */}
+        <button
+          className="md:hidden flex items-center gap-2 bg-primary text-white rounded-xl px-3 py-2 text-sm font-semibold"
+          onClick={() => setShowOrderSheet(true)}
+        >
+          <ShoppingCart className="w-4 h-4" />
+          Order
+          {orderItemCount > 0 && (
+            <span className="bg-white text-primary rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">
+              {orderItemCount}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* ── Split Layout ── */}
+      <div className="flex-1 flex overflow-hidden">
+
+        {/* ─── LEFT PANEL: Service picker ─── */}
+        <div className="flex-1 md:flex-[3] flex flex-col overflow-hidden min-w-0 bg-white border-r border-gray-100">
+
+          {/* Client + Staff row */}
+          <div className="flex-shrink-0 px-4 py-3 border-b border-gray-100 space-y-2">
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="flex items-center gap-1"><Phone className="w-3.5 h-3.5" /> Phone</Label>
+              {/* Phone lookup */}
+              <div className="space-y-1">
+                <Label className="text-xs text-gray-500 flex items-center gap-1">
+                  <Phone className="w-3 h-3" /> Client Phone
+                </Label>
                 <div className="relative">
                   <Input
-                    value={form.client_phone}
+                    value={clientPhone}
                     onChange={(e) => {
-                      setForm(f => ({ ...f, client_phone: e.target.value }))
+                      setClientPhone(e.target.value)
                       lookupClient(e.target.value)
                     }}
                     placeholder="03001234567"
-                    className="h-10 pr-8"
+                    className="h-9 pr-8 text-sm"
                   />
-                  {lookingUp && <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-gray-400" />}
+                  {lookingUp && <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 animate-spin text-gray-400" />}
                 </div>
-                {clientProfile && (
-                  <div className="flex items-center gap-2 bg-purple-50 border border-purple-200 rounded-lg px-2.5 py-1.5">
-                    <Star className="w-3.5 h-3.5 text-purple-500" />
-                    <span className="text-xs text-purple-700 font-medium">{clientProfile.name} · Loyalty: {formatCurrency(clientProfile.loyalty_balance, currency)}</span>
-                  </div>
-                )}
               </div>
-              <div className="space-y-1.5">
-                <Label className="flex items-center gap-1"><User className="w-3.5 h-3.5" /> Client Name</Label>
+              {/* Client name */}
+              <div className="space-y-1">
+                <Label className="text-xs text-gray-500 flex items-center gap-1">
+                  <User className="w-3 h-3" /> Client Name
+                </Label>
                 <Input
-                  value={form.client_name}
-                  onChange={(e) => setForm(f => ({ ...f, client_name: e.target.value }))}
+                  value={clientName}
+                  onChange={(e) => setClientName(e.target.value)}
                   placeholder="Guest"
-                  className="h-10"
+                  className="h-9 text-sm"
                 />
               </div>
             </div>
+            {/* Client loyalty banner */}
+            {clientProfile && (
+              <div className="flex items-center gap-2 bg-purple-50 border border-purple-200 rounded-lg px-2.5 py-1.5">
+                <Star className="w-3.5 h-3.5 text-purple-500 flex-shrink-0" />
+                <span className="text-xs text-purple-700 font-medium">
+                  {clientProfile.name} · Loyalty: {formatCurrency(clientProfile.loyalty_balance, currency)}
+                </span>
+              </div>
+            )}
+            {/* Staff select */}
+            <Select value={staffId} onValueChange={(v) => setStaffId(v ?? '')}>
+              <SelectTrigger className="h-9 text-sm">
+                <SelectValue placeholder="Assign staff (optional)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">No staff</SelectItem>
+                {staffList.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
+          {/* Search + Tab filters */}
+          <div className="flex-shrink-0 px-4 py-2 border-b border-gray-100 space-y-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search services or deals..."
+                className="pl-9 h-9 text-sm"
+              />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            <div className="flex gap-1">
+              {(['all', 'services', 'deals'] as const).map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={cn(
+                    'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors capitalize',
+                    activeTab === tab
+                      ? 'bg-primary text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  )}
+                >
+                  {tab === 'all' ? 'All' : tab === 'deals' ? `Deals (${filteredDeals.length})` : `Services (${filteredServices.length})`}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Services / Deals grid */}
+          <div className="flex-1 overflow-y-auto p-4">
             {/* Deals section */}
-            {deals.length > 0 && (
-              <div className="space-y-2">
-                <Label className="text-sm font-semibold">Deal / Package <span className="text-gray-400 font-normal text-xs">(optional)</span></Label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {deals.map(deal => {
-                    const isSelected = form.deal_id === deal.id
+            {(activeTab === 'all' || activeTab === 'deals') && filteredDeals.length > 0 && (
+              <div className="mb-4">
+                {activeTab === 'all' && <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Deals</p>}
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
+                  {filteredDeals.map(deal => {
+                    const isSelected = selectedDealId === deal.id
                     return (
                       <button
                         key={deal.id}
                         type="button"
-                        onClick={() => {
-                          if (isSelected) {
-                            setForm(f => ({ ...f, deal_id: '', service_ids: [] }))
-                          } else {
-                            const svcIds = deal.deal_services.map(ds => ds.services?.id).filter(Boolean) as string[]
-                            setForm(f => ({ ...f, deal_id: deal.id, service_ids: svcIds }))
-                          }
-                        }}
-                        className={`flex flex-col items-start p-3 rounded-xl text-left transition-all border ${
+                        onClick={() => selectDeal(deal.id)}
+                        className={cn(
+                          'flex flex-col items-start p-3 rounded-xl text-left transition-all border relative',
                           isSelected
-                            ? 'bg-primary text-white border-primary shadow-md ring-2 ring-primary/30'
+                            ? 'bg-primary text-white border-primary shadow-md'
                             : 'bg-gray-50 border-gray-200 hover:border-primary/40 hover:bg-primary/5'
-                        }`}
+                        )}
                       >
-                        <span className={`font-semibold text-sm ${isSelected ? 'text-white' : 'text-gray-900'}`}>{deal.name}</span>
-                        <span className={`text-xs mt-0.5 ${isSelected ? 'text-white/80' : 'text-gray-500'}`}>
+                        {isSelected && (
+                          <div className="absolute top-2 right-2">
+                            <CheckCircle2 className="w-4 h-4 text-white" />
+                          </div>
+                        )}
+                        <Package className={cn('w-4 h-4 mb-1', isSelected ? 'text-white/80' : 'text-primary')} />
+                        <span className={cn('font-semibold text-sm leading-tight', isSelected ? 'text-white' : 'text-gray-900')}>{deal.name}</span>
+                        <span className={cn('text-xs mt-0.5 line-clamp-1', isSelected ? 'text-white/70' : 'text-gray-500')}>
                           {deal.deal_services.map(ds => ds.services?.name).filter(Boolean).join(', ')}
                         </span>
-                        <span className={`text-sm font-bold mt-1 ${isSelected ? 'text-white' : 'text-primary'}`}>
+                        <span className={cn('text-sm font-bold mt-2', isSelected ? 'text-white' : 'text-primary')}>
                           {formatCurrency(Number(deal.price), currency)}
                         </span>
                       </button>
@@ -527,325 +830,179 @@ export default function WalkInPage() {
               </div>
             )}
 
-            {/* Services grid */}
-            <div className="space-y-2">
-              <Label className="text-sm font-semibold">{deals.length > 0 && form.deal_id ? 'Extra Services' : 'Select Services *'}</Label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-64 overflow-y-auto">
-                {services.map((s) => {
-                  const selected = form.service_ids.includes(s.id)
-                  return (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => toggleService(s.id)}
-                      className={`flex flex-col items-start p-3 rounded-xl text-left transition-all ${
-                        selected
-                          ? 'bg-primary text-white shadow-md ring-2 ring-primary/30'
-                          : 'bg-gray-50 border border-gray-200 hover:border-primary/40 hover:bg-primary/5'
-                      }`}
-                    >
-                      <span className="font-semibold text-sm truncate w-full">{s.name}</span>
-                      <span className={`text-xs mt-1 ${selected ? 'text-white/80' : 'text-gray-500'}`}>{s.duration} min</span>
-                      <span className={`text-sm font-bold mt-1 ${selected ? 'text-white' : 'text-primary'}`}>
-                        {formatCurrency(Number(s.price), currency)}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-              {form.service_ids.length > 0 && (
-                <div className="flex items-center justify-between bg-primary/5 rounded-xl px-4 py-2.5">
-                  <div className="flex flex-wrap gap-1">
-                    {selectedServices.map(s => (
-                      <span key={s.id} className="bg-primary/15 text-primary text-xs rounded-full px-2.5 py-0.5 font-medium">{s.name}</span>
-                    ))}
+            {/* Services section */}
+            {(activeTab === 'all' || activeTab === 'services') && (
+              <div>
+                {activeTab === 'all' && filteredDeals.length > 0 && <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Services</p>}
+                {filteredServices.length === 0 ? (
+                  <div className="text-center py-8 text-gray-400 text-sm">No services found</div>
+                ) : (
+                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
+                    {filteredServices.map(svc => {
+                      const isSelected = selectedServiceIds.includes(svc.id)
+                      const isDealService = dealServiceIds.includes(svc.id)
+                      return (
+                        <button
+                          key={svc.id}
+                          type="button"
+                          onClick={() => toggleService(svc.id)}
+                          className={cn(
+                            'flex flex-col items-start p-3 rounded-xl text-left transition-all border relative',
+                            isSelected
+                              ? 'bg-primary text-white border-primary shadow-md'
+                              : 'bg-gray-50 border-gray-200 hover:border-primary/40 hover:bg-primary/5',
+                            isDealService && !isSelected ? 'opacity-50' : ''
+                          )}
+                        >
+                          {isSelected && (
+                            <div className="absolute top-2 right-2">
+                              <CheckCircle2 className="w-4 h-4 text-white" />
+                            </div>
+                          )}
+                          <span className={cn('font-semibold text-sm leading-tight truncate w-full pr-5', isSelected ? 'text-white' : 'text-gray-900')}>{svc.name}</span>
+                          <div className={cn('flex items-center gap-1 mt-1', isSelected ? 'text-white/70' : 'text-gray-400')}>
+                            <Clock className="w-3 h-3" />
+                            <span className="text-xs">{svc.duration} min</span>
+                          </div>
+                          <span className={cn('text-sm font-bold mt-2', isSelected ? 'text-white' : 'text-primary')}>
+                            {formatCurrency(Number(svc.price), currency)}
+                          </span>
+                        </button>
+                      )
+                    })}
                   </div>
-                  <div className="text-right flex-shrink-0 ml-2">
-                    <p className="text-xs text-gray-500">{selectedServices.reduce((s, svc) => s + svc.duration, 0)} min</p>
-                    <p className="font-bold text-primary">{formatCurrency(subtotal, currency)}</p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Staff */}
-            <div className="space-y-1.5">
-              <Label>Staff <span className="text-gray-400 font-normal text-xs">(optional)</span></Label>
-              <Select value={form.staff_id} onValueChange={(v) => setForm(f => ({ ...f, staff_id: v ?? '' }))}>
-                <SelectTrigger className="h-10">
-                  <SelectValue placeholder="Select staff member">
-                    {form.staff_id ? (staffList.find(s => s.id === form.staff_id)?.name ?? undefined) : undefined}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {staffList.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Discount */}
-            <div className="rounded-xl bg-gray-50 border border-gray-100 p-4 space-y-3">
-              <p className="text-sm font-semibold text-gray-700">Discount <span className="text-xs font-normal text-gray-400">(optional)</span></p>
-              <div className="grid grid-cols-2 gap-3">
-                <Select value={form.discount_type} onValueChange={(v) => setForm(f => ({ ...f, discount_type: (v ?? 'percentage') as DiscountType }))}>
-                  <SelectTrigger className="h-9">
-                    <SelectValue>
-                      {form.discount_type === 'fixed' ? `Fixed (${currency})` : 'Percentage (%)'}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="percentage">Percentage (%)</SelectItem>
-                    <SelectItem value="fixed">Fixed ({currency})</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Input
-                  type="number" min="0"
-                  max={form.discount_type === 'percentage' ? '100' : undefined}
-                  value={form.discount_value}
-                  onChange={(e) => setForm(f => ({ ...f, discount_value: e.target.value }))}
-                  placeholder={form.discount_type === 'percentage' ? '0%' : '0.00'}
-                  className="h-9"
-                />
-              </div>
-              {form.discount_value && (
-                <Select value={form.discount_reason} onValueChange={(v) => setForm(f => ({ ...f, discount_reason: (v ?? '') as DiscountReason | '' }))}>
-                  <SelectTrigger className="h-9"><SelectValue placeholder="Discount reason" /></SelectTrigger>
-                  <SelectContent>
-                    {DISCOUNT_REASONS.map(r => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-
-            {/* Loyalty redemption */}
-            {loyaltyEnabled && clientProfile && clientProfile.loyalty_balance > 0 && (
-              <div className="rounded-xl bg-purple-50 border border-purple-200 p-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-purple-800">Loyalty Points</p>
-                  <span className="text-sm font-bold text-purple-700">Balance: {formatCurrency(clientProfile.loyalty_balance, currency)}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="number" min="0" max={clientProfile.loyalty_balance}
-                    value={form.loyalty_redeem}
-                    onChange={(e) => setForm(f => ({ ...f, loyalty_redeem: e.target.value }))}
-                    placeholder="Amount to redeem"
-                    className="h-9 flex-1"
-                  />
-                  <Button type="button" size="sm" variant="outline"
-                    onClick={() => setForm(f => ({ ...f, loyalty_redeem: String(Math.min(clientProfile.loyalty_balance, subtotal - discountAmount)) }))}
-                    className="border-purple-300 text-purple-700 hover:bg-purple-100 text-xs">
-                    Max
-                  </Button>
-                </div>
-                {loyaltyRedeemAmount > 0 && (
-                  <p className="text-xs text-purple-600">Redeeming {formatCurrency(loyaltyRedeemAmount, currency)} from loyalty points</p>
                 )}
               </div>
             )}
 
-            {/* Bill Summary — always visible */}
-            <div className="rounded-xl bg-primary/5 border border-primary/20 p-4 space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Subtotal</span>
-                <span className="font-medium">{formatCurrency(subtotal, currency)}</span>
-              </div>
-              {discountAmount > 0 && (
-                <div className="flex justify-between text-sm text-green-600">
-                  <span>Discount</span>
-                  <span>-{formatCurrency(discountAmount, currency)}</span>
-                </div>
-              )}
-              {loyaltyRedeemAmount > 0 && (
-                <div className="flex justify-between text-sm text-purple-600">
-                  <span>Loyalty Redeemed</span>
-                  <span>-{formatCurrency(loyaltyRedeemAmount, currency)}</span>
-                </div>
-              )}
-              <div className="flex justify-between font-bold text-xl border-t border-primary/20 pt-2 mt-1">
-                <span className="text-gray-900">Total</span>
-                <span className="text-primary">{formatCurrency(total, currency)}</span>
-              </div>
-              {loyaltyEnabled && loyaltyEarned > 0 && (
-                <p className="text-xs text-purple-600 text-right">+{formatCurrency(loyaltyEarned, currency)} loyalty earned</p>
-              )}
-            </div>
-
-            {/* ONE-CLICK PAYMENT BUTTONS (dynamic from settings) */}
-            <div className="space-y-2">
-              <Label className="text-sm font-semibold">Pay & Complete</Label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {paymentMethodConfig.filter(pm => pm.enabled).map(pm => {
-                  const iconInfo = PAYMENT_ICON_MAP[pm.value] ?? { icon: CreditCard, color: 'bg-gray-500 hover:bg-gray-600' }
-                  const Icon = iconInfo.icon
-                  return (
-                    <button
-                      key={pm.value}
-                      type="button"
-                      disabled={submitting || (form.service_ids.length === 0 && !form.deal_id)}
-                      onClick={() => handleSubmit(pm.value as PaymentMethod)}
-                      className={`flex flex-col items-center justify-center gap-2 py-4 px-3 rounded-xl text-white font-semibold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed ${iconInfo.color} shadow-sm`}
-                    >
-                      {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Icon className="w-5 h-5" />}
-                      <span>{pm.label}</span>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Notes */}
-            <div className="space-y-1.5">
-              <Label>Notes <span className="text-gray-400 font-normal text-xs">(optional)</span></Label>
-              <Input
-                value={form.notes}
-                onChange={(e) => setForm(f => ({ ...f, notes: e.target.value }))}
-                placeholder="Any special notes..."
-                className="h-9"
-              />
-            </div>
-
-            <div className="flex justify-end">
-              <Button type="button" variant="outline" onClick={() => { setShowForm(false); setClientProfile(null) }}>
-                <X className="w-4 h-4 mr-1" /> Cancel
-              </Button>
-            </div>
+            {activeTab === 'deals' && filteredDeals.length === 0 && (
+              <div className="text-center py-8 text-gray-400 text-sm">No deals found</div>
+            )}
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
 
-      {/* Receipt Dialog */}
-      <Dialog open={!!receiptWalkIn} onOpenChange={(o) => { if (!o) setReceiptWalkIn(null) }}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Receipt className="w-4 h-4 text-primary" />
-              Receipt
-            </DialogTitle>
-          </DialogHeader>
-          {receiptWalkIn && (
-            <ReceiptView walkin={receiptWalkIn} currency={currency} salonName={salonName} serviceNames={receiptServiceNames} />
-          )}
-          <DialogFooter>
-            <Button variant="outline" size="sm" onClick={() => window.print()} className="gap-2">
-              <Printer className="w-4 h-4" /> Print
-            </Button>
-            <Button size="sm" className="bg-primary hover:bg-primary/90" onClick={() => setReceiptWalkIn(null)}>Done</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        {/* ─── RIGHT PANEL: Order (desktop only) ─── */}
+        <div className="hidden md:flex flex-[2] flex-col bg-white overflow-hidden max-w-sm">
+          <div className="flex-shrink-0 px-4 py-3 border-b border-gray-100">
+            <h2 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+              <ShoppingCart className="w-4 h-4 text-primary" />
+              Current Order
+              {orderItemCount > 0 && (
+                <Badge className="bg-primary/10 text-primary border-primary/20 text-xs ml-auto">
+                  {orderItemCount} item{orderItemCount !== 1 ? 's' : ''}
+                </Badge>
+              )}
+            </h2>
+          </div>
+          <OrderPanel />
+        </div>
+      </div>
 
-      {/* Today's Stats */}
-      {todayWalkIns.length > 0 && (
-        <div className="grid grid-cols-3 gap-4">
-          {[
-            { label: "Today's Walk-Ins", value: todayWalkIns.length, color: 'text-primary', bg: 'bg-primary/10' },
-            { label: 'Revenue', value: formatCurrency(todayRevenue, currency), color: 'text-green-600', bg: 'bg-green-50' },
-            { label: 'Discounts', value: formatCurrency(todayDiscounts, currency), color: 'text-orange-600', bg: 'bg-orange-50' },
-          ].map((s) => (
-            <Card key={s.label} className="border-gray-100">
-              <CardContent className="pt-4 pb-3">
-                <div className={`w-8 h-8 rounded-lg ${s.bg} flex items-center justify-center mb-2`}>
-                  <Zap className={`w-4 h-4 ${s.color}`} />
-                </div>
-                <p className={`text-lg font-bold ${s.color}`}>{s.value}</p>
-                <p className="text-xs text-gray-500">{s.label}</p>
-              </CardContent>
-            </Card>
-          ))}
+      {/* ── Mobile: sticky View Order button ── */}
+      {orderItemCount > 0 && (
+        <div className="md:hidden flex-shrink-0 px-4 py-3 bg-white border-t border-gray-100 safe-area-bottom">
+          <button
+            onClick={() => setShowOrderSheet(true)}
+            className="w-full flex items-center justify-between bg-primary text-white rounded-xl px-4 py-3 font-semibold text-sm shadow-lg"
+          >
+            <div className="flex items-center gap-2">
+              <ShoppingCart className="w-4 h-4" />
+              View Order ({orderItemCount} item{orderItemCount !== 1 ? 's' : ''})
+            </div>
+            <span className="text-lg font-black">{formatCurrency(total, currency)}</span>
+          </button>
         </div>
       )}
 
-      {/* Walk-Ins List */}
-      <Card className="border-gray-100">
-        <CardHeader className="pb-3 border-b border-gray-50">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base">Recent Walk-Ins</CardTitle>
-            <Badge className="bg-primary/10 text-primary border-primary/20">{walkIns.length}</Badge>
+      {/* ── Mobile: Order Sheet Dialog ── */}
+      <Dialog open={showOrderSheet} onOpenChange={setShowOrderSheet}>
+        <DialogContent className="sm:max-w-sm h-[90vh] p-0 flex flex-col overflow-hidden">
+          <DialogHeader className="px-4 py-3 border-b border-gray-100 flex-shrink-0">
+            <DialogTitle className="text-sm font-bold flex items-center gap-2">
+              <ShoppingCart className="w-4 h-4 text-primary" />
+              Current Order
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-hidden">
+            <OrderPanel compact />
           </div>
-        </CardHeader>
-        <CardContent className="pt-4">
-          {walkIns.length === 0 ? (
-            <div className="text-center py-12">
-              <Zap className="w-10 h-10 text-gray-200 mx-auto mb-3" />
-              <p className="text-gray-500 font-medium">No walk-ins yet</p>
-              <p className="text-sm text-gray-400 mt-1">Click &quot;New Walk-In&quot; to record your first one</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {walkIns.map((w) => {
-                const svcList = (w.walk_in_services && w.walk_in_services.length > 0)
-                  ? w.walk_in_services.map(ws => ws.services?.name).filter(Boolean)
-                  : w.services ? [w.services.name] : []
-                return (
-                  <div key={w.id} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 hover:bg-gray-100/80 transition-colors">
-                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <Zap className="w-4 h-4 text-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-semibold text-gray-900">{w.client_name || 'Guest'}</p>
-                        {svcList.length > 0 && (
-                          <>
-                            <span className="text-gray-300">·</span>
-                            <p className="text-sm text-gray-600 truncate">{svcList.join(', ')}</p>
-                          </>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <Clock className="w-3 h-3 text-gray-400" />
-                        <span className="text-xs text-gray-400">{format(new Date(w.created_at), 'MMM d, h:mm a')}</span>
-                        {w.staff && <><span className="text-gray-300">·</span><span className="text-xs text-gray-400">{w.staff.name}</span></>}
-                        <span className="text-gray-300">·</span>
-                        <span className="text-xs text-gray-500 capitalize">{w.payment_method}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      {w.discount_amount > 0 && <span className="text-xs text-green-600">-{formatCurrency(w.discount_amount, currency)}</span>}
-                      <span className="font-bold text-sm text-primary">{formatCurrency(w.total, currency)}</span>
-                      <Badge className="text-xs bg-green-50 text-green-700 border-green-200">Paid</Badge>
-                      <button onClick={() => { setReceiptServiceNames(svcList as string[]); setReceiptWalkIn(w) }}
-                        className="p-1.5 rounded-lg hover:bg-white text-gray-400 hover:text-primary transition-colors" title="Receipt">
-                        <Receipt className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => setInvoiceData({
-                          id: w.id,
-                          invoiceType: 'walkin',
-                          salonName,
-                          salonAddress,
-                          clientName: w.client_name ?? undefined,
-                          clientPhone: w.client_phone ?? undefined,
-                          staffName: w.staff?.name ?? undefined,
-                          serviceName: svcList.join(', ') || undefined,
-                          date: w.created_at.slice(0, 10),
-                          subtotal: w.subtotal,
-                          discountAmount: w.discount_amount,
-                          taxPercentage,
-                          total: w.total,
-                          paymentMethod: w.payment_method,
-                          currency,
-                        })}
-                        className="p-1.5 rounded-lg hover:bg-white text-gray-400 hover:text-blue-600 transition-colors" title="Invoice">
-                        <FileText className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Completion Modal ── */}
+      <Dialog open={!!completedWalkIn} onOpenChange={(o) => { if (!o) setCompletedWalkIn(null) }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-green-700">
+              <CheckCircle2 className="w-5 h-5" />
+              Walk-In Complete!
+            </DialogTitle>
+          </DialogHeader>
+          {completedWalkIn && (
+            <ReceiptView walkin={completedWalkIn} currency={currency} salonName={salonName} serviceNames={completedServiceNames} />
           )}
-        </CardContent>
-      </Card>
+          <DialogFooter className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => window.print()} className="gap-1.5 flex-1">
+              <Printer className="w-4 h-4" /> Print
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5 flex-1"
+              onClick={() => {
+                if (!completedWalkIn) return
+                const msg = encodeURIComponent(
+                  `Thank you for visiting ${salonName}!\nYour receipt: ${formatCurrency(completedWalkIn.total, currency)}`
+                )
+                window.open(`https://wa.me/?text=${msg}`, '_blank')
+              }}
+            >
+              WhatsApp
+            </Button>
+            <Button
+              size="sm"
+              className="bg-primary hover:bg-primary/90 flex-1"
+              onClick={() => {
+                if (completedWalkIn) {
+                  setInvoiceData({
+                    id: completedWalkIn.id,
+                    invoiceType: 'walkin',
+                    salonName, salonAddress,
+                    clientName: completedWalkIn.client_name ?? undefined,
+                    clientPhone: completedWalkIn.client_phone ?? undefined,
+                    staffName: (completedWalkIn.staff as StaffMember | undefined)?.name,
+                    serviceName: completedServiceNames.join(', ') || undefined,
+                    date: completedWalkIn.created_at.slice(0, 10),
+                    subtotal: completedWalkIn.subtotal,
+                    discountAmount: completedWalkIn.discount_amount,
+                    taxPercentage,
+                    total: completedWalkIn.total,
+                    paymentMethod: completedWalkIn.payment_method,
+                    currency,
+                  })
+                }
+                setCompletedWalkIn(null)
+              }}
+            >
+              <Receipt className="w-4 h-4 mr-1" /> Invoice
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setCompletedWalkIn(null)}
+            >
+              New Walk-In
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <FeedbackModal
         open={!!feedbackWalkIn}
         onClose={() => setFeedbackWalkIn(null)}
         ownerId={ownerId}
         staffId={feedbackWalkIn?.staff_id ?? null}
-        staffName={feedbackWalkIn?.staff?.name ?? 'Staff'}
+        staffName={(feedbackWalkIn?.staff as StaffMember | undefined)?.name ?? 'Staff'}
         clientName={feedbackWalkIn?.client_name ?? ''}
         walkInId={feedbackWalkIn?.id}
       />

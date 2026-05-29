@@ -18,12 +18,19 @@ export async function toggleSalonStatus(userId: string, newStatus: 'active' | 's
   return { success: true }
 }
 
+const ALL_MODULES = [
+  'dashboard','appointments','calendar','walkin','services','staff','clients',
+  'inventory','expenses','payroll','attendance','reports_pnl','reviews',
+  'performance','branches','team_members','settings',
+]
+
 export async function createSalonAccount(
   salonName: string,
   email: string,
   password: string,
   maxBranches = 1,
   maxStaff = 10,
+  enabledModules: string[] = ALL_MODULES,
 ) {
   const supabase = createAdminClient()
 
@@ -47,6 +54,7 @@ export async function createSalonAccount(
     last_set_password: password,
     max_branches: maxBranches,
     max_staff: maxStaff,
+    enabled_modules: enabledModules,
   })
 
   if (profileError) {
@@ -185,6 +193,21 @@ export async function getLeads() {
     return { error: error.message }
   }
   return { data: data ?? [] }
+}
+
+export async function updateSalonModules(userId: string, modules: string[]) {
+  const supabase = createAdminClient()
+  const { error } = await supabase
+    .from('profiles')
+    .update({ enabled_modules: modules })
+    .eq('id', userId)
+
+  if (error) {
+    console.error('[updateSalonModules]', error)
+    return { error: error.message }
+  }
+  revalidatePath('/admin')
+  return { success: true }
 }
 
 export async function updateLead(id: string, updates: { status?: string; notes?: string }) {

@@ -13,6 +13,7 @@ import {
   getLeads,
   updateLead,
   updateSalonLimits,
+  updateSalonModules,
 } from './actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -57,9 +58,32 @@ import {
   Phone,
   MapPin,
   MessageSquare,
+  LayoutGrid,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Lead } from '@/lib/types'
+
+const ALL_MODULES = [
+  { key: 'dashboard', label: 'Dashboard' },
+  { key: 'appointments', label: 'Appointments' },
+  { key: 'calendar', label: 'Calendar' },
+  { key: 'walkin', label: 'Walk-In POS' },
+  { key: 'services', label: 'Services' },
+  { key: 'staff', label: 'Staff' },
+  { key: 'performance', label: 'Staff Performance' },
+  { key: 'reviews', label: 'Reviews' },
+  { key: 'clients', label: 'Clients' },
+  { key: 'branches', label: 'Branches' },
+  { key: 'team_members', label: 'Team Members' },
+  { key: 'expenses', label: 'Expenses' },
+  { key: 'inventory', label: 'Inventory' },
+  { key: 'payroll', label: 'Payroll' },
+  { key: 'attendance', label: 'Attendance' },
+  { key: 'reports_pnl', label: 'P&L Reports' },
+  { key: 'settings', label: 'Settings' },
+]
+
+const ALL_MODULE_KEYS = ALL_MODULES.map((m) => m.key)
 
 type Salon = {
   id: string
@@ -71,6 +95,7 @@ type Salon = {
   member_count?: number
   max_branches?: number | null
   max_staff?: number | null
+  enabled_modules?: string[] | null
 }
 
 type CreatedCredentials = {
@@ -116,6 +141,7 @@ export default function AdminDashboard({ salons: initialSalons }: { salons: Salo
   const [newPassword, setNewPassword] = useState('')
   const [newMaxBranches, setNewMaxBranches] = useState('1')
   const [newMaxStaff, setNewMaxStaff] = useState('10')
+  const [newModules, setNewModules] = useState<string[]>(ALL_MODULE_KEYS)
   const [creating, setCreating] = useState(false)
   const [credentials, setCredentials] = useState<CreatedCredentials | null>(null)
   const [copied, setCopied] = useState(false)
@@ -126,6 +152,13 @@ export default function AdminDashboard({ salons: initialSalons }: { salons: Salo
   const [limitsMaxBranches, setLimitsMaxBranches] = useState('1')
   const [limitsMaxStaff, setLimitsMaxStaff] = useState('10')
   const [savingLimits, setSavingLimits] = useState(false)
+
+  // Edit modules
+  const [modulesOpen, setModulesOpen] = useState(false)
+  const [modulesSalonId, setModulesSalonId] = useState<string | null>(null)
+  const [modulesSalonName, setModulesSalonName] = useState('')
+  const [selectedModules, setSelectedModules] = useState<string[]>(ALL_MODULE_KEYS)
+  const [savingModules, setSavingModules] = useState(false)
 
   // Per-salon inline state
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set())
@@ -203,6 +236,13 @@ export default function AdminDashboard({ salons: initialSalons }: { salons: Salo
     setDetailLoading(false)
   }
 
+  function openEditModules(salon: Salon) {
+    setModulesSalonId(salon.id)
+    setModulesSalonName(salon.salon_name || salon.email)
+    setSelectedModules(salon.enabled_modules ?? ALL_MODULE_KEYS)
+    setModulesOpen(true)
+  }
+
   function handleToggle(salon: Salon) {
     const next = salon.subscription_status === 'suspended' ? 'active' : 'suspended'
     setTogglingId(salon.id)
@@ -234,6 +274,7 @@ export default function AdminDashboard({ salons: initialSalons }: { salons: Salo
         newSalonName, newEmail, newPassword,
         parseInt(newMaxBranches) || 1,
         parseInt(newMaxStaff) || 10,
+        newModules,
       )
       if ('error' in res) {
         toast.error(res.error)
@@ -244,6 +285,7 @@ export default function AdminDashboard({ salons: initialSalons }: { salons: Salo
         setNewPassword('')
         setNewMaxBranches('1')
         setNewMaxStaff('10')
+        setNewModules(ALL_MODULE_KEYS)
         router.refresh()
       }
     } catch {
@@ -281,6 +323,41 @@ export default function AdminDashboard({ salons: initialSalons }: { salons: Salo
     } finally {
       setSavingLimits(false)
     }
+  }
+
+  async function handleSaveModules(e: React.FormEvent) {
+    e.preventDefault()
+    if (!modulesSalonId) return
+    setSavingModules(true)
+    try {
+      const res = await updateSalonModules(modulesSalonId, selectedModules)
+      if ('error' in res) {
+        toast.error(res.error)
+      } else {
+        toast.success('Modules updated')
+        setSalons(prev => prev.map(s => s.id === modulesSalonId
+          ? { ...s, enabled_modules: selectedModules }
+          : s
+        ))
+        setModulesOpen(false)
+      }
+    } catch {
+      toast.error('Failed to update modules')
+    } finally {
+      setSavingModules(false)
+    }
+  }
+
+  function toggleModule(key: string) {
+    setSelectedModules(prev =>
+      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+    )
+  }
+
+  function toggleNewModule(key: string) {
+    setNewModules(prev =>
+      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+    )
   }
 
   async function handleDelete() {
@@ -418,6 +495,62 @@ export default function AdminDashboard({ salons: initialSalons }: { salons: Salo
   const resetSalon = salons.find((s) => s.id === resetSalonId)
   const deleteSalon = salons.find((s) => s.id === deleteConfirmId)
   const changeEmailSalon = salons.find((s) => s.id === changeEmailSalonId)
+
+  // Module checklist component (shared between Create and Edit dialogs)
+  const ModuleChecklist = ({
+    modules,
+    onChange,
+  }: {
+    modules: string[]
+    onChange: (key: string) => void
+  }) => (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-xs text-gray-500 font-medium">Enabled Modules ({modules.length}/{ALL_MODULES.length})</span>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => ALL_MODULES.forEach(m => !modules.includes(m.key) && onChange(m.key))}
+            className="text-xs text-primary hover:underline"
+          >
+            All
+          </button>
+          <span className="text-gray-300">|</span>
+          <button
+            type="button"
+            onClick={() => ALL_MODULES.forEach(m => modules.includes(m.key) && onChange(m.key))}
+            className="text-xs text-red-500 hover:underline"
+          >
+            None
+          </button>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-1.5 max-h-64 overflow-y-auto pr-1">
+        {ALL_MODULES.map((mod) => {
+          const enabled = modules.includes(mod.key)
+          return (
+            <label
+              key={mod.key}
+              className={cn(
+                'flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer text-sm transition-colors',
+                enabled
+                  ? 'bg-primary/5 border-primary/30 text-primary'
+                  : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+              )}
+            >
+              <input
+                type="checkbox"
+                checked={enabled}
+                onChange={() => onChange(mod.key)}
+                className="rounded accent-primary"
+              />
+              {mod.label}
+            </label>
+          )
+        })}
+      </div>
+    </div>
+  )
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -559,6 +692,7 @@ export default function AdminDashboard({ salons: initialSalons }: { salons: Salo
                       const isSuspended = salon.subscription_status === 'suspended'
                       const isToggling = togglingId === salon.id && isPending
                       const showPw = visiblePasswords.has(salon.id)
+                      const enabledCount = salon.enabled_modules?.length ?? ALL_MODULE_KEYS.length
                       return (
                         <div
                           key={salon.id}
@@ -607,6 +741,13 @@ export default function AdminDashboard({ salons: initialSalons }: { salons: Salo
                                   Limits: {salon.max_branches ?? 1}B / {salon.max_staff ?? 10}S
                                 </button>
                               )}
+                              <button
+                                onClick={() => openEditModules(salon)}
+                                className="inline-flex items-center gap-1 text-xs text-indigo-600 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded-full hover:bg-indigo-100 transition-colors"
+                              >
+                                <LayoutGrid className="w-3 h-3" />
+                                {enabledCount}/{ALL_MODULE_KEYS.length} modules
+                              </button>
                             </div>
                             {salon.last_set_password && (
                               <div className="flex items-center gap-1.5 mt-1">
@@ -847,7 +988,7 @@ export default function AdminDashboard({ salons: initialSalons }: { salons: Salo
         open={createOpen}
         onOpenChange={(open) => { setCreateOpen(open); if (!open) setCredentials(null) }}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create Salon Account</DialogTitle>
           </DialogHeader>
@@ -888,19 +1029,43 @@ export default function AdminDashboard({ salons: initialSalons }: { salons: Salo
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Max Branches Allowed</Label>
+                  <Label>Max Branches</Label>
                   <Input type="number" min="1" value={newMaxBranches} onChange={(e) => setNewMaxBranches(e.target.value)} placeholder="1" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Max Staff Allowed</Label>
+                  <Label>Max Staff</Label>
                   <Input type="number" min="1" value={newMaxStaff} onChange={(e) => setNewMaxStaff(e.target.value)} placeholder="10" />
                 </div>
               </div>
+
+              {/* Module access checklist */}
+              <div className="space-y-2 border border-gray-100 rounded-lg p-3 bg-gray-50">
+                <ModuleChecklist modules={newModules} onChange={toggleNewModule} />
+              </div>
+
               <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={creating}>
                 {creating ? 'Creating...' : 'Create Account'}
               </Button>
             </form>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Edit Modules Dialog ── */}
+      <Dialog open={modulesOpen} onOpenChange={(open) => { if (!open) setModulesOpen(false) }}>
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <LayoutGrid className="w-4 h-4 text-primary" />
+              Module Access — {modulesSalonName}
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSaveModules} className="space-y-4">
+            <ModuleChecklist modules={selectedModules} onChange={toggleModule} />
+            <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={savingModules}>
+              {savingModules ? 'Saving...' : 'Save Module Access'}
+            </Button>
+          </form>
         </DialogContent>
       </Dialog>
 
@@ -1090,7 +1255,10 @@ export default function AdminDashboard({ salons: initialSalons }: { salons: Salo
                         })
                       : '—',
                   },
-                  { label: 'Plan', value: 'Growth' },
+                  {
+                    label: 'Modules Enabled',
+                    value: `${detailSalon?.enabled_modules?.length ?? ALL_MODULE_KEYS.length}/${ALL_MODULE_KEYS.length}`,
+                  },
                 ].map(({ label, value }) => (
                   <div key={label} className="bg-gray-50 rounded-lg p-3">
                     <p className="text-xs text-gray-500 mb-1">{label}</p>
@@ -1098,6 +1266,20 @@ export default function AdminDashboard({ salons: initialSalons }: { salons: Salo
                   </div>
                 ))}
               </div>
+
+              {/* Enabled modules summary */}
+              {detailSalon?.enabled_modules && detailSalon.enabled_modules.length < ALL_MODULE_KEYS.length && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <p className="text-xs font-medium text-amber-800 mb-2">Disabled Modules</p>
+                  <div className="flex flex-wrap gap-1">
+                    {ALL_MODULES.filter(m => !detailSalon.enabled_modules!.includes(m.key)).map(m => (
+                      <span key={m.key} className="text-xs bg-amber-100 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full">
+                        {m.label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Stats */}
               {salonDetail && (
@@ -1125,7 +1307,7 @@ export default function AdminDashboard({ salons: initialSalons }: { salons: Salo
               {/* Team members */}
               {salonDetail && salonDetail.members.length > 0 && (
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-700 mb-2">Team Members</h3>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2">Team Members ({salonDetail.members.length})</h3>
                   <div className="rounded-lg border border-gray-100 divide-y divide-gray-50">
                     {salonDetail.members.map((m) => (
                       <div key={m.id} className="px-3 py-2.5 flex items-center gap-3">
@@ -1194,6 +1376,18 @@ export default function AdminDashboard({ salons: initialSalons }: { salons: Salo
               <div>
                 <h3 className="text-sm font-semibold text-gray-700 mb-2">Quick Actions</h3>
                 <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-indigo-200 text-indigo-600 hover:bg-indigo-50"
+                    onClick={() => {
+                      const s = detailSalon
+                      setDetailSalon(null)
+                      setTimeout(() => { if (s) openEditModules(s) }, 50)
+                    }}
+                  >
+                    <LayoutGrid className="w-3.5 h-3.5 mr-1.5" /> Edit Modules
+                  </Button>
                   {detailSalon?.subscription_status === 'suspended' ? (
                     <Button
                       size="sm"

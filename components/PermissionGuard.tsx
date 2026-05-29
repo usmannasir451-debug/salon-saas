@@ -19,21 +19,68 @@ const PERM_TO_HREF: Record<string, string> = {
   inventory: '/inventory',
   expenses: '/expenses',
   payroll: '/payroll',
+  attendance: '/attendance',
   reports: '/reports/pnl',
+  reports_pnl: '/reports/pnl',
   team: '/team',
+  team_members: '/team',
+  branches: '/branches',
   settings: '/settings',
+}
+
+// Map of module key → path prefixes it covers
+const MODULE_PATH_MAP: Record<string, string[]> = {
+  dashboard: ['/dashboard'],
+  appointments: ['/appointments'],
+  calendar: ['/calendar'],
+  walkin: ['/walkin'],
+  services: ['/services'],
+  staff: ['/staff'],
+  performance: ['/staff/performance'],
+  reviews: ['/reviews'],
+  clients: ['/clients'],
+  inventory: ['/inventory'],
+  expenses: ['/expenses'],
+  payroll: ['/payroll'],
+  attendance: ['/attendance'],
+  reports_pnl: ['/reports/pnl', '/reports'],
+  branches: ['/branches'],
+  team_members: ['/team'],
+  settings: ['/settings'],
 }
 
 // Always blocked for sub-users — even if owner accidentally grants these permissions
 const OWNER_ONLY_PATHS = ['/team', '/settings', '/payroll', '/admin']
-const OWNER_ONLY_PERM_KEYS = new Set(['team', 'settings', 'payroll'])
+const OWNER_ONLY_PERM_KEYS = new Set(['team', 'settings', 'payroll', 'team_members'])
+
+function isModuleEnabled(pathname: string, enabledModules: string[] | null | undefined): boolean {
+  if (!enabledModules) return true // no restriction if null (all enabled)
+  // Export and onboarding are always accessible
+  if (pathname.startsWith('/export') || pathname.startsWith('/onboarding') || pathname.startsWith('/suspended')) return true
+
+  for (const [mod, paths] of Object.entries(MODULE_PATH_MAP)) {
+    const covers = paths.some((p) => pathname === p || pathname.startsWith(p + '/'))
+    if (covers) {
+      return enabledModules.includes(mod)
+    }
+  }
+  return true // unknown paths pass through
+}
 
 export function PermissionGuard({ children }: { children: React.ReactNode }) {
-  const { role, permissions } = useUserContext()
+  const { role, permissions, enabledModules } = useUserContext()
   const pathname = usePathname()
   const router = useRouter()
 
   useEffect(() => {
+    // Check salon-level module access first (applies to everyone including owner)
+    if (!isModuleEnabled(pathname, enabledModules)) {
+      toast.error('This feature is not enabled for your account. Please contact support.')
+      router.replace('/dashboard')
+      return
+    }
+
+    // Sub-user role/permission checks
     if (role === 'owner') return
 
     const isOwnerOnlyPath = OWNER_ONLY_PATHS.some(
@@ -68,7 +115,7 @@ export function PermissionGuard({ children }: { children: React.ReactNode }) {
       toast.error('Access denied')
       router.replace(firstAllowed)
     }
-  }, [pathname, role, permissions, router])
+  }, [pathname, role, permissions, enabledModules, router])
 
   return <>{children}</>
 }

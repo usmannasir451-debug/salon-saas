@@ -58,6 +58,15 @@ const CURRENCIES = [
   { code: 'SGD', label: 'SGD — Singapore Dollar' },
 ]
 
+const PRESET_COLORS = [
+  { hex: '#e11d48', label: 'Rose' },
+  { hex: '#7c3aed', label: 'Purple' },
+  { hex: '#2563eb', label: 'Blue' },
+  { hex: '#059669', label: 'Green' },
+  { hex: '#ea580c', label: 'Orange' },
+  { hex: '#0d9488', label: 'Teal' },
+]
+
 type FormState = {
   salon_name: string
   salon_address: string
@@ -67,9 +76,6 @@ type FormState = {
   salon_currency: string
   salon_primary_color: string
   salon_logo_url: string
-  max_discount_owner: string
-  max_discount_manager: string
-  max_discount_cashier: string
   tax_percentage: string
   loyalty_enabled: boolean
   loyalty_earn_pct: string
@@ -83,11 +89,8 @@ const defaultForm: FormState = {
   salon_email: '',
   salon_timezone: 'UTC',
   salon_currency: 'USD',
-  salon_primary_color: '#f43f5e',
+  salon_primary_color: '#e11d48',
   salon_logo_url: '',
-  max_discount_owner: '100',
-  max_discount_manager: '30',
-  max_discount_cashier: '15',
   tax_percentage: '0',
   loyalty_enabled: false,
   loyalty_earn_pct: '10',
@@ -119,6 +122,14 @@ export default function SettingsPage() {
     loadPlanLimits()
   }, [role, router]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Apply brand color preview in real time
+  useEffect(() => {
+    const color = form.salon_primary_color?.trim() || '#e11d48'
+    document.documentElement.style.setProperty('--primary', color)
+    document.documentElement.style.setProperty('--ring', color)
+    document.documentElement.style.setProperty('--sidebar-primary', color)
+  }, [form.salon_primary_color])
+
   async function loadPlanLimits() {
     const supabase = createClient()
     const [profileRes, branchRes, staffRes] = await Promise.all([
@@ -138,7 +149,7 @@ export default function SettingsPage() {
     const supabase = createClient()
     const { data } = await supabase
       .from('profiles')
-      .select('salon_name, salon_address, salon_phone, salon_email, salon_timezone, salon_currency, salon_primary_color, salon_logo_url, max_discount_owner, max_discount_manager, max_discount_cashier, tax_percentage, loyalty_enabled, loyalty_earn_pct, loyalty_expiry_days, payment_methods')
+      .select('salon_name, salon_address, salon_phone, salon_email, salon_timezone, salon_currency, salon_primary_color, salon_logo_url, tax_percentage, loyalty_enabled, loyalty_earn_pct, loyalty_expiry_days, payment_methods')
       .eq('id', ownerId)
       .single()
 
@@ -150,11 +161,8 @@ export default function SettingsPage() {
         salon_email: data.salon_email ?? '',
         salon_timezone: data.salon_timezone ?? 'UTC',
         salon_currency: data.salon_currency ?? 'USD',
-        salon_primary_color: data.salon_primary_color ?? '#f43f5e',
+        salon_primary_color: data.salon_primary_color ?? '#e11d48',
         salon_logo_url: data.salon_logo_url ?? '',
-        max_discount_owner: String(data.max_discount_owner ?? 100),
-        max_discount_manager: String(data.max_discount_manager ?? 30),
-        max_discount_cashier: String(data.max_discount_cashier ?? 15),
         tax_percentage: String(data.tax_percentage ?? 0),
         loyalty_enabled: data.loyalty_enabled ?? false,
         loyalty_earn_pct: String(data.loyalty_earn_pct ?? 10),
@@ -219,9 +227,6 @@ export default function SettingsPage() {
         salon_currency: form.salon_currency || null,
         salon_primary_color: form.salon_primary_color || null,
         salon_logo_url: form.salon_logo_url || null,
-        max_discount_owner: parseInt(form.max_discount_owner) || 100,
-        max_discount_manager: parseInt(form.max_discount_manager) || 30,
-        max_discount_cashier: parseInt(form.max_discount_cashier) || 15,
         tax_percentage: parseFloat(form.tax_percentage) || 0,
         loyalty_enabled: form.loyalty_enabled,
         loyalty_earn_pct: parseFloat(form.loyalty_earn_pct) || 10,
@@ -488,61 +493,56 @@ export default function SettingsPage() {
               Brand Color
             </CardTitle>
           </CardHeader>
-          <CardContent className="pt-5">
+          <CardContent className="pt-5 space-y-4">
+            {/* Preset swatches */}
+            <div>
+              <p className="text-xs text-gray-500 mb-2">Preset colors</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                {PRESET_COLORS.map((c) => (
+                  <button
+                    key={c.hex}
+                    type="button"
+                    title={c.label}
+                    onClick={() => set('salon_primary_color', c.hex)}
+                    className="w-8 h-8 rounded-lg shadow-sm transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-1"
+                    style={{
+                      backgroundColor: c.hex,
+                      outline: form.salon_primary_color === c.hex ? `3px solid ${c.hex}` : undefined,
+                      outlineOffset: form.salon_primary_color === c.hex ? '2px' : undefined,
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Custom color picker */}
             <div className="flex items-center gap-4">
-              <input
-                type="color"
-                value={form.salon_primary_color}
-                onChange={(e) => set('salon_primary_color', e.target.value)}
-                className="w-12 h-12 rounded-xl border border-gray-200 cursor-pointer p-1 bg-white"
-              />
-              <div>
-                <p className="text-sm font-medium text-gray-900">{form.salon_primary_color}</p>
-                <p className="text-xs text-gray-500 mt-0.5">Choose your salon&apos;s primary brand color</p>
+              <div className="relative">
+                <input
+                  type="color"
+                  value={form.salon_primary_color}
+                  onChange={(e) => set('salon_primary_color', e.target.value)}
+                  className="w-12 h-12 rounded-xl border border-gray-200 cursor-pointer p-1 bg-white"
+                />
+              </div>
+              <div className="flex-1">
+                <Input
+                  value={form.salon_primary_color}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    if (/^#[0-9a-fA-F]{0,6}$/.test(val)) set('salon_primary_color', val)
+                  }}
+                  placeholder="#e11d48"
+                  className="h-10 font-mono"
+                  maxLength={7}
+                />
               </div>
               <div
-                className="w-10 h-10 rounded-xl shadow-sm flex-shrink-0"
+                className="w-12 h-12 rounded-xl shadow-sm flex-shrink-0 border border-gray-100"
                 style={{ backgroundColor: form.salon_primary_color }}
               />
             </div>
-          </CardContent>
-        </Card>
-
-        {/* ── Discount Limits ── */}
-        <Card className="border-gray-100">
-          <CardHeader className="pb-3 border-b border-gray-50">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Percent className="w-4 h-4 text-primary" />
-              Max Discount Limits
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-5 space-y-4">
-            <p className="text-xs text-gray-500">Set the maximum discount percentage each role can apply.</p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {[
-                { key: 'max_discount_owner' as const, label: 'Owner', color: 'text-primary' },
-                { key: 'max_discount_manager' as const, label: 'Manager', color: 'text-blue-600' },
-                { key: 'max_discount_cashier' as const, label: 'Cashier', color: 'text-green-600' },
-              ].map((item) => (
-                <div key={item.key} className="space-y-1.5">
-                  <Label htmlFor={item.key}>
-                    <span className={`font-semibold ${item.color}`}>{item.label}</span> (%)
-                  </Label>
-                  <div className="relative">
-                    <Input
-                      id={item.key}
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={form[item.key]}
-                      onChange={(e) => set(item.key, e.target.value)}
-                      className="h-10 pr-8"
-                    />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <p className="text-xs text-gray-400">Color updates apply immediately after saving. The sidebar, buttons, and accents will reflect your brand color.</p>
           </CardContent>
         </Card>
 

@@ -82,6 +82,7 @@ export type Profile = {
   expense_budgets?: Record<string, number> | null
   max_branches?: number | null
   max_staff?: number | null
+  enabled_modules?: string[] | null
   created_at: string
 }
 

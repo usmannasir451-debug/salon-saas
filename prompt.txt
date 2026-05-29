@@ -1,1 +1,164 @@
-Create a proper favicon for Snipforce. Generate a favicon.ico file and apple-touch-icon.png in the public folder. Use a scissors icon with rose/pink color (#e11d48) on dark navy background (#0f172a). Make sure it replaces any existing favicon completely. Also update app/layout.tsx metadata to reference the new favicon files correctly.
+You are an expert SaaS developer working on "Snipforce". Make these architectural improvements carefully. Review the entire codebase before making changes. Ensure existing data and features are not broken.
+
+PART 1 - FEATURE-BASED MODULE ACCESS CONTROL FROM ADMIN PANEL
+
+ARCHITECTURE:
+- Add a modules/features permission system at the salon account level (not just sub-user level)
+- Each salon account can have specific modules enabled or disabled by the Snipforce admin
+- Store enabled modules in profiles table as enabled_modules JSONB array
+- Default: all existing accounts get all modules enabled (backward compatible)
+
+MODULES TO CONTROL:
+- dashboard
+- appointments
+- calendar
+- walkin
+- services
+- staff
+- clients
+- inventory
+- expenses
+- payroll
+- attendance
+- reports_pnl
+- reviews
+- performance
+- branches
+- team_members
+- settings
+
+ADMIN PANEL CHANGES:
+- When creating a new salon account: show a checklist of all modules with checkboxes
+- Default: all modules checked
+- Admin can uncheck modules the salon should not have access to
+- When editing/viewing a salon: show current module access with ability to update
+- Save selected modules to profiles.enabled_modules
+
+PRODUCT ENFORCEMENT:
+- On login: fetch enabled_modules from profiles table
+- Sidebar navigation: only show modules that are enabled for this salon
+- Direct URL access: if salon tries to access disabled module URL, redirect to dashboard with message "This feature is not enabled for your account. Please contact support."
+- This check must work for both owners AND their sub-users
+- Sub-user permissions are a subset of salon-level module access (sub-user cannot access module even if they have permission, if salon-level module is disabled)
+
+BACKWARD COMPATIBILITY:
+- All existing salon accounts: set enabled_modules to all modules (full access) by default via SQL migration
+- No existing functionality should break
+
+PART 2 - WALK-IN POS REDESIGN (Single Screen Experience)
+
+Completely redesign the walk-in page as a professional single-screen POS interface:
+
+LAYOUT (split screen):
+LEFT PANEL (60% width):
+- Search bar at top to search services/deals quickly
+- Category filter tabs (All, Hair, Skin, Tools, Deals, etc.)
+- Service/Deal cards in a grid:
+  * Service name
+  * Duration
+  * Price
+  * Click to add to order
+  * Already added items show a checkmark or quantity badge
+- Staff selection dropdown at top of left panel
+- Client phone number lookup at top (auto-loads client name and loyalty points)
+
+RIGHT PANEL (40% width):
+- Order summary title "Current Order"
+- Selected items list:
+  * Service/deal name
+  * Price
+  * Remove button (x)
+- Divider line
+- Subtotal
+- Discount section:
+  * Toggle: Fixed Amount / Percentage
+  * Input field for discount value
+  * Discount reason dropdown
+- Loyalty points section (if client has points):
+  * Show available points balance
+  * Input: how many points to redeem
+- Divider
+- Total Amount (large, prominent)
+- Payment method buttons (full width, colored):
+  * Cash (green)
+  * Card (blue)
+  * Other methods from settings
+- Notes field (optional, collapsible)
+- "Complete & Save" button (large rose gradient, full width)
+
+MOBILE RESPONSIVE:
+- On mobile: show left panel first, sticky "View Order (X items)" button at bottom
+- Tapping the button slides up the right panel as a sheet
+
+AFTER COMPLETION:
+- Show receipt/summary modal
+- Options: Print, Share via WhatsApp, New Walk-in
+- Clear the order for next customer
+
+PART 3 - BRAND COLOR IMPLEMENTATION FIX
+
+Currently brand color saved in settings but not applied anywhere. Fix this completely:
+
+IMPLEMENTATION:
+- When salon owner saves brand color in settings: store in profiles.salon_primary_color
+- On dashboard layout load: fetch salon_primary_color from profiles
+- Apply color as CSS custom property: --brand-color: [hex value]
+- Replace ALL hardcoded pink/rose color values with var(--brand-color) in:
+  * Sidebar active states and accents
+  * Buttons (primary buttons)
+  * Links and hover states
+  * KPI card accents
+  * Chart colors (primary color)
+  * Badge colors
+  * Focus ring colors
+- Default color: #e11d48 (current rose) if no color set
+- Color change should reflect immediately after saving settings (no page reload needed)
+- Landing page keeps original rose color - only dashboard/app area changes
+
+COLOR PICKER IN SETTINGS:
+- Make sure color picker works properly
+- Show preview of selected color before saving
+- Add some preset color options: Rose (#e11d48), Purple (#7c3aed), Blue (#2563eb), Green (#059669), Orange (#ea580c), Teal (#0d9488)
+
+PART 4 - REMOVE MAXIMUM DISCOUNT LIMITS
+
+- Find and remove all maximum discount limit logic from the codebase
+- Remove max_discount_percentage settings from settings page
+- Remove discount cap validation from walk-in form
+- Remove discount cap validation from appointment mark-as-paid flow
+- Remove any role-based discount restrictions
+- Discounts should be freely applicable with no system-enforced limits
+- Keep discount type (fixed/percentage) and reason field - just remove the cap
+
+PART 5 - SUB-USER MANAGEMENT IMPROVEMENTS
+
+SUB-USER CONNECTION FIX:
+- Audit the entire sub-user flow: creation, login, data access
+- Ensure when sub-user logs in: they always get the correct owner_id from salon_members table
+- Ensure all data queries use effective owner_id (not sub-user's own id)
+- Test that sub-user can: create appointments, process walk-ins, view clients - all under owner's salon data
+- Fix any queries that accidentally use auth.uid() instead of effective owner_id for data operations
+
+ADMIN PANEL HIERARCHY:
+- Redesign the salons list in admin panel to show clear hierarchy
+- Main salon account shown as primary row
+- Sub-users shown as indented/collapsible rows under their parent salon
+- OR: clicking on a salon opens a detail panel showing:
+  * Salon info (name, email, status, plan, modules enabled)
+  * Sub-users section: list of all sub-users with name, email, permissions summary, last set password
+  * Stats: total appointments, total revenue, date joined
+  * Actions: Edit modules, Change email, Reset password, Suspend, Delete
+- Remove sub-users from the main salon list (they should not appear as separate salons)
+- Add a filter: "Show only main accounts" toggle
+
+TECHNICAL REQUIREMENTS:
+- Add enabled_modules JSONB column to profiles table
+- SQL migration must set enabled_modules to full access array for all existing accounts
+- Review and add missing RLS policies if any
+- All changes must be backward compatible
+- Run npm run build to verify zero TypeScript errors before finishing
+- Update CLAUDE.md with all architectural changes
+- Generate complete SQL migration file
+- Mobile responsive throughout
+- Dark mode compatible
+- Maintain brand color theming

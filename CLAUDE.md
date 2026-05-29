@@ -75,7 +75,11 @@ NEXT_PUBLIC_ADMIN_EMAIL           # Email address that can access /admin page
 - Notes per appointment
 - Invoice/receipt generation (PDF via jsPDF)
 
-### Walk-In POS
+### Walk-In POS (Redesigned)
+- Full-screen split-panel POS interface (60% service picker + 40% order panel)
+- Left panel: client phone lookup, staff assignment, search bar, service/deal grid
+- Right panel: order summary, discount, loyalty redemption, payment buttons
+- Mobile responsive: sticky "View Order" button + slide-up order sheet
 - Instant walk-in checkout (no prior booking needed)
 - Multi-service selection per transaction
 - Multiple payment methods
@@ -162,10 +166,11 @@ NEXT_PUBLIC_ADMIN_EMAIL           # Email address that can access /admin page
 - Audit log (settings changes, member activity)
 
 ### Settings (owner-only)
-- Salon branding: logo upload, primary color
+- Salon branding: logo upload, primary color with preset swatches + live preview
 - Salon details: address, phone, email, timezone, currency
-- Discount limits per role (max_discount_owner / manager / cashier)
 - Tax percentage
+- Brand color applies immediately via CSS custom property injection (no page reload)
+- Discount limits removed — discounts are freely applicable with no system cap
 - Loyalty settings (enabled, earn %, expiry days)
 - Subscription status management
 - Expense categories and budgets
@@ -174,6 +179,9 @@ NEXT_PUBLIC_ADMIN_EMAIL           # Email address that can access /admin page
 ### Admin Panel (`/admin`)
 - Accessible only to the admin email defined in env
 - Salon/user management from a super-admin perspective
+- Sub-users are filtered out of the main salons list (excluded by checking `salon_members.member_user_id`)
+- Per-salon module access control: admin can enable/disable individual modules per salon
+- Module checklist shown in Create Account and Edit Modules dialogs
 
 ### Auth & Onboarding
 - Email/password login (no social auth)
@@ -186,7 +194,7 @@ NEXT_PUBLIC_ADMIN_EMAIL           # Email address that can access /admin page
 
 | Table | Purpose |
 |-------|---------|
-| `profiles` | One row per salon owner. Stores all salon settings, branding, limits, subscription status. |
+| `profiles` | One row per salon owner. Stores all salon settings, branding, limits, subscription status, and `enabled_modules` JSONB array. |
 | `services` | Services offered by the salon (name, duration, price). |
 | `staff` | Staff directory with contact info, salary config, and active status. |
 | `appointments` | Scheduled bookings — links client, service, staff, branch, deal. |
@@ -219,6 +227,9 @@ NEXT_PUBLIC_ADMIN_EMAIL           # Email address that can access /admin page
 - **RLS on all tables**: Every table uses Supabase Row Level Security. Policies use `get_effective_owner_id()` to allow both the owner and their team members access.
 - **Grants on all tables**: Every table has explicit `GRANT` statements for `authenticated`, `service_role`, and `anon` roles (see the top of this file).
 - **Role-based permissions**: Roles define which nav items are visible; custom per-member permissions in `salon_members.permissions` can override defaults.
+- **Module-level access control**: `profiles.enabled_modules` (JSONB array) stores which features a salon can access. Enforced in `Sidebar.tsx` (hides nav items) and `PermissionGuard.tsx` (redirects with toast). Applies to owners AND their sub-users. Managed by Snipforce admin via the admin panel.
+- **Brand color**: `profiles.salon_primary_color` (hex string). Applied via `BrandColorApplier` client component which sets `--primary` CSS variable on `document.documentElement`. Settings page applies preview in real-time via `useEffect`.
+- **No discount caps**: Maximum discount limits have been removed from settings and enforcement. Discounts are freely applicable.
 - **Server vs client Supabase**: `lib/supabase/client.ts` for browser, `lib/supabase/server.ts` for server components/actions, `lib/supabase/admin.ts` for privileged operations using SERVICE_ROLE_KEY.
 
 ## 8. FOLDER STRUCTURE
@@ -260,9 +271,10 @@ salon-saas/
 │
 ├── components/
 │   ├── ui/                         # shadcn/ui primitives
-│   ├── Sidebar.tsx                 # Navigation sidebar (role-aware)
-│   ├── RoleContext.tsx             # Context: current user role, ownerId, permissions
-│   ├── PermissionGuard.tsx         # Client-side route permission enforcement
+│   ├── Sidebar.tsx                 # Navigation sidebar (role-aware, module-filtered)
+│   ├── RoleContext.tsx             # Context: current user role, ownerId, permissions, enabledModules
+│   ├── PermissionGuard.tsx         # Client-side route + module permission enforcement
+│   ├── BrandColorApplier.tsx       # Injects --primary CSS variable from salon_primary_color
 │   ├── FeedbackModal.tsx           # Collect appointment feedback
 │   ├── InvoiceModal.tsx            # PDF receipt/invoice generation
 │   ├── FloatingWalkIn.tsx          # Floating walk-in shortcut button

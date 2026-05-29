@@ -8,6 +8,7 @@ export interface UserCtx {
   ownerId: string
   staffId?: string
   permissions?: string[] | null
+  enabledModules?: string[] | null
   isOwner: boolean
   displayName?: string | null
 }

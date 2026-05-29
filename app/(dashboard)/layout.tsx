@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Sidebar from '@/components/Sidebar'
 import FloatingWalkIn from '@/components/FloatingWalkIn'
+import BrandColorApplier from '@/components/BrandColorApplier'
 import { RoleProvider, type UserCtx } from '@/components/RoleContext'
 import { PermissionGuard } from '@/components/PermissionGuard'
 import type { UserRole } from '@/lib/types'
@@ -36,14 +37,17 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('salon_name, salon_logo_url')
+    .select('salon_name, salon_logo_url, salon_primary_color, enabled_modules')
     .eq('id', ownerId)
     .single()
 
-  const ctx: UserCtx = { role, ownerId, staffId, permissions, isOwner, displayName }
+  const enabledModules = (profile?.enabled_modules as string[] | null) ?? null
+
+  const ctx: UserCtx = { role, ownerId, staffId, permissions, enabledModules, isOwner, displayName }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <BrandColorApplier primaryColor={profile?.salon_primary_color} />
       <RoleProvider value={ctx}>
         <Sidebar
           salonName={profile?.salon_name ?? undefined}
@@ -52,6 +56,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           role={role}
           ownerId={ownerId}
           permissions={permissions}
+          enabledModules={enabledModules}
           displayName={displayName}
         />
         <div className="lg:pl-60">
