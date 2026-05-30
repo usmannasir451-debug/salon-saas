@@ -91,7 +91,7 @@ function RevenueTooltip({ active, payload, label, currency }: any) {
 }
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-const HOURS = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+const HOURS = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]
 const WEEK_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const DOW_TO_LABEL = [6, 0, 1, 2, 3, 4, 5] // JS getDay (0=Sun) → WEEK_DAYS index
 
@@ -478,22 +478,35 @@ export default function DashboardPage() {
       .slice(0, 6)
   }, [monthlyAppts])
 
-  // ── Peak hours heatmap ────────────────────────────────────────────────────
+  // ── Peak hours heatmap (appointments + walk-ins, 8AM–10PM) ─────────────────
 
   const peakHeatmap = useMemo(() => {
     const map: Record<string, number> = {}
+    // Appointments: use appointment_time column (the booked slot time)
     monthlyAppts.forEach(a => {
+      if (!a.appointment_time) return
       const dow   = new Date(a.appointment_date + 'T00:00:00').getDay()
       const wdIdx = DOW_TO_LABEL[dow]
       const hour  = parseInt(a.appointment_time.split(':')[0])
-      if (hour >= 7 && hour <= 20) {
-        const key  = `${wdIdx}-${hour}`
-        map[key]   = (map[key] ?? 0) + 1
+      if (hour >= 8 && hour <= 22) {
+        const key = `${wdIdx}-${hour}`
+        map[key]  = (map[key] ?? 0) + 1
+      }
+    })
+    // Walk-ins: use created_at timestamp (actual checkout time)
+    branchFilteredWalkIns.forEach(w => {
+      const d     = new Date(w.created_at)
+      const dow   = d.getDay()
+      const wdIdx = DOW_TO_LABEL[dow]
+      const hour  = d.getHours()
+      if (hour >= 8 && hour <= 22) {
+        const key = `${wdIdx}-${hour}`
+        map[key]  = (map[key] ?? 0) + 1
       }
     })
     const max = Math.max(...Object.values(map), 1)
     return { map, max }
-  }, [monthlyAppts])
+  }, [monthlyAppts, branchFilteredWalkIns])
 
   // ── Busiest days of week ──────────────────────────────────────────────────
 
@@ -1051,12 +1064,13 @@ export default function DashboardPage() {
       <Card className="border-gray-100">
         <CardHeader className="pb-2 border-b border-gray-50">
           <CardTitle className="text-base flex items-center gap-2">
-            <Clock className="w-4 h-4 text-primary" /> Peak Hours This Month
+            <Clock className="w-4 h-4 text-primary" /> Busy Hours This Month
+            <span className="text-xs font-normal text-gray-400 ml-1">appointments + walk-ins • 8AM–10PM</span>
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-4">
-          {monthlyAppts.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-6">No appointments this month</p>
+          {monthlyAppts.length === 0 && branchFilteredWalkIns.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-6">No activity this month</p>
           ) : (
             <div className="overflow-x-auto">
               <div className="min-w-[480px]">
@@ -1083,7 +1097,7 @@ export default function DashboardPage() {
                               ? '#f3f4f6'
                               : `rgba(244, 63, 94, ${0.15 + intensity * 0.85})`,
                           }}
-                          title={`${day} ${hour}:00 — ${count} appt${count !== 1 ? 's' : ''}`}>
+                          title={`${day} ${hour}:00 — ${count} booking${count !== 1 ? 's' : ''}`}>
                           {count > 0 && (
                             <span className="text-[8px] font-bold"
                               style={{ color: intensity > 0.5 ? '#fff' : '#f43f5e' }}>

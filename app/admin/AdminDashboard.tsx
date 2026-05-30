@@ -69,6 +69,7 @@ const ALL_MODULES = [
   { key: 'calendar', label: 'Calendar' },
   { key: 'walkin', label: 'Walk-In POS' },
   { key: 'services', label: 'Services' },
+  { key: 'memberships', label: 'Memberships' },
   { key: 'staff', label: 'Staff' },
   { key: 'performance', label: 'Staff Performance' },
   { key: 'reviews', label: 'Reviews' },

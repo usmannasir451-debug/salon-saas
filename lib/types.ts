@@ -279,3 +279,68 @@ export type Lead = {
   notes: string | null
   created_at: string
 }
+
+export type MembershipPlan = {
+  id: string
+  owner_id: string
+  name: string
+  description: string | null
+  type: 'service_based' | 'balance_based'
+  price: number
+  billing_period: 'monthly' | 'quarterly' | 'yearly'
+  services_included: Array<{ service_id: string; service_name: string; quantity_per_period: number }>
+  discount_percentage: number
+  is_active: boolean
+  created_at: string
+}
+
+export type ClientMembership = {
+  id: string
+  owner_id: string
+  client_phone: string
+  client_name: string | null
+  plan_id: string
+  status: 'active' | 'paused' | 'cancelled' | 'expired'
+  start_date: string
+  next_billing_date: string | null
+  balance: number
+  services_remaining: Record<string, number>
+  created_at: string
+  membership_plans?: Pick<MembershipPlan, 'id' | 'name' | 'type' | 'price' | 'billing_period' | 'discount_percentage'>
+}
+
+export type MembershipTransaction = {
+  id: string
+  owner_id: string
+  membership_id: string
+  type: 'payment' | 'service_redemption' | 'balance_credit'
+  amount: number
+  description: string | null
+  created_at: string
+}
+
+export type Package = {
+  id: string
+  owner_id: string
+  name: string
+  description: string | null
+  services_included: Array<{ service_id: string; service_name: string; quantity: number }>
+  price: number
+  validity_days: number
+  is_active: boolean
+  created_at: string
+}
+
+export type ClientPackage = {
+  id: string
+  owner_id: string
+  client_phone: string
+  client_name: string | null
+  package_id: string
+  purchase_date: string
+  expiry_date: string | null
+  services_remaining: Record<string, number>
+  status: 'active' | 'expired' | 'used'
+  created_at: string
+  packages?: Pick<Package, 'id' | 'name' | 'price' | 'validity_days'>
+}

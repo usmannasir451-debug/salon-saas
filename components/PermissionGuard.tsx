@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { useUserContext } from './RoleContext'
@@ -26,6 +26,7 @@ const PERM_TO_HREF: Record<string, string> = {
   team_members: '/team',
   branches: '/branches',
   settings: '/settings',
+  memberships: '/memberships',
 }
 
 // Map of module key → path prefixes it covers
@@ -47,6 +48,7 @@ const MODULE_PATH_MAP: Record<string, string[]> = {
   branches: ['/branches'],
   team_members: ['/team'],
   settings: ['/settings'],
+  memberships: ['/memberships'],
 }
 
 // Always blocked for sub-users — even if owner accidentally grants these permissions
@@ -55,7 +57,7 @@ const OWNER_ONLY_PERM_KEYS = new Set(['team', 'settings', 'payroll', 'team_membe
 
 function isModuleEnabled(pathname: string, enabledModules: string[] | null | undefined): boolean {
   if (!enabledModules) return true // no restriction if null (all enabled)
-  // Export and onboarding are always accessible
+  // These paths are always accessible
   if (pathname.startsWith('/export') || pathname.startsWith('/onboarding') || pathname.startsWith('/suspended')) return true
 
   for (const [mod, paths] of Object.entries(MODULE_PATH_MAP)) {
@@ -71,12 +73,24 @@ export function PermissionGuard({ children }: { children: React.ReactNode }) {
   const { role, permissions, enabledModules } = useUserContext()
   const pathname = usePathname()
   const router = useRouter()
+  // Track previous pathname — null means this is the initial page load.
+  // On initial load we redirect silently (no toast) so sub-users don't see
+  // spurious "Access denied" errors when first landing on /dashboard.
+  const prevPathnameRef = useRef<string | null>(null)
 
   useEffect(() => {
+    const prevPath = prevPathnameRef.current
+    prevPathnameRef.current = pathname
+
     // Check salon-level module access first (applies to everyone including owner)
     if (!isModuleEnabled(pathname, enabledModules)) {
-      toast.error('This feature is not enabled for your account. Please contact support.')
-      router.replace('/dashboard')
+      if (prevPath !== null) {
+        toast.error('This feature is not enabled for your account. Please contact support.')
+      }
+      // Avoid infinite loop if /dashboard is also disabled
+      if (pathname !== '/dashboard') {
+        router.replace('/dashboard')
+      }
       return
     }
 
@@ -102,7 +116,9 @@ export function PermissionGuard({ children }: { children: React.ReactNode }) {
     const firstAllowed = allowed[0] ?? '/appointments'
 
     if (isOwnerOnlyPath) {
-      toast.error('Access denied — owner only')
+      if (prevPath !== null) {
+        toast.error('Access denied — owner only')
+      }
       router.replace(firstAllowed)
       return
     }
@@ -112,7 +128,9 @@ export function PermissionGuard({ children }: { children: React.ReactNode }) {
     )
 
     if (!isAllowed) {
-      toast.error('Access denied')
+      if (prevPath !== null) {
+        toast.error('Access denied')
+      }
       router.replace(firstAllowed)
     }
   }, [pathname, role, permissions, enabledModules, router])

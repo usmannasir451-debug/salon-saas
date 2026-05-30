@@ -46,6 +46,7 @@ export async function middleware(request: NextRequest) {
     '/dashboard', '/appointments', '/calendar', '/walkin', '/services', '/staff',
     '/clients', '/branches', '/team', '/settings', '/expenses', '/inventory',
     '/payroll', '/reports', '/reviews', '/export', '/onboarding', '/suspended', '/admin',
+    '/memberships',
   ]
 
   const isAuthRoute = authRoutes.some((r) => pathname.startsWith(r))

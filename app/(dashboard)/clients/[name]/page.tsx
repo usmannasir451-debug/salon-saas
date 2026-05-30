@@ -17,8 +17,12 @@ import {
   Loader2,
   MessageCircle,
   ReceiptText,
+  Crown,
+  Package,
+  Calendar,
 } from 'lucide-react'
 import Link from 'next/link'
+import type { ClientMembership, ClientPackage } from '@/lib/types'
 
 type AppRow = {
   id: string
@@ -52,6 +56,8 @@ export default function ClientProfilePage({ params }: { params: Promise<{ name: 
   const { formatAmount } = useCurrency()
 
   const [appointments, setAppointments] = useState<AppRow[]>([])
+  const [memberships, setMemberships] = useState<ClientMembership[]>([])
+  const [clientPackages, setClientPackages] = useState<ClientPackage[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -71,6 +77,28 @@ export default function ClientProfilePage({ params }: { params: Promise<{ name: 
       .order('appointment_time', { ascending: false })
 
     setAppointments((data as unknown as AppRow[]) ?? [])
+
+    // Load memberships and packages by phone (if we have the phone)
+    const phone = (data as unknown as AppRow[])?.find(a => a.client_phone)?.client_phone
+    if (phone) {
+      const [membRes, pkgRes] = await Promise.all([
+        supabase
+          .from('client_memberships')
+          .select('*, membership_plans(id, name, type, price, billing_period, discount_percentage)')
+          .eq('owner_id', ownerId)
+          .eq('client_phone', phone)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('client_packages')
+          .select('*, packages(id, name, price, validity_days)')
+          .eq('owner_id', ownerId)
+          .eq('client_phone', phone)
+          .order('created_at', { ascending: false }),
+      ])
+      setMemberships((membRes.data ?? []) as unknown as ClientMembership[])
+      setClientPackages((pkgRes.data ?? []) as unknown as ClientPackage[])
+    }
+
     setLoading(false)
   }
 
@@ -167,6 +195,92 @@ export default function ClientProfilePage({ params }: { params: Promise<{ name: 
             <p className="text-sm font-semibold text-gray-800">Favourite Service</p>
             <p className="text-xs text-gray-500">{favoriteService}</p>
           </div>
+        </div>
+      )}
+
+      {/* Memberships & Packages */}
+      {(memberships.length > 0 || clientPackages.length > 0) && (
+        <div className="mb-6 space-y-3">
+          {memberships.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Crown className="w-4 h-4 text-primary" />
+                <h3 className="text-sm font-semibold text-gray-700">Memberships</h3>
+              </div>
+              <div className="space-y-2">
+                {memberships.map(m => (
+                  <div key={m.id} className="flex items-center gap-3 p-3 rounded-xl bg-primary/5 border border-primary/10">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-medium text-gray-900">{m.membership_plans?.name ?? 'Membership'}</span>
+                        <Badge className={
+                          m.status === 'active' ? 'bg-green-50 text-green-700 border-green-200 text-xs'
+                          : m.status === 'paused' ? 'bg-yellow-50 text-yellow-700 border-yellow-200 text-xs'
+                          : 'bg-gray-100 text-gray-500 border-gray-200 text-xs'
+                        }>
+                          {m.status}
+                        </Badge>
+                      </div>
+                      {m.next_billing_date && (
+                        <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          Renews {format(new Date(m.next_billing_date + 'T00:00:00'), 'MMM d, yyyy')}
+                        </p>
+                      )}
+                    </div>
+                    <Link href="/memberships" className="text-xs text-primary hover:underline shrink-0">
+                      Manage →
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {clientPackages.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Package className="w-4 h-4 text-blue-600" />
+                <h3 className="text-sm font-semibold text-gray-700">Packages</h3>
+              </div>
+              <div className="space-y-2">
+                {clientPackages.map(p => (
+                  <div key={p.id} className="flex items-center gap-3 p-3 rounded-xl bg-blue-50 border border-blue-100">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-medium text-gray-900">{p.packages?.name ?? 'Package'}</span>
+                        <Badge className={
+                          p.status === 'active' ? 'bg-green-50 text-green-700 border-green-200 text-xs'
+                          : p.status === 'expired' ? 'bg-red-50 text-red-600 border-red-200 text-xs'
+                          : 'bg-purple-50 text-purple-700 border-purple-200 text-xs'
+                        }>
+                          {p.status}
+                        </Badge>
+                      </div>
+                      {p.expiry_date && (
+                        <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          Expires {format(new Date(p.expiry_date + 'T00:00:00'), 'MMM d, yyyy')}
+                        </p>
+                      )}
+                      {Object.keys(p.services_remaining).length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {Object.entries(p.services_remaining).map(([svcId, qty]) => (
+                            <span key={svcId} className="text-[10px] bg-white text-blue-600 border border-blue-200 px-1.5 py-0.5 rounded-full">
+                              {qty} sessions left
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <Link href="/memberships" className="text-xs text-blue-600 hover:underline shrink-0">
+                      Manage →
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

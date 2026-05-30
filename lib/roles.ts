@@ -19,11 +19,11 @@ export const ROLE_COLORS: Record<UserRole, string> = {
 }
 
 export const ROLE_NAV: Record<UserRole, string[]> = {
-  owner: ['/dashboard', '/appointments', '/calendar', '/walkin', '/services', '/staff', '/staff/performance', '/reviews', '/clients', '/branches', '/team', '/expenses', '/inventory', '/payroll', '/attendance', '/reports/pnl', '/reports', '/export', '/settings', '/settings/audit', '/onboarding'],
+  owner: ['/dashboard', '/appointments', '/calendar', '/walkin', '/services', '/memberships', '/staff', '/staff/performance', '/reviews', '/clients', '/branches', '/team', '/expenses', '/inventory', '/payroll', '/attendance', '/reports/pnl', '/reports', '/export', '/settings', '/settings/audit', '/onboarding'],
   regional_manager: ['/dashboard', '/branches', '/reports/pnl', '/reports', '/export'],
-  manager: ['/dashboard', '/appointments', '/calendar', '/walkin', '/services', '/staff', '/staff/performance', '/reviews', '/clients', '/branches', '/expenses', '/inventory', '/payroll', '/attendance', '/reports/pnl', '/reports', '/export'],
-  receptionist: ['/appointments', '/calendar', '/walkin', '/clients'],
-  cashier: ['/appointments', '/calendar', '/walkin'],
+  manager: ['/dashboard', '/appointments', '/calendar', '/walkin', '/services', '/memberships', '/staff', '/staff/performance', '/reviews', '/clients', '/branches', '/expenses', '/inventory', '/payroll', '/attendance', '/reports/pnl', '/reports', '/export'],
+  receptionist: ['/appointments', '/calendar', '/walkin', '/clients', '/memberships'],
+  cashier: ['/appointments', '/calendar', '/walkin', '/memberships'],
   staff: ['/appointments'],
 }
 

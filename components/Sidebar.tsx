@@ -34,6 +34,7 @@ import {
   Sun,
   Moon,
   ClipboardList,
+  Crown,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -60,6 +61,7 @@ const PERM_TO_HREF: Record<string, string> = {
   team_members: '/team',
   branches: '/branches',
   settings: '/settings',
+  memberships: '/memberships',
 }
 
 // Maps module key → hrefs that module covers
@@ -81,6 +83,7 @@ const MODULE_HREFS: Record<string, string[]> = {
   branches: ['/branches'],
   team_members: ['/team'],
   settings: ['/settings', '/settings/audit'],
+  memberships: ['/memberships'],
 }
 
 const allNavItems = [
@@ -89,6 +92,7 @@ const allNavItems = [
   { href: '/calendar', label: 'Calendar', icon: CalendarRange },
   { href: '/walkin', label: 'Walk-In', icon: Zap },
   { href: '/services', label: 'Services', icon: Scissors },
+  { href: '/memberships', label: 'Memberships', icon: Crown },
   { href: '/staff', label: 'Staff', icon: Users },
   { href: '/staff/performance', label: 'Performance', icon: TrendingUp },
   { href: '/reviews', label: 'Reviews', icon: Star },
@@ -199,7 +203,7 @@ export default function Sidebar({
         <div className="flex items-center justify-between">
           <Link
             href={navItems[0]?.href ?? '/appointments'}
-            className="flex items-center gap-2.5 group"
+            className="flex items-center gap-2.5 group min-w-0 flex-1"
             onClick={() => setMobileOpen(false)}
           >
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center shadow-sm shadow-primary/30 flex-shrink-0 overflow-hidden">
@@ -209,8 +213,11 @@ export default function Sidebar({
                 <Scissors className="w-4 h-4 text-white" />
               )}
             </div>
-            <div className="overflow-hidden">
-              <p className="font-bold text-sm text-gray-900 leading-tight truncate">
+            <div className="overflow-hidden min-w-0">
+              <p
+                className="font-bold text-sm text-gray-900 leading-tight truncate"
+                title={salonName || 'My Salon'}
+              >
                 {salonName || 'My Salon'}
               </p>
               <p className="text-[10px] text-primary font-medium leading-tight">Snipforce</p>
@@ -308,18 +315,23 @@ export default function Sidebar({
       </aside>
 
       {/* Mobile Header */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between shadow-sm">
-        <Link href={navItems[0]?.href ?? '/appointments'} className="flex items-center gap-2">
-          <div className="w-7 h-7 bg-primary rounded-lg flex items-center justify-center overflow-hidden">
+      <header className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 px-4 py-3 flex items-center gap-2 shadow-sm">
+        <Link href={navItems[0]?.href ?? '/appointments'} className="flex items-center gap-2 min-w-0 flex-1">
+          <div className="w-7 h-7 bg-primary rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
             {salonLogoUrl ? (
               <Image src={salonLogoUrl} alt="Logo" width={28} height={28} className="object-cover w-full h-full" unoptimized />
             ) : (
               <Scissors className="w-3.5 h-3.5 text-white" />
             )}
           </div>
-          <span className="font-bold text-sm text-gray-900">{salonName || 'Snipforce'}</span>
+          <span
+            className="font-bold text-sm text-gray-900 dark:text-gray-100 truncate"
+            title={salonName || 'Snipforce'}
+          >
+            {salonName || 'Snipforce'}
+          </span>
         </Link>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 flex-shrink-0">
           <button
             onClick={toggleDarkMode}
             className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"

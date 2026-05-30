@@ -99,6 +99,18 @@ NEXT_PUBLIC_ADMIN_EMAIL           # Email address that can access /admin page
 - Bulk CSV import and export
 - Deal redemption in appointments and walk-ins
 
+### Memberships & Packages (`/memberships`)
+- **Membership Plans**: Service-based (redeem services per billing period) or Balance-based (recurring credit)
+- **Packages**: One-time service bundles with validity period
+- Plan management: name, type, price, billing period (monthly/quarterly/yearly), included services with quantity, discount on other services
+- Package management: name, services with quantities, price, validity in days
+- Client Memberships: assign plans to clients, track services_remaining (JSONB), next billing date, balance
+- Client Packages: sell packages to clients, track expiry and services_remaining
+- Active Members tab: view all client memberships and packages with status management
+- Dashboard stats: active members count, monthly recurring revenue (MRR), packages sold this month, expiring soon alert
+- Client profile page shows active memberships and packages for that client
+- Module key: `memberships` — disabled by default for existing accounts, admin enables per salon
+
 ### Staff Management
 - Staff directory (name, phone, gender, designation, joining date)
 - Emergency contact fields
@@ -213,6 +225,11 @@ NEXT_PUBLIC_ADMIN_EMAIL           # Email address that can access /admin page
 | `loyalty_transactions` | Points earned and redeemed per client phone number. |
 | `custom_inventory_categories` | Owner-defined inventory categories. |
 | `leads` | Demo/sales lead submissions from the landing page. |
+| `membership_plans` | Recurring membership plan definitions (service-based or balance-based). |
+| `client_memberships` | Active client memberships linking client phone to a plan, with services_remaining and next_billing_date. |
+| `membership_transactions` | Payment and service redemption log per client membership. |
+| `packages` | One-time service bundle definitions with price and validity. |
+| `client_packages` | Client package purchases with expiry_date and services_remaining. |
 
 ### Key DB function
 - `get_effective_owner_id()` — used in all RLS policies so both owner and their team members see the same data.
@@ -230,6 +247,9 @@ NEXT_PUBLIC_ADMIN_EMAIL           # Email address that can access /admin page
 - **Module-level access control**: `profiles.enabled_modules` (JSONB array) stores which features a salon can access. Enforced in `Sidebar.tsx` (hides nav items) and `PermissionGuard.tsx` (redirects with toast). Applies to owners AND their sub-users. Managed by Snipforce admin via the admin panel.
 - **Brand color**: `profiles.salon_primary_color` (hex string). Applied via `BrandColorApplier` client component which sets `--primary` CSS variable on `document.documentElement`. Settings page applies preview in real-time via `useEffect`.
 - **No discount caps**: Maximum discount limits have been removed from settings and enforcement. Discounts are freely applicable.
+- **Memberships module**: `profiles.enabled_modules` now includes `memberships` key. Disabled by default for existing accounts (admin enables per salon). New accounts have it enabled by default.
+- **PermissionGuard silent redirect**: On initial page load (e.g., sub-user lands on /dashboard), the guard redirects silently without showing a toast. Toast only fires on subsequent navigations to restricted pages, preventing spurious "Access denied" errors at login.
+- **Busy hours heatmap**: Extended to 8AM–10PM (was 7AM–8PM), now includes walk-in data (via `created_at` timestamp) in addition to appointments. Uses `get_effective_owner_id()` for branch filtering.
 - **Server vs client Supabase**: `lib/supabase/client.ts` for browser, `lib/supabase/server.ts` for server components/actions, `lib/supabase/admin.ts` for privileged operations using SERVICE_ROLE_KEY.
 
 ## 8. FOLDER STRUCTURE
@@ -256,6 +276,7 @@ salon-saas/
 │   │   ├── settings/               # Salon settings + audit log
 │   │   ├── staff/                  # Staff directory + performance
 │   │   ├── team/                   # Team member management + server actions
+│   │   ├── memberships/            # Memberships & Packages management
 │   │   └── walkin/                 # Walk-in POS
 │   ├── admin/                      # Super-admin panel (email-gated)
 │   ├── api/

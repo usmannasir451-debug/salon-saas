@@ -1,142 +1,129 @@
-You are an expert SaaS developer working on "Snipforce". Fix and improve the following carefully. Review codebase before changes. Ensure no existing features break.
+You are an expert SaaS developer working on "Snipforce". Make these important fixes and additions. Review entire codebase carefully before implementing. Ensure no existing features break.
 
-PART 1 - WALK-IN POS FIXES
+PART 1 - FIX SUB-USER SYSTEM COMPLETELY
 
-1. DUPLICATE SERVICE BUG
-- Service is being added twice to cart when clicked once
-- Find and fix the double-add bug in the click handler
-- Ensure clicking a service adds it exactly once
+CRITICAL BUGS TO FIX:
+1. Sub-user login shows "Access Denied" errors and infinite notifications - fix completely
+2. Sub-users appearing as separate accounts in admin panel - fix this
+3. Sub-user data isolation: ensure sub-users always use owner's data via get_effective_owner_id()
 
-2. ORDER HISTORY / COMPLETED ORDERS
-- After order is completed, there is no way to view past walk-in orders
-- Add a "Today's Orders" or "Order History" tab/panel on the walk-in screen
-- Show list of completed walk-ins for today with: time, client name, services, total, payment method
-- Clicking an order shows its details/receipt
+ROOT CAUSE INVESTIGATION:
+- Check RoleContext.tsx - how is ownerId being set for sub-users?
+- Check salon_members table - is member_user_id properly linked?
+- Check PermissionGuard.tsx - is it causing infinite redirect loops?
+- Check notification system - is it firing repeatedly for sub-users?
+- Check all dashboard queries - are they using effective owner_id or auth.uid()?
 
-3. TABLE/LIST VIEW OPTION
-- Add a toggle button to switch between Grid view (current cards) and List/Table view for services
-- List view shows: service name, duration, price, add button in a compact table format
-- Remember user preference
+COMPLETE FIX:
+- When sub-user logs in: immediately find their salon_members record, get owner_id
+- Use that owner_id for ALL data queries throughout the app
+- Fix PermissionGuard to not cause redirect loops
+- Fix notification queries to use effective owner_id
+- Fix dashboard, appointments, walk-in, clients, staff pages for sub-users
+- Sub-users should have smooth experience with only their permitted pages visible
+- No access denied errors unless they directly navigate to restricted URL
 
-4. STAFF SELECTION SHOWING CODE
-- After selecting staff, it shows UUID/code instead of staff name
-- Fix the staff dropdown to always show staff name after selection
-- Check all Select components in walk-in page for same issue
+ADMIN PANEL HIERARCHY FIX:
+- Main salon accounts list: show ONLY owner accounts (not sub-users)
+- Each salon row shows: salon name, email, status, modules, sub-user count badge
+- Clicking a salon opens a full detail panel/modal showing:
+  * Salon info: name, email, status, plan, date joined, modules enabled
+  * Sub-Users section: list all sub-users with display name, email, permissions, last set password (eye toggle), status
+  * Stats: total appointments, walk-ins, revenue
+  * Actions: Edit Modules, Change Email, Reset Password, Suspend, Delete
+- Remove sub-users from appearing as separate salon entries in the main list
+- Add filter toggle: "Main Accounts Only" (default on)
 
-5. LOYALTY POINTS VISIBILITY
-- When client has loyalty points and phone number is entered, the loyalty section is overlapping or hiding cart items
-- Fix layout so loyalty section appears cleanly below order items without hiding anything
-- Make loyalty redemption input compact and non-intrusive
+PART 2 - UI FIX: SALON NAME OVERFLOW IN HEADER
 
-PART 2 - CURRENCY FIX EVERYWHERE
+Problem: When salon name is long, notification bell and dark mode toggle icons go outside the UI/overflow
 
-- "Price (PKR)" is hardcoded in service add/edit form and other places
-- Use the useCurrency() hook everywhere to get current currency symbol and name
-- Fix specifically:
-  * Service form: "Price (PKR)" → "Price ([currency])"
-  * Staff salary fields: any hardcoded PKR or $ symbols
-  * Walk-in form: any hardcoded currency
-  * Inventory cost fields
-  * Expense amount fields
-  * Any other place with hardcoded PKR or $ symbol
-- Search entire codebase for hardcoded "PKR", "USD", "$", "₨" and replace with dynamic currency
+Fix:
+- In dashboard layout header/top bar: constrain the salon name to max width with text truncation (truncate class)
+- Icons (notification bell + dark mode toggle) must always be visible and never pushed off screen
+- Use flexbox properly: salon name takes available space but truncates, icons stay fixed on right
+- Add tooltip on truncated salon name to show full name on hover
+- Test with very long salon names like "Muhammad Usman's Premium Salon & Spa DHA Karachi"
 
-PART 3 - REPORTS MODULE (Rename + Expand)
+PART 3 - BUSY HOURS TRACKING
 
-RENAME:
-- Rename "Export Data" in sidebar/navigation to "Reports"
-- Update route if needed or keep same route but update all labels
+Check if time is already being recorded with appointments and walk-ins:
+- appointments table: check if appointment_time or created_at captures time
+- walk_ins table: check if created_at captures time
+- If time already exists: make sure busy hours chart on dashboard is using it correctly
+- If not: add appointment_time column to appointments (time of the appointment slot, not creation time)
 
-NEW REPORTS PAGE (/reports):
-Create a comprehensive reports page with multiple report types as tabs or sections:
+BUSY HOURS VISUALIZATION:
+- Dashboard busy hours heatmap: show 8AM to 10PM, which hours have most bookings
+- Combine appointments + walk-ins by hour
+- Show as bar chart or heatmap grid
+- Filter by branch if multiple branches
 
-1. SALES REPORT
-- Date range filter (today, this week, this month, custom range)
-- Total revenue (appointments + walk-ins)
-- Number of transactions
-- Average transaction value
-- Revenue by service category
-- Top 10 services by revenue
-- Exportable as CSV
+PART 4 - MEMBERSHIPS & PACKAGES SYSTEM
 
-2. WALK-IN REPORT
-- Date range filter
-- Total walk-ins count
-- Total walk-in revenue
-- Walk-ins by staff member
-- Walk-ins by hour of day (peak hours)
-- Walk-ins by day of week
-- Exportable as CSV
+Build a complete membership and package system:
 
-3. PAYMENT METHODS REPORT
-- Date range filter
-- Breakdown by payment method: Cash, Card, and all custom methods
-- Amount and percentage for each method
-- Trend over time (bar chart)
-- Exportable as CSV
+DATABASE TABLES NEEDED:
+- membership_plans: id, owner_id, name, description, type (service_based/balance_based), price, billing_period (monthly/quarterly/yearly), services_included (JSONB array of {service_id, quantity_per_period}), discount_percentage, is_active, created_at
+- client_memberships: id, owner_id, client_id, plan_id, status (active/paused/cancelled/expired), start_date, next_billing_date, balance (for balance-based), services_remaining (JSONB), created_at
+- membership_transactions: id, membership_id, type (payment/service_redemption/balance_credit), amount, description, created_at
+- packages: id, owner_id, name, description, services_included (JSONB array of {service_id, quantity}), price, validity_days, is_active, created_at
+- client_packages: id, owner_id, client_id, package_id, purchase_date, expiry_date, services_remaining (JSONB), status (active/expired/used), created_at
 
-4. APPOINTMENTS REPORT
-- Date range filter
-- Total appointments
-- Confirmed vs completed vs cancelled vs no-show
-- Revenue from appointments
-- Appointments by staff
-- Exportable as CSV
+MEMBERSHIP PLANS PAGE (/memberships):
+- Add to sidebar under Services section (if memberships module enabled)
+- Two tabs: Membership Plans and Packages
 
-5. STAFF PERFORMANCE REPORT
-- Date range filter
-- Per staff: appointments count, walk-ins count, revenue generated, avg rating, commission earned
-- Exportable as CSV
+MEMBERSHIP PLANS TAB:
+- List all plans with: name, type, price/period, active members count, status toggle
+- Create plan form:
+  * Plan name
+  * Type: Service-Based (redeem services) or Balance-Based (recurring credit)
+  * Price and billing period (monthly/quarterly/yearly)
+  * For service-based: select services and quantity per period (e.g. 2 haircuts/month)
+  * Discount on other services (%)
+  * Description
 
-6. CLIENT REPORT
-- Date range filter
-- New clients vs returning clients
-- Top 10 clients by spend
-- Client retention rate
-- Exportable as CSV
+PACKAGES TAB:
+- List all packages with: name, included services, price, validity, sales count
+- Create package form:
+  * Package name
+  * Select services and quantities (e.g. 5 haircuts + 3 facials)
+  * Package price (usually discounted vs individual prices)
+  * Validity in days
+  * Description
 
-7. INVENTORY REPORT
-- Current stock levels
-- Low stock items
-- Stock value
-- Exportable as CSV
+CLIENT MEMBERSHIPS:
+- On client profile page: show active memberships and packages
+- "Add Membership" button: assign a plan to client, record payment
+- "Add Package" button: sell a package to client, record payment
+- Show services remaining, balance, next billing date
+- Pause/cancel membership option
 
-8. EXPENSE REPORT (only if expenses module enabled)
-- Date range filter
-- Expenses by category
-- Total expenses
-- Exportable as CSV
+WALK-IN & APPOINTMENT INTEGRATION:
+- When processing walk-in or appointment: check if client has active membership/package
+- Show "Use Membership" or "Redeem Package" option
+- If redeemed: deduct from services_remaining, show discounted/zero price
+- Record redemption in membership_transactions
 
-MODULE-BASED REPORTS:
-- Only show report tabs for modules the salon has enabled
-- If expenses module disabled: hide expense report tab
-- If staff module disabled: hide staff performance report
-- If inventory module disabled: hide inventory report
-- etc.
+MEMBERSHIPS DASHBOARD (/memberships/dashboard):
+- Total active members
+- Monthly recurring revenue (MRR) from memberships
+- Packages sold this month
+- Expiring memberships this week (alert)
+- Recent membership transactions
 
-PART 4 - DASHBOARD DATE RANGE FILTER
+ADMIN MODULE CONTROL:
+- Add "memberships" to the modules list in admin panel
+- Disabled by default for existing accounts
+- Admin can enable per salon
 
-Current: Today, This Week, This Month buttons
-Add:
-- "Custom Range" button/option that opens a date picker
-- Date range picker: start date and end date inputs
-- When custom range selected: all KPIs, charts update to show data for that range
-- Show selected range label: "May 1 - May 15, 2026"
-- Clear button to go back to preset filters
-
-Also add TIME display:
-- Show current time (live updating) in dashboard header area
-- Format: "Saturday, May 30, 2026 — 3:45 PM"
-- Updates every minute
-
-TECHNICAL REQUIREMENTS:
-- Use date-fns or dayjs for date handling (already likely installed)
-- All report exports use the same CSV export pattern
-- Reports respect owner_id data isolation
-- Module-based report visibility uses enabled_modules from context
-- Run npm run build to verify zero TypeScript errors
-- Update CLAUDE.md
-- Generate SQL migration if any new tables/columns needed
-- Mobile responsive
+PART 5 - TECHNICAL REQUIREMENTS
+- Generate complete SQL migration for all new tables
+- RLS policies on all new tables with grants for authenticated, service_role, anon
+- Run npm run build to confirm zero TypeScript errors
+- Update CLAUDE.md with all new features and tables
+- Mobile responsive throughout
 - Dark mode compatible
-- Maintain brand color theming
+- Brand color theming
+- No breaking changes to existing features
