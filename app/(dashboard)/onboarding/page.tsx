@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { useUserContext } from '@/components/RoleContext'
+import { useCurrency } from '@/hooks/useCurrency'
 import {
   CheckCircle2, ChevronRight, Scissors, Users, UserPlus, Settings, Loader2, X, Upload,
 } from 'lucide-react'
@@ -23,6 +24,7 @@ const STEPS = [
 
 export default function OnboardingPage() {
   const { role, ownerId } = useUserContext()
+  const { currency } = useCurrency()
   const router = useRouter()
 
   const [step, setStep] = useState(1)
@@ -301,7 +303,7 @@ export default function OnboardingPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <Label htmlFor="svc-price">Price (PKR) *</Label>
+                      <Label htmlFor="svc-price">Price ({currency}) *</Label>
                       <Input
                         id="svc-price"
                         type="number"

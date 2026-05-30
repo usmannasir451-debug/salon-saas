@@ -12,7 +12,7 @@ import InvoiceModal, { type InvoiceData } from '@/components/InvoiceModal'
 import {
   Zap, Loader2, X, Banknote, CreditCard, User, Phone, Search,
   Star, ChevronDown, ChevronUp, CheckCircle2, Receipt, Printer,
-  MessageSquare, ShoppingCart, Trash2, Package, Clock,
+  MessageSquare, ShoppingCart, Trash2, Package, Clock, History, LayoutGrid, List,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -37,6 +37,16 @@ type PaymentMethodConfig = { value: string; label: string; enabled: boolean }
 type ServiceItem = Pick<Service, 'id' | 'name' | 'price' | 'duration'>
 type StaffItem = Pick<StaffMember, 'id' | 'name'>
 type ClientProfile = { name: string; loyalty_balance: number }
+
+type TodayOrder = {
+  id: string
+  client_name: string | null
+  client_phone: string | null
+  total: number
+  payment_method: string
+  created_at: string
+  walk_in_services: { services: { name: string } | null }[]
+}
 
 const DEFAULT_PAYMENT_METHODS: PaymentMethodConfig[] = [
   { value: 'cash', label: 'Cash', enabled: true },
@@ -177,6 +187,17 @@ export default function WalkInPage() {
   const [feedbackWalkIn, setFeedbackWalkIn] = useState<WalkIn | null>(null)
   const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(null)
 
+  // View mode & history
+  const [serviceViewMode, setServiceViewMode] = useState<'grid' | 'list'>('grid')
+  const [activeMainTab, setActiveMainTab] = useState<'pos' | 'history'>('pos')
+  const [todayOrders, setTodayOrders] = useState<TodayOrder[]>([])
+  const [selectedOrderDetail, setSelectedOrderDetail] = useState<TodayOrder | null>(null)
+
+  useEffect(() => {
+    const saved = localStorage.getItem('walkin_view_mode')
+    if (saved === 'list' || saved === 'grid') setServiceViewMode(saved)
+  }, [])
+
   useEffect(() => {
     const hasAccess =
       ['owner', 'regional_manager', 'manager', 'receptionist', 'cashier'].includes(role) ||
@@ -208,6 +229,16 @@ export default function WalkInPage() {
     const pm = profileRes.data?.payment_methods
     if (pm && Array.isArray(pm) && pm.length > 0) setPaymentMethodConfig(pm as PaymentMethodConfig[])
     else setPaymentMethodConfig(DEFAULT_PAYMENT_METHODS)
+
+    const todayStr = format(new Date(), 'yyyy-MM-dd')
+    const { data: todayData } = await supabase
+      .from('walk_ins')
+      .select('id, client_name, client_phone, total, payment_method, created_at, walk_in_services(services(name))')
+      .eq('user_id', ownerId)
+      .gte('created_at', todayStr + 'T00:00:00')
+      .order('created_at', { ascending: false })
+    setTodayOrders((todayData as unknown as TodayOrder[]) ?? [])
+
     setLoading(false)
   }
 
@@ -425,6 +456,17 @@ export default function WalkInPage() {
     setShowOrderSheet(false)
     clearOrder()
     toast.success('Walk-in recorded!')
+
+    // Refresh today's orders list
+    const refreshStr = format(new Date(), 'yyyy-MM-dd')
+    const { data: freshOrders } = await supabase
+      .from('walk_ins')
+      .select('id, client_name, client_phone, total, payment_method, created_at, walk_in_services(services(name))')
+      .eq('user_id', ownerId)
+      .gte('created_at', refreshStr + 'T00:00:00')
+      .order('created_at', { ascending: false })
+    setTodayOrders((freshOrders as unknown as TodayOrder[]) ?? [])
+
     setSubmitting(false)
   }
 
@@ -466,7 +508,7 @@ export default function WalkInPage() {
                 </div>
               </div>
             )}
-            {additionalServices.map(svc => (
+            {selectedDeal && additionalServices.map(svc => (
               <div key={svc.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
                 <div className="flex items-center gap-2 min-w-0">
                   <Zap className="w-4 h-4 text-primary flex-shrink-0" />
@@ -505,7 +547,7 @@ export default function WalkInPage() {
       </div>
 
       {/* Summary + checkout section */}
-      <div className="border-t border-gray-100 px-4 py-3 space-y-3 flex-shrink-0">
+      <div className="border-t border-gray-100 px-4 py-3 space-y-3 flex-shrink-0 overflow-y-auto max-h-[60vh]">
         {/* Subtotal row */}
         <div className="flex justify-between text-sm text-gray-600">
           <span>Subtotal</span>
@@ -667,32 +709,109 @@ export default function WalkInPage() {
     <div className="flex flex-col h-[calc(100vh-0px)] lg:h-screen overflow-hidden bg-gray-50">
 
       {/* ── Page Header ── */}
-      <div className="flex-shrink-0 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
+      <div className="flex-shrink-0 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
             <Zap className="w-4 h-4 text-primary" />
           </div>
-          <div>
+          <div className="hidden sm:block min-w-0">
             <h1 className="text-base font-bold text-gray-900">Walk-In POS</h1>
-            <p className="text-xs text-gray-400 hidden sm:block">Select services, choose payment</p>
+            <p className="text-xs text-gray-400">Select services, choose payment</p>
           </div>
         </div>
+        {/* Tab switcher */}
+        <div className="flex items-center gap-1 border border-gray-200 rounded-lg p-0.5 bg-gray-50">
+          <button
+            onClick={() => setActiveMainTab('pos')}
+            className={cn(
+              'px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1',
+              activeMainTab === 'pos' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            )}
+          >
+            <Zap className="w-3 h-3" /> POS
+          </button>
+          <button
+            onClick={() => setActiveMainTab('history')}
+            className={cn(
+              'px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5',
+              activeMainTab === 'history' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            )}
+          >
+            <History className="w-3 h-3" />
+            Orders
+            {todayOrders.length > 0 && (
+              <span className={cn(
+                'text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-bold',
+                activeMainTab === 'history' ? 'bg-primary text-white' : 'bg-gray-300 text-gray-600'
+              )}>
+                {todayOrders.length}
+              </span>
+            )}
+          </button>
+        </div>
         {/* Mobile: order button in header */}
-        <button
-          className="md:hidden flex items-center gap-2 bg-primary text-white rounded-xl px-3 py-2 text-sm font-semibold"
-          onClick={() => setShowOrderSheet(true)}
-        >
-          <ShoppingCart className="w-4 h-4" />
-          Order
-          {orderItemCount > 0 && (
-            <span className="bg-white text-primary rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">
-              {orderItemCount}
-            </span>
-          )}
-        </button>
+        {activeMainTab === 'pos' && (
+          <button
+            className="md:hidden flex items-center gap-2 bg-primary text-white rounded-xl px-3 py-2 text-sm font-semibold flex-shrink-0"
+            onClick={() => setShowOrderSheet(true)}
+          >
+            <ShoppingCart className="w-4 h-4" />
+            {orderItemCount > 0 && (
+              <span className="bg-white text-primary rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">
+                {orderItemCount}
+              </span>
+            )}
+          </button>
+        )}
       </div>
 
-      {/* ── Split Layout ── */}
+      {/* ── Split Layout (POS mode) ── */}
+      {activeMainTab === 'history' ? (
+        /* ── Today's Orders History ── */
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-bold text-gray-700 flex items-center gap-1.5">
+              <History className="w-4 h-4 text-primary" />
+              Today&apos;s Orders
+              <span className="text-xs font-normal text-gray-400">({format(new Date(), 'MMM d, yyyy')})</span>
+            </h2>
+          </div>
+          {todayOrders.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <ShoppingCart className="w-12 h-12 text-gray-200 mb-3" />
+              <p className="text-sm text-gray-400">No orders yet today</p>
+              <p className="text-xs text-gray-300 mt-1">Completed walk-ins will appear here</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {todayOrders.map(order => {
+                const services = order.walk_in_services.map(ws => ws.services?.name).filter(Boolean)
+                return (
+                  <button
+                    key={order.id}
+                    type="button"
+                    onClick={() => setSelectedOrderDetail(order)}
+                    className="w-full text-left bg-white border border-gray-100 rounded-xl p-4 hover:border-primary/30 hover:bg-primary/5 transition-all"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-gray-900">{order.client_name || 'Walk-in Client'}</span>
+                        <Badge className="bg-green-50 text-green-700 border-green-200 text-xs capitalize">{order.payment_method}</Badge>
+                      </div>
+                      <span className="text-base font-bold text-primary">{formatCurrency(order.total, currency)}</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-gray-400">
+                      <span>{format(new Date(order.created_at), 'h:mm a')}</span>
+                      {order.client_phone && <span>{order.client_phone}</span>}
+                      {services.length > 0 && <span className="truncate">{services.join(', ')}</span>}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      ) : (
       <div className="flex-1 flex overflow-hidden">
 
         {/* ─── LEFT PANEL: Service picker ─── */}
@@ -742,12 +861,12 @@ export default function WalkInPage() {
               </div>
             )}
             {/* Staff select */}
-            <Select value={staffId} onValueChange={(v) => setStaffId(v ?? '')}>
+            <Select value={staffId || 'none'} onValueChange={(v) => setStaffId(v === 'none' ? '' : (v ?? ''))}>
               <SelectTrigger className="h-9 text-sm">
                 <SelectValue placeholder="Assign staff (optional)" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">No staff</SelectItem>
+                <SelectItem value="none">No staff</SelectItem>
                 {staffList.map((s) => (
                   <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                 ))}
@@ -771,7 +890,7 @@ export default function WalkInPage() {
                 </button>
               )}
             </div>
-            <div className="flex gap-1">
+            <div className="flex items-center gap-1">
               {(['all', 'services', 'deals'] as const).map(tab => (
                 <button
                   key={tab}
@@ -786,6 +905,18 @@ export default function WalkInPage() {
                   {tab === 'all' ? 'All' : tab === 'deals' ? `Deals (${filteredDeals.length})` : `Services (${filteredServices.length})`}
                 </button>
               ))}
+              <button
+                type="button"
+                onClick={() => {
+                  const next = serviceViewMode === 'grid' ? 'list' : 'grid'
+                  setServiceViewMode(next)
+                  localStorage.setItem('walkin_view_mode', next)
+                }}
+                className="ml-auto h-7 w-7 flex items-center justify-center rounded-lg border border-gray-200 bg-white hover:bg-gray-50 flex-shrink-0"
+                title={serviceViewMode === 'grid' ? 'Switch to list view' : 'Switch to grid view'}
+              >
+                {serviceViewMode === 'grid' ? <List className="w-3.5 h-3.5 text-gray-500" /> : <LayoutGrid className="w-3.5 h-3.5 text-gray-500" />}
+              </button>
             </div>
           </div>
 
@@ -836,6 +967,39 @@ export default function WalkInPage() {
                 {activeTab === 'all' && filteredDeals.length > 0 && <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Services</p>}
                 {filteredServices.length === 0 ? (
                   <div className="text-center py-8 text-gray-400 text-sm">No services found</div>
+                ) : serviceViewMode === 'list' ? (
+                  <div className="space-y-1">
+                    {filteredServices.map(svc => {
+                      const isSelected = selectedServiceIds.includes(svc.id)
+                      const isDealService = dealServiceIds.includes(svc.id)
+                      return (
+                        <div
+                          key={svc.id}
+                          className={cn(
+                            'flex items-center gap-3 px-3 py-2 rounded-lg border transition-all',
+                            isSelected ? 'bg-primary/5 border-primary/40' : 'bg-gray-50 border-gray-100 hover:border-primary/20',
+                            isDealService && !isSelected ? 'opacity-50' : ''
+                          )}
+                        >
+                          <span className="flex-1 text-sm font-medium text-gray-900 truncate">{svc.name}</span>
+                          <span className="text-xs text-gray-400 flex-shrink-0">{svc.duration} min</span>
+                          <span className="text-sm font-bold text-primary flex-shrink-0 w-24 text-right">{formatCurrency(Number(svc.price), currency)}</span>
+                          <button
+                            type="button"
+                            onClick={() => toggleService(svc.id)}
+                            className={cn(
+                              'w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-sm font-bold transition-colors',
+                              isSelected
+                                ? 'bg-primary text-white'
+                                : 'bg-white border border-gray-200 text-gray-500 hover:border-primary hover:text-primary'
+                            )}
+                          >
+                            {isSelected ? <X className="w-3.5 h-3.5" /> : '+'}
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
                 ) : (
                   <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
                     {filteredServices.map(svc => {
@@ -897,9 +1061,10 @@ export default function WalkInPage() {
           <OrderPanel />
         </div>
       </div>
+      )} {/* end activeMainTab === 'pos' */}
 
-      {/* ── Mobile: sticky View Order button ── */}
-      {orderItemCount > 0 && (
+      {/* ── Mobile: sticky View Order button (POS mode only) ── */}
+      {activeMainTab === 'pos' && orderItemCount > 0 && (
         <div className="md:hidden flex-shrink-0 px-4 py-3 bg-white border-t border-gray-100 safe-area-bottom">
           <button
             onClick={() => setShowOrderSheet(true)}
@@ -1008,6 +1173,62 @@ export default function WalkInPage() {
       />
 
       <InvoiceModal open={!!invoiceData} onClose={() => setInvoiceData(null)} data={invoiceData} />
+
+      {/* ── Order Detail Dialog ── */}
+      <Dialog open={!!selectedOrderDetail} onOpenChange={(o) => { if (!o) setSelectedOrderDetail(null) }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-gray-800">
+              <Receipt className="w-4 h-4 text-primary" />
+              Order Details
+            </DialogTitle>
+          </DialogHeader>
+          {selectedOrderDetail && (
+            <div className="space-y-3 text-sm">
+              <div className="bg-gray-50 rounded-xl p-4 space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Time</span>
+                  <span className="font-medium">{format(new Date(selectedOrderDetail.created_at), 'h:mm a')}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Client</span>
+                  <span className="font-medium">{selectedOrderDetail.client_name || 'Walk-in'}</span>
+                </div>
+                {selectedOrderDetail.client_phone && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Phone</span>
+                    <span className="font-medium">{selectedOrderDetail.client_phone}</span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Payment</span>
+                  <span className="font-medium capitalize">{selectedOrderDetail.payment_method}</span>
+                </div>
+              </div>
+              {selectedOrderDetail.walk_in_services.length > 0 && (
+                <div>
+                  <p className="text-xs text-gray-400 mb-1.5 uppercase tracking-wide font-semibold">Services</p>
+                  <div className="space-y-1">
+                    {selectedOrderDetail.walk_in_services.map((ws, i) => (
+                      <div key={i} className="flex items-center gap-2 text-sm">
+                        <Zap className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+                        <span>{ws.services?.name ?? 'Service'}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="flex justify-between items-center border-t border-gray-100 pt-3">
+                <span className="font-bold text-gray-900">Total</span>
+                <span className="text-xl font-black text-primary">{formatCurrency(selectedOrderDetail.total, currency)}</span>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setSelectedOrderDetail(null)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

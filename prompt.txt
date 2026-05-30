@@ -1,164 +1,142 @@
-You are an expert SaaS developer working on "Snipforce". Make these architectural improvements carefully. Review the entire codebase before making changes. Ensure existing data and features are not broken.
+You are an expert SaaS developer working on "Snipforce". Fix and improve the following carefully. Review codebase before changes. Ensure no existing features break.
 
-PART 1 - FEATURE-BASED MODULE ACCESS CONTROL FROM ADMIN PANEL
+PART 1 - WALK-IN POS FIXES
 
-ARCHITECTURE:
-- Add a modules/features permission system at the salon account level (not just sub-user level)
-- Each salon account can have specific modules enabled or disabled by the Snipforce admin
-- Store enabled modules in profiles table as enabled_modules JSONB array
-- Default: all existing accounts get all modules enabled (backward compatible)
+1. DUPLICATE SERVICE BUG
+- Service is being added twice to cart when clicked once
+- Find and fix the double-add bug in the click handler
+- Ensure clicking a service adds it exactly once
 
-MODULES TO CONTROL:
-- dashboard
-- appointments
-- calendar
-- walkin
-- services
-- staff
-- clients
-- inventory
-- expenses
-- payroll
-- attendance
-- reports_pnl
-- reviews
-- performance
-- branches
-- team_members
-- settings
+2. ORDER HISTORY / COMPLETED ORDERS
+- After order is completed, there is no way to view past walk-in orders
+- Add a "Today's Orders" or "Order History" tab/panel on the walk-in screen
+- Show list of completed walk-ins for today with: time, client name, services, total, payment method
+- Clicking an order shows its details/receipt
 
-ADMIN PANEL CHANGES:
-- When creating a new salon account: show a checklist of all modules with checkboxes
-- Default: all modules checked
-- Admin can uncheck modules the salon should not have access to
-- When editing/viewing a salon: show current module access with ability to update
-- Save selected modules to profiles.enabled_modules
+3. TABLE/LIST VIEW OPTION
+- Add a toggle button to switch between Grid view (current cards) and List/Table view for services
+- List view shows: service name, duration, price, add button in a compact table format
+- Remember user preference
 
-PRODUCT ENFORCEMENT:
-- On login: fetch enabled_modules from profiles table
-- Sidebar navigation: only show modules that are enabled for this salon
-- Direct URL access: if salon tries to access disabled module URL, redirect to dashboard with message "This feature is not enabled for your account. Please contact support."
-- This check must work for both owners AND their sub-users
-- Sub-user permissions are a subset of salon-level module access (sub-user cannot access module even if they have permission, if salon-level module is disabled)
+4. STAFF SELECTION SHOWING CODE
+- After selecting staff, it shows UUID/code instead of staff name
+- Fix the staff dropdown to always show staff name after selection
+- Check all Select components in walk-in page for same issue
 
-BACKWARD COMPATIBILITY:
-- All existing salon accounts: set enabled_modules to all modules (full access) by default via SQL migration
-- No existing functionality should break
+5. LOYALTY POINTS VISIBILITY
+- When client has loyalty points and phone number is entered, the loyalty section is overlapping or hiding cart items
+- Fix layout so loyalty section appears cleanly below order items without hiding anything
+- Make loyalty redemption input compact and non-intrusive
 
-PART 2 - WALK-IN POS REDESIGN (Single Screen Experience)
+PART 2 - CURRENCY FIX EVERYWHERE
 
-Completely redesign the walk-in page as a professional single-screen POS interface:
+- "Price (PKR)" is hardcoded in service add/edit form and other places
+- Use the useCurrency() hook everywhere to get current currency symbol and name
+- Fix specifically:
+  * Service form: "Price (PKR)" → "Price ([currency])"
+  * Staff salary fields: any hardcoded PKR or $ symbols
+  * Walk-in form: any hardcoded currency
+  * Inventory cost fields
+  * Expense amount fields
+  * Any other place with hardcoded PKR or $ symbol
+- Search entire codebase for hardcoded "PKR", "USD", "$", "₨" and replace with dynamic currency
 
-LAYOUT (split screen):
-LEFT PANEL (60% width):
-- Search bar at top to search services/deals quickly
-- Category filter tabs (All, Hair, Skin, Tools, Deals, etc.)
-- Service/Deal cards in a grid:
-  * Service name
-  * Duration
-  * Price
-  * Click to add to order
-  * Already added items show a checkmark or quantity badge
-- Staff selection dropdown at top of left panel
-- Client phone number lookup at top (auto-loads client name and loyalty points)
+PART 3 - REPORTS MODULE (Rename + Expand)
 
-RIGHT PANEL (40% width):
-- Order summary title "Current Order"
-- Selected items list:
-  * Service/deal name
-  * Price
-  * Remove button (x)
-- Divider line
-- Subtotal
-- Discount section:
-  * Toggle: Fixed Amount / Percentage
-  * Input field for discount value
-  * Discount reason dropdown
-- Loyalty points section (if client has points):
-  * Show available points balance
-  * Input: how many points to redeem
-- Divider
-- Total Amount (large, prominent)
-- Payment method buttons (full width, colored):
-  * Cash (green)
-  * Card (blue)
-  * Other methods from settings
-- Notes field (optional, collapsible)
-- "Complete & Save" button (large rose gradient, full width)
+RENAME:
+- Rename "Export Data" in sidebar/navigation to "Reports"
+- Update route if needed or keep same route but update all labels
 
-MOBILE RESPONSIVE:
-- On mobile: show left panel first, sticky "View Order (X items)" button at bottom
-- Tapping the button slides up the right panel as a sheet
+NEW REPORTS PAGE (/reports):
+Create a comprehensive reports page with multiple report types as tabs or sections:
 
-AFTER COMPLETION:
-- Show receipt/summary modal
-- Options: Print, Share via WhatsApp, New Walk-in
-- Clear the order for next customer
+1. SALES REPORT
+- Date range filter (today, this week, this month, custom range)
+- Total revenue (appointments + walk-ins)
+- Number of transactions
+- Average transaction value
+- Revenue by service category
+- Top 10 services by revenue
+- Exportable as CSV
 
-PART 3 - BRAND COLOR IMPLEMENTATION FIX
+2. WALK-IN REPORT
+- Date range filter
+- Total walk-ins count
+- Total walk-in revenue
+- Walk-ins by staff member
+- Walk-ins by hour of day (peak hours)
+- Walk-ins by day of week
+- Exportable as CSV
 
-Currently brand color saved in settings but not applied anywhere. Fix this completely:
+3. PAYMENT METHODS REPORT
+- Date range filter
+- Breakdown by payment method: Cash, Card, and all custom methods
+- Amount and percentage for each method
+- Trend over time (bar chart)
+- Exportable as CSV
 
-IMPLEMENTATION:
-- When salon owner saves brand color in settings: store in profiles.salon_primary_color
-- On dashboard layout load: fetch salon_primary_color from profiles
-- Apply color as CSS custom property: --brand-color: [hex value]
-- Replace ALL hardcoded pink/rose color values with var(--brand-color) in:
-  * Sidebar active states and accents
-  * Buttons (primary buttons)
-  * Links and hover states
-  * KPI card accents
-  * Chart colors (primary color)
-  * Badge colors
-  * Focus ring colors
-- Default color: #e11d48 (current rose) if no color set
-- Color change should reflect immediately after saving settings (no page reload needed)
-- Landing page keeps original rose color - only dashboard/app area changes
+4. APPOINTMENTS REPORT
+- Date range filter
+- Total appointments
+- Confirmed vs completed vs cancelled vs no-show
+- Revenue from appointments
+- Appointments by staff
+- Exportable as CSV
 
-COLOR PICKER IN SETTINGS:
-- Make sure color picker works properly
-- Show preview of selected color before saving
-- Add some preset color options: Rose (#e11d48), Purple (#7c3aed), Blue (#2563eb), Green (#059669), Orange (#ea580c), Teal (#0d9488)
+5. STAFF PERFORMANCE REPORT
+- Date range filter
+- Per staff: appointments count, walk-ins count, revenue generated, avg rating, commission earned
+- Exportable as CSV
 
-PART 4 - REMOVE MAXIMUM DISCOUNT LIMITS
+6. CLIENT REPORT
+- Date range filter
+- New clients vs returning clients
+- Top 10 clients by spend
+- Client retention rate
+- Exportable as CSV
 
-- Find and remove all maximum discount limit logic from the codebase
-- Remove max_discount_percentage settings from settings page
-- Remove discount cap validation from walk-in form
-- Remove discount cap validation from appointment mark-as-paid flow
-- Remove any role-based discount restrictions
-- Discounts should be freely applicable with no system-enforced limits
-- Keep discount type (fixed/percentage) and reason field - just remove the cap
+7. INVENTORY REPORT
+- Current stock levels
+- Low stock items
+- Stock value
+- Exportable as CSV
 
-PART 5 - SUB-USER MANAGEMENT IMPROVEMENTS
+8. EXPENSE REPORT (only if expenses module enabled)
+- Date range filter
+- Expenses by category
+- Total expenses
+- Exportable as CSV
 
-SUB-USER CONNECTION FIX:
-- Audit the entire sub-user flow: creation, login, data access
-- Ensure when sub-user logs in: they always get the correct owner_id from salon_members table
-- Ensure all data queries use effective owner_id (not sub-user's own id)
-- Test that sub-user can: create appointments, process walk-ins, view clients - all under owner's salon data
-- Fix any queries that accidentally use auth.uid() instead of effective owner_id for data operations
+MODULE-BASED REPORTS:
+- Only show report tabs for modules the salon has enabled
+- If expenses module disabled: hide expense report tab
+- If staff module disabled: hide staff performance report
+- If inventory module disabled: hide inventory report
+- etc.
 
-ADMIN PANEL HIERARCHY:
-- Redesign the salons list in admin panel to show clear hierarchy
-- Main salon account shown as primary row
-- Sub-users shown as indented/collapsible rows under their parent salon
-- OR: clicking on a salon opens a detail panel showing:
-  * Salon info (name, email, status, plan, modules enabled)
-  * Sub-users section: list of all sub-users with name, email, permissions summary, last set password
-  * Stats: total appointments, total revenue, date joined
-  * Actions: Edit modules, Change email, Reset password, Suspend, Delete
-- Remove sub-users from the main salon list (they should not appear as separate salons)
-- Add a filter: "Show only main accounts" toggle
+PART 4 - DASHBOARD DATE RANGE FILTER
+
+Current: Today, This Week, This Month buttons
+Add:
+- "Custom Range" button/option that opens a date picker
+- Date range picker: start date and end date inputs
+- When custom range selected: all KPIs, charts update to show data for that range
+- Show selected range label: "May 1 - May 15, 2026"
+- Clear button to go back to preset filters
+
+Also add TIME display:
+- Show current time (live updating) in dashboard header area
+- Format: "Saturday, May 30, 2026 — 3:45 PM"
+- Updates every minute
 
 TECHNICAL REQUIREMENTS:
-- Add enabled_modules JSONB column to profiles table
-- SQL migration must set enabled_modules to full access array for all existing accounts
-- Review and add missing RLS policies if any
-- All changes must be backward compatible
-- Run npm run build to verify zero TypeScript errors before finishing
-- Update CLAUDE.md with all architectural changes
-- Generate complete SQL migration file
-- Mobile responsive throughout
+- Use date-fns or dayjs for date handling (already likely installed)
+- All report exports use the same CSV export pattern
+- Reports respect owner_id data isolation
+- Module-based report visibility uses enabled_modules from context
+- Run npm run build to verify zero TypeScript errors
+- Update CLAUDE.md
+- Generate SQL migration if any new tables/columns needed
+- Mobile responsive
 - Dark mode compatible
 - Maintain brand color theming

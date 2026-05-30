@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { useUserContext } from '@/components/RoleContext'
 import { Download, FileText, Users, CalendarDays, DollarSign, Wallet, Loader2 } from 'lucide-react'
+import { useCurrency } from '@/hooks/useCurrency'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -67,6 +68,7 @@ function downloadCSV(filename: string, rows: string[][]) {
 
 export default function ExportPage() {
   const { ownerId, role } = useUserContext()
+  const { currency } = useCurrency()
 
   const defaultFrom = format(startOfMonth(new Date()), 'yyyy-MM-dd')
   const defaultTo = format(endOfMonth(new Date()), 'yyyy-MM-dd')
@@ -96,7 +98,7 @@ export default function ExportPage() {
 
     if (error || !data) { toast.error('Export failed'); setLoading(null); return }
 
-    const headers = ['Date', 'Time', 'Client', 'Phone', 'Service', 'Price (PKR)', 'Staff', 'Status', 'Notes']
+    const headers = ['Date', 'Time', 'Client', 'Phone', 'Service', `Price (${currency})`, 'Staff', 'Status', 'Notes']
     const rows = data.map((a: any) => [
       a.appointment_date,
       a.appointment_time?.slice(0, 5) ?? '',
@@ -138,7 +140,7 @@ export default function ExportPage() {
       if (!c.last || a.appointment_date > c.last) c.last = a.appointment_date
     })
 
-    const headers = ['Client Name', 'Phone', 'Total Visits', 'Completed', 'Total Spend (PKR)', 'Last Visit']
+    const headers = ['Client Name', 'Phone', 'Total Visits', 'Completed', `Total Spend (${currency})`, 'Last Visit']
     const rows = Array.from(map.entries()).map(([name, c]) => [
       name, c.phone, String(c.visits), String(c.completed), String(Math.round(c.spend)), c.last,
     ])
@@ -161,7 +163,7 @@ export default function ExportPage() {
 
     if (error || !data) { toast.error('Export failed'); setLoading(null); return }
 
-    const headers = ['Date', 'Category', 'Description', 'Amount (PKR)', 'Paid By', 'Recurring', 'Notes']
+    const headers = ['Date', 'Category', 'Description', `Amount (${currency})`, 'Paid By', 'Recurring', 'Notes']
     const rows = data.map((e: any) => [
       e.expense_date,
       e.category?.replace(/_/g, ' ') ?? '',
@@ -188,7 +190,7 @@ export default function ExportPage() {
 
     if (error || !data) { toast.error('Export failed'); setLoading(null); return }
 
-    const headers = ['Staff', 'Month', 'Year', 'Base Salary (PKR)', 'Commission (PKR)', 'Bonus (PKR)', 'Deductions (PKR)', 'Net Salary (PKR)', 'Status']
+    const headers = ['Staff', 'Month', 'Year', `Base Salary (${currency})`, `Commission (${currency})`, `Bonus (${currency})`, `Deductions (${currency})`, `Net Salary (${currency})`, 'Status']
     const rows = data.map((p: any) => [
       p.staff?.name ?? '',
       String(p.month ?? ''),

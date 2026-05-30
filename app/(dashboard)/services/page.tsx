@@ -22,7 +22,7 @@ const emptyDealForm = { name: '', description: '', price: '', validity_days: '',
 export default function ServicesPage() {
   const { role, ownerId, isOwner } = useUserContext()
   const router = useRouter()
-  const { formatAmount } = useCurrency()
+  const { formatAmount, currency } = useCurrency()
 
   const [services, setServices] = useState<Service[]>([])
   const [deals, setDeals] = useState<(Deal & { deal_services?: { services: Service }[] })[]>([])
@@ -381,7 +381,7 @@ export default function ServicesPage() {
                   onChange={(e) => setServiceForm({ ...serviceForm, duration: e.target.value })} required className="h-9" />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="price">Price (PKR)</Label>
+                <Label htmlFor="price">Price ({currency})</Label>
                 <Input id="price" type="number" min="0" step="50" placeholder="1500" value={serviceForm.price}
                   onChange={(e) => setServiceForm({ ...serviceForm, price: e.target.value })} required className="h-9" />
               </div>
@@ -444,7 +444,7 @@ export default function ServicesPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>Deal Price (PKR) *</Label>
+                <Label>Deal Price ({currency}) *</Label>
                 <Input type="number" min="0" step="50" placeholder="1500" value={dealForm.price}
                   onChange={(e) => setDealForm({ ...dealForm, price: e.target.value })} required className="h-9" />
               </div>

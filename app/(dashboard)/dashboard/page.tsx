@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
-import { format, subDays, startOfWeek, startOfMonth, endOfMonth, subMonths } from 'date-fns'
+import { format, subDays, startOfWeek, startOfMonth, endOfMonth, subMonths, parseISO } from 'date-fns'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -14,7 +14,7 @@ import {
 import {
   CalendarDays, TrendingUp, Scissors, Users, Clock, Loader2, Sparkles, Download, MessageCircle,
   Building2, CheckCircle2, ReceiptText, AlertTriangle, Package,
-  TrendingDown, UserCheck, Star, Gift, CreditCard, Zap, Activity,
+  TrendingDown, UserCheck, Star, Gift, CreditCard, Zap, Activity, X,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -116,12 +116,21 @@ export default function DashboardPage() {
   const [currency, setCurrency] = useState('USD')
   const [branches, setBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeFilter, setActiveFilter] = useState<'today' | 'week' | 'month'>('month')
+  const [activeFilter, setActiveFilter] = useState<'today' | 'week' | 'month' | 'custom'>('month')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
+  const [showCustomPicker, setShowCustomPicker] = useState(false)
+  const [liveTime, setLiveTime] = useState(() => format(new Date(), 'h:mm a'))
   const [activeBranch, setActiveBranch] = useState('all')
   const [pdfLoading, setPdfLoading] = useState(false)
   const [avgRating, setAvgRating] = useState(0)
   const [totalReviews, setTotalReviews] = useState(0)
   const [birthdayClients, setBirthdayClients] = useState<{ name: string; phone: string | null }[]>([])
+
+  useEffect(() => {
+    const timer = setInterval(() => setLiveTime(format(new Date(), 'h:mm a')), 60000)
+    return () => clearInterval(timer)
+  }, [])
 
   useEffect(() => {
     if (!['owner', 'regional_manager', 'manager'].includes(role)) {
@@ -294,9 +303,13 @@ export default function DashboardPage() {
     switch (activeFilter) {
       case 'today': return branchFiltered.filter(a => a.appointment_date === todayStr)
       case 'week':  return branchFiltered.filter(a => new Date(a.appointment_date + 'T00:00:00') >= weekStart)
+      case 'custom': {
+        if (!customFrom || !customTo) return branchFiltered.filter(a => new Date(a.appointment_date + 'T00:00:00') >= monthStart)
+        return branchFiltered.filter(a => a.appointment_date >= customFrom && a.appointment_date <= customTo)
+      }
       default:      return branchFiltered.filter(a => new Date(a.appointment_date + 'T00:00:00') >= monthStart)
     }
-  }, [branchFiltered, activeFilter])
+  }, [branchFiltered, activeFilter, customFrom, customTo])
 
   // ── Today walk-ins ──────────────────────────────────────────────────────────
 
@@ -330,7 +343,11 @@ export default function DashboardPage() {
   const stats = useMemo(() => {
     const completed     = periodFiltered.filter(a => a.status === 'completed')
     const apptRevenue   = completed.reduce((sum, a) => sum + Number(a.total_amount ?? a.services?.price ?? 0), 0)
-    const periodWalkIns = activeFilter === 'today' ? todayWalkIns : activeFilter === 'week' ? weekWalkIns : branchFilteredWalkIns
+    const periodWalkIns = activeFilter === 'today' ? todayWalkIns
+      : activeFilter === 'week' ? weekWalkIns
+      : activeFilter === 'custom' && customFrom && customTo
+        ? branchFilteredWalkIns.filter(w => { const d = w.created_at.slice(0, 10); return d >= customFrom && d <= customTo })
+        : branchFilteredWalkIns
     const walkinRevenue = periodWalkIns.reduce((sum, w) => sum + Number(w.total ?? 0), 0)
     const revenue       = apptRevenue + walkinRevenue
     const totalClients  = new Set(periodFiltered.map(a => a.client_name)).size
@@ -345,7 +362,7 @@ export default function DashboardPage() {
         : 0,
       clients:  totalClients,
     }
-  }, [periodFiltered, activeFilter, todayWalkIns, weekWalkIns, branchFilteredWalkIns])
+  }, [periodFiltered, activeFilter, todayWalkIns, weekWalkIns, branchFilteredWalkIns, customFrom, customTo])
 
   // ── Monthly revenue & net profit (branch-filtered expenses) ──────────────
 
@@ -493,7 +510,11 @@ export default function DashboardPage() {
   // ── Payment method donut ──────────────────────────────────────────────────
 
   const paymentBreakdown = useMemo(() => {
-    const periodWalkIns = activeFilter === 'today' ? todayWalkIns : activeFilter === 'week' ? weekWalkIns : branchFilteredWalkIns
+    const periodWalkIns = activeFilter === 'today' ? todayWalkIns
+      : activeFilter === 'week' ? weekWalkIns
+      : activeFilter === 'custom' && customFrom && customTo
+        ? branchFilteredWalkIns.filter(w => { const d = w.created_at.slice(0, 10); return d >= customFrom && d <= customTo })
+        : branchFilteredWalkIns
     const completed     = periodFiltered.filter(a => a.status === 'completed')
     const map = new Map<string, number>()
     periodWalkIns.forEach(w => {
@@ -609,7 +630,11 @@ export default function DashboardPage() {
     )
   }
 
-  const filterLabels = { today: 'Today', week: 'This Week', month: 'This Month' }
+  const filterLabels: Record<string, string> = { today: 'Today', week: 'This Week', month: 'This Month', custom: 'Custom' }
+
+  const customLabel = activeFilter === 'custom' && customFrom && customTo
+    ? `${format(parseISO(customFrom), 'MMM d')} – ${format(parseISO(customTo), 'MMM d, yyyy')}`
+    : null
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
@@ -621,7 +646,11 @@ export default function DashboardPage() {
             <Sparkles className="w-5 h-5 text-primary" />
             <h1 className="text-2xl font-bold text-gray-900">{salonName || 'Dashboard'}</h1>
           </div>
-          <p className="text-gray-500 text-sm">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
+          <p className="text-gray-500 text-sm">
+            {format(new Date(), 'EEEE, MMMM d, yyyy')}
+            <span className="mx-2 text-gray-300">—</span>
+            <span className="font-medium text-gray-700">{liveTime}</span>
+          </p>
         </div>
         <Button onClick={downloadPDF} disabled={pdfLoading} variant="outline"
           className="gap-2 border-primary/30 text-primary hover:bg-primary/5 flex-shrink-0">
@@ -682,30 +711,75 @@ export default function DashboardPage() {
       )}
 
       {/* Filters */}
-      <div className="flex items-center gap-2 flex-wrap">
-        {(['today', 'week', 'month'] as const).map(f => (
-          <button key={f} onClick={() => setActiveFilter(f)}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
-              activeFilter === f
+      <div className="space-y-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {(['today', 'week', 'month'] as const).map(f => (
+            <button key={f} onClick={() => { setActiveFilter(f); setShowCustomPicker(false) }}
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+                activeFilter === f
+                  ? 'bg-primary text-white shadow-sm shadow-primary/30'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}>
+              {filterLabels[f]}
+            </button>
+          ))}
+          <button
+            onClick={() => { setShowCustomPicker(v => !v); if (activeFilter !== 'custom') setActiveFilter('custom') }}
+            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all flex items-center gap-1.5 ${
+              activeFilter === 'custom'
                 ? 'bg-primary text-white shadow-sm shadow-primary/30'
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}>
-            {filterLabels[f]}
+            <CalendarDays className="w-3.5 h-3.5" />
+            {customLabel ?? 'Custom Range'}
+            {activeFilter === 'custom' && customLabel && (
+              <span className="ml-1 cursor-pointer hover:text-white/80" onClick={(e) => { e.stopPropagation(); setActiveFilter('month'); setCustomFrom(''); setCustomTo(''); setShowCustomPicker(false) }}>
+                <X className="w-3 h-3" />
+              </span>
+            )}
           </button>
-        ))}
-        {branches.length > 0 && (
-          <div className="flex items-center gap-2 ml-auto flex-wrap">
-            <Building2 className="w-4 h-4 text-gray-400 flex-shrink-0" />
-            {[{ id: 'all', name: 'All Branches' }, ...branches].map(b => (
-              <button key={b.id} onClick={() => setActiveBranch(b.id)}
-                className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
-                  activeBranch === b.id
-                    ? 'bg-primary/15 text-primary border border-primary/30'
-                    : 'bg-gray-50 text-gray-500 border border-gray-200 hover:bg-gray-100'
-                }`}>
-                {b.name}
-              </button>
-            ))}
+          {branches.length > 0 && (
+            <div className="flex items-center gap-2 ml-auto flex-wrap">
+              <Building2 className="w-4 h-4 text-gray-400 flex-shrink-0" />
+              {[{ id: 'all', name: 'All Branches' }, ...branches].map(b => (
+                <button key={b.id} onClick={() => setActiveBranch(b.id)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                    activeBranch === b.id
+                      ? 'bg-primary/15 text-primary border border-primary/30'
+                      : 'bg-gray-50 text-gray-500 border border-gray-200 hover:bg-gray-100'
+                  }`}>
+                  {b.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        {/* Custom date range picker */}
+        {showCustomPicker && (
+          <div className="flex flex-wrap items-center gap-3 p-3 bg-gray-50 border border-gray-100 rounded-xl">
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-gray-500 whitespace-nowrap">From</label>
+              <input
+                type="date"
+                value={customFrom}
+                onChange={(e) => setCustomFrom(e.target.value)}
+                className="h-8 px-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-primary/50"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-gray-500 whitespace-nowrap">To</label>
+              <input
+                type="date"
+                value={customTo}
+                onChange={(e) => setCustomTo(e.target.value)}
+                className="h-8 px-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-primary/50"
+              />
+            </div>
+            {customFrom && customTo && (
+              <span className="text-xs text-gray-500">
+                {format(parseISO(customFrom), 'MMM d')} – {format(parseISO(customTo), 'MMM d, yyyy')}
+              </span>
+            )}
           </div>
         )}
       </div>

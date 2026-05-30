@@ -100,7 +100,7 @@ const allNavItems = [
   { href: '/payroll', label: 'Payroll', icon: Wallet },
   { href: '/attendance', label: 'Attendance', icon: ClipboardList },
   { href: '/reports/pnl', label: 'P&L Report', icon: BarChart2 },
-  { href: '/export', label: 'Export Data', icon: Download },
+  { href: '/reports', label: 'Reports', icon: Download },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
 
@@ -112,7 +112,7 @@ function getEnabledHrefs(enabledModules: string[] | null | undefined): Set<strin
     for (const p of paths) hrefs.add(p)
   }
   // Export is always available if any module is enabled
-  hrefs.add('/export')
+  hrefs.add('/reports')
   return hrefs
 }
 
@@ -175,7 +175,7 @@ export default function Sidebar({
   if (enabledHrefs) {
     allowedPaths = allowedPaths.filter((p) => {
       // Check if this path is covered by an enabled module
-      return enabledHrefs.has(p) || p.startsWith('/export') || p.startsWith('/onboarding')
+      return enabledHrefs.has(p) || p.startsWith('/reports') || p.startsWith('/export') || p.startsWith('/onboarding')
     })
   }
 
