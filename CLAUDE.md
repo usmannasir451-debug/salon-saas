@@ -356,3 +356,4 @@ git push origin main
 - **Currency symbols**: Do not hardcode currency symbols (e.g., `$` or `PKR`). Always use the `useCurrency` hook.
 - **Role permission changes**: If adding a new page/feature, update `lib/roles.ts` to include the route in the appropriate role's nav array.
 - **next-themes dark mode**: Components must use `dark:` Tailwind classes for dark mode support — do not use inline style toggles.
+- **Recharts Tooltip formatter type**: Do not annotate the `formatter` callback param as `(v: number)` — Recharts types it as `ValueType` (string | number). Use `(v) => formatAmount(Number(v))` instead. Same applies to `Pie label` prop: cast to `(props: any)` when accessing custom data fields not in `PieLabelRenderProps`.

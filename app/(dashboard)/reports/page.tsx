@@ -651,7 +651,7 @@ export default function ReportsPage() {
                         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                         <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                         <YAxis tick={{ fontSize: 10 }} />
-                        <Tooltip formatter={(v: number) => formatAmount(v)} />
+                        <Tooltip formatter={(v) => formatAmount(Number(v))} />
                         <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[3, 3, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
@@ -765,10 +765,10 @@ export default function ReportsPage() {
                 <CardContent>
                   <ResponsiveContainer width="100%" height={200}>
                     <PieChart>
-                      <Pie data={payData} cx="50%" cy="50%" outerRadius={70} dataKey="amount" nameKey="method" label={({ method, pct }) => `${method} ${pct}%`} labelLine={false}>
+                      <Pie data={payData} cx="50%" cy="50%" outerRadius={70} dataKey="amount" nameKey="method" label={(props: any) => `${props.method} ${props.pct}%`} labelLine={false}>
                         {payData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
                       </Pie>
-                      <Tooltip formatter={(v: number) => formatAmount(v)} />
+                      <Tooltip formatter={(v) => formatAmount(Number(v))} />
                     </PieChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -1027,7 +1027,7 @@ export default function ReportsPage() {
                             <Pie data={expData.byCategory} cx="50%" cy="50%" outerRadius={70} dataKey="amount" nameKey="category">
                               {expData.byCategory.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
                             </Pie>
-                            <Tooltip formatter={(v: number) => formatAmount(v)} />
+                            <Tooltip formatter={(v) => formatAmount(Number(v))} />
                             <Legend iconSize={8} formatter={(v) => <span style={{ fontSize: 11 }}>{v}</span>} />
                           </PieChart>
                         </ResponsiveContainer>
