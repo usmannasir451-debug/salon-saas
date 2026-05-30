@@ -52,6 +52,7 @@ const ALL_PERMISSIONS = [
   { key: 'calendar', label: 'Calendar', description: 'View appointment calendar' },
   { key: 'walkin', label: 'Walk-In', description: 'Process walk-in customers and payments' },
   { key: 'services', label: 'Services', description: 'View and manage services and deals' },
+  { key: 'memberships', label: 'Memberships', description: 'Manage membership plans and client packages' },
   { key: 'staff', label: 'Staff', description: 'View and manage staff members' },
   { key: 'performance', label: 'Performance', description: 'View staff performance reports' },
   { key: 'reviews', label: 'Reviews', description: 'View customer reviews' },
@@ -70,12 +71,12 @@ const PRESETS = [
   {
     label: 'Manager Setup',
     color: 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100',
-    perms: ['dashboard', 'appointments', 'calendar', 'walkin', 'services', 'staff', 'clients'],
+    perms: ['dashboard', 'appointments', 'calendar', 'walkin', 'services', 'memberships', 'staff', 'clients'],
   },
   {
     label: 'Receptionist',
     color: 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100',
-    perms: ['appointments', 'calendar', 'clients'],
+    perms: ['appointments', 'calendar', 'walkin', 'memberships', 'clients'],
   },
 ]
 

@@ -1,129 +1,39 @@
-You are an expert SaaS developer working on "Snipforce". Make these important fixes and additions. Review entire codebase carefully before implementing. Ensure no existing features break.
+You are an expert SaaS developer working on "Snipforce". Fix these two issues in Snipforce:
 
-PART 1 - FIX SUB-USER SYSTEM COMPLETELY
+PART 1 - SUB-USER NAVIGATION FIX
 
-CRITICAL BUGS TO FIX:
-1. Sub-user login shows "Access Denied" errors and infinite notifications - fix completely
-2. Sub-users appearing as separate accounts in admin panel - fix this
-3. Sub-user data isolation: ensure sub-users always use owner's data via get_effective_owner_id()
+Problem: Sub-user has access to services, staff, clients but clicking them redirects to appointments page.
 
-ROOT CAUSE INVESTIGATION:
-- Check RoleContext.tsx - how is ownerId being set for sub-users?
-- Check salon_members table - is member_user_id properly linked?
-- Check PermissionGuard.tsx - is it causing infinite redirect loops?
-- Check notification system - is it firing repeatedly for sub-users?
-- Check all dashboard queries - are they using effective owner_id or auth.uid()?
-
-COMPLETE FIX:
-- When sub-user logs in: immediately find their salon_members record, get owner_id
-- Use that owner_id for ALL data queries throughout the app
-- Fix PermissionGuard to not cause redirect loops
-- Fix notification queries to use effective owner_id
-- Fix dashboard, appointments, walk-in, clients, staff pages for sub-users
-- Sub-users should have smooth experience with only their permitted pages visible
-- No access denied errors unless they directly navigate to restricted URL
-
-ADMIN PANEL HIERARCHY FIX:
-- Main salon accounts list: show ONLY owner accounts (not sub-users)
-- Each salon row shows: salon name, email, status, modules, sub-user count badge
-- Clicking a salon opens a full detail panel/modal showing:
-  * Salon info: name, email, status, plan, date joined, modules enabled
-  * Sub-Users section: list all sub-users with display name, email, permissions, last set password (eye toggle), status
-  * Stats: total appointments, walk-ins, revenue
-  * Actions: Edit Modules, Change Email, Reset Password, Suspend, Delete
-- Remove sub-users from appearing as separate salon entries in the main list
-- Add filter toggle: "Main Accounts Only" (default on)
-
-PART 2 - UI FIX: SALON NAME OVERFLOW IN HEADER
-
-Problem: When salon name is long, notification bell and dark mode toggle icons go outside the UI/overflow
+Root cause investigation:
+- Check lib/roles.ts - the custom permission system uses salon_members.permissions (JSONB array of page keys)
+- The permissions array likely has keys like "appointments", "calendar", "walkin" but services/staff/clients keys may be different or missing
+- Check what keys are being saved when owner creates sub-user permissions in team page
+- Check PermissionGuard.tsx MODULE_PATH_MAP - verify services, staff, clients are mapped correctly
+- Check Sidebar.tsx - verify services, staff, clients nav items are shown when permissions include them
 
 Fix:
-- In dashboard layout header/top bar: constrain the salon name to max width with text truncation (truncate class)
-- Icons (notification bell + dark mode toggle) must always be visible and never pushed off screen
-- Use flexbox properly: salon name takes available space but truncates, icons stay fixed on right
-- Add tooltip on truncated salon name to show full name on hover
-- Test with very long salon names like "Muhammad Usman's Premium Salon & Spa DHA Karachi"
+- Make sure permission keys exactly match the module keys used in PermissionGuard and Sidebar
+- Services permission key should map to /services path
+- Staff permission key should map to /staff path  
+- Clients permission key should map to /clients path
+- Test that sub-user with these permissions can navigate to all three pages without redirect
 
-PART 3 - BUSY HOURS TRACKING
+PART 2 - MEMBERSHIPS PAGE NOT SHOWING CONTENT
 
-Check if time is already being recorded with appointments and walk-ins:
-- appointments table: check if appointment_time or created_at captures time
-- walk_ins table: check if created_at captures time
-- If time already exists: make sure busy hours chart on dashboard is using it correctly
-- If not: add appointment_time column to appointments (time of the appointment slot, not creation time)
+Problem: Memberships page exists but shows nothing - no plans, no packages, no UI visible.
 
-BUSY HOURS VISUALIZATION:
-- Dashboard busy hours heatmap: show 8AM to 10PM, which hours have most bookings
-- Combine appointments + walk-ins by hour
-- Show as bar chart or heatmap grid
-- Filter by branch if multiple branches
+Possible causes to check:
+- SQL migration may not have been run yet - check if tables exist
+- Module may not be enabled for the salon account
+- Page may have a loading/error state that shows blank
+- RoleContext may not be providing correct ownerId
 
-PART 4 - MEMBERSHIPS & PACKAGES SYSTEM
+Fix:
+- Add proper empty states: "No membership plans yet. Create your first plan."
+- Add loading spinner while data fetches
+- Add error boundary to show what went wrong
+- Make sure page works even if memberships tables do not exist yet (graceful error handling)
+- Check if memberships module needs to be enabled in admin panel for the account
+- Add a visible error message if Supabase query fails
 
-Build a complete membership and package system:
-
-DATABASE TABLES NEEDED:
-- membership_plans: id, owner_id, name, description, type (service_based/balance_based), price, billing_period (monthly/quarterly/yearly), services_included (JSONB array of {service_id, quantity_per_period}), discount_percentage, is_active, created_at
-- client_memberships: id, owner_id, client_id, plan_id, status (active/paused/cancelled/expired), start_date, next_billing_date, balance (for balance-based), services_remaining (JSONB), created_at
-- membership_transactions: id, membership_id, type (payment/service_redemption/balance_credit), amount, description, created_at
-- packages: id, owner_id, name, description, services_included (JSONB array of {service_id, quantity}), price, validity_days, is_active, created_at
-- client_packages: id, owner_id, client_id, package_id, purchase_date, expiry_date, services_remaining (JSONB), status (active/expired/used), created_at
-
-MEMBERSHIP PLANS PAGE (/memberships):
-- Add to sidebar under Services section (if memberships module enabled)
-- Two tabs: Membership Plans and Packages
-
-MEMBERSHIP PLANS TAB:
-- List all plans with: name, type, price/period, active members count, status toggle
-- Create plan form:
-  * Plan name
-  * Type: Service-Based (redeem services) or Balance-Based (recurring credit)
-  * Price and billing period (monthly/quarterly/yearly)
-  * For service-based: select services and quantity per period (e.g. 2 haircuts/month)
-  * Discount on other services (%)
-  * Description
-
-PACKAGES TAB:
-- List all packages with: name, included services, price, validity, sales count
-- Create package form:
-  * Package name
-  * Select services and quantities (e.g. 5 haircuts + 3 facials)
-  * Package price (usually discounted vs individual prices)
-  * Validity in days
-  * Description
-
-CLIENT MEMBERSHIPS:
-- On client profile page: show active memberships and packages
-- "Add Membership" button: assign a plan to client, record payment
-- "Add Package" button: sell a package to client, record payment
-- Show services remaining, balance, next billing date
-- Pause/cancel membership option
-
-WALK-IN & APPOINTMENT INTEGRATION:
-- When processing walk-in or appointment: check if client has active membership/package
-- Show "Use Membership" or "Redeem Package" option
-- If redeemed: deduct from services_remaining, show discounted/zero price
-- Record redemption in membership_transactions
-
-MEMBERSHIPS DASHBOARD (/memberships/dashboard):
-- Total active members
-- Monthly recurring revenue (MRR) from memberships
-- Packages sold this month
-- Expiring memberships this week (alert)
-- Recent membership transactions
-
-ADMIN MODULE CONTROL:
-- Add "memberships" to the modules list in admin panel
-- Disabled by default for existing accounts
-- Admin can enable per salon
-
-PART 5 - TECHNICAL REQUIREMENTS
-- Generate complete SQL migration for all new tables
-- RLS policies on all new tables with grants for authenticated, service_role, anon
-- Run npm run build to confirm zero TypeScript errors
-- Update CLAUDE.md with all new features and tables
-- Mobile responsive throughout
-- Dark mode compatible
-- Brand color theming
-- No breaking changes to existing features
+Also: Run npm run build to confirm zero TypeScript errors after fixes.

@@ -124,6 +124,7 @@ export default function MembershipsPage() {
 
   const [activeTab, setActiveTab] = useState<Tab>('plans')
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [services, setServices] = useState<Service[]>([])
 
   // Plans
@@ -171,30 +172,47 @@ export default function MembershipsPage() {
   const [updatingPackageId, setUpdatingPackageId] = useState<string | null>(null)
 
   const loadData = useCallback(async () => {
-    if (!ownerId) return
+    if (!ownerId) {
+      setLoadError('Unable to identify your account. Please refresh the page or log out and back in.')
+      setLoading(false)
+      return
+    }
     setLoading(true)
+    setLoadError(null)
     const supabase = createClient()
 
-    const [plansRes, pkgsRes, svcsRes, membershipsRes, clientPkgsRes] = await Promise.all([
-      supabase.from('membership_plans').select('*').eq('owner_id', ownerId).order('created_at', { ascending: false }),
-      supabase.from('packages').select('*').eq('owner_id', ownerId).order('created_at', { ascending: false }),
-      supabase.from('services').select('id, name, price').eq('user_id', ownerId).order('name'),
-      supabase.from('client_memberships')
-        .select('*, membership_plans(id, name, type, price, billing_period, discount_percentage)')
-        .eq('owner_id', ownerId)
-        .order('created_at', { ascending: false }),
-      supabase.from('client_packages')
-        .select('*, packages(id, name, price, validity_days)')
-        .eq('owner_id', ownerId)
-        .order('created_at', { ascending: false }),
-    ])
+    try {
+      const [plansRes, pkgsRes, svcsRes, membershipsRes, clientPkgsRes] = await Promise.all([
+        supabase.from('membership_plans').select('*').eq('owner_id', ownerId).order('created_at', { ascending: false }),
+        supabase.from('packages').select('*').eq('owner_id', ownerId).order('created_at', { ascending: false }),
+        supabase.from('services').select('id, name, price').eq('user_id', ownerId).order('name'),
+        supabase.from('client_memberships')
+          .select('*, membership_plans(id, name, type, price, billing_period, discount_percentage)')
+          .eq('owner_id', ownerId)
+          .order('created_at', { ascending: false }),
+        supabase.from('client_packages')
+          .select('*, packages(id, name, price, validity_days)')
+          .eq('owner_id', ownerId)
+          .order('created_at', { ascending: false }),
+      ])
 
-    setPlans((plansRes.data ?? []) as unknown as MembershipPlan[])
-    setPackages((pkgsRes.data ?? []) as unknown as PkgType[])
-    setServices((svcsRes.data ?? []) as Service[])
-    setMemberships((membershipsRes.data ?? []) as unknown as ClientMembership[])
-    setClientPackages((clientPkgsRes.data ?? []) as unknown as ClientPackage[])
-    setLoading(false)
+      if (plansRes.error) throw new Error(`Membership plans: ${plansRes.error.message}`)
+      if (pkgsRes.error) throw new Error(`Packages: ${pkgsRes.error.message}`)
+      if (membershipsRes.error) throw new Error(`Client memberships: ${membershipsRes.error.message}`)
+      if (clientPkgsRes.error) throw new Error(`Client packages: ${clientPkgsRes.error.message}`)
+
+      setPlans((plansRes.data ?? []) as unknown as MembershipPlan[])
+      setPackages((pkgsRes.data ?? []) as unknown as PkgType[])
+      setServices((svcsRes.data ?? []) as Service[])
+      setMemberships((membershipsRes.data ?? []) as unknown as ClientMembership[])
+      setClientPackages((clientPkgsRes.data ?? []) as unknown as ClientPackage[])
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to load membership data'
+      setLoadError(msg)
+      toast.error('Failed to load memberships data')
+    } finally {
+      setLoading(false)
+    }
   }, [ownerId])
 
   useEffect(() => {
@@ -576,6 +594,21 @@ export default function MembershipsPage() {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <Loader2 className="w-6 h-6 text-primary animate-spin" />
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <div className="p-4 md:p-6 max-w-5xl mx-auto">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+          <AlertTriangle className="w-10 h-10 text-red-400 mx-auto mb-3" />
+          <p className="text-red-700 font-medium mb-1">Failed to load memberships</p>
+          <p className="text-red-500 text-sm mb-4">{loadError}</p>
+          <Button onClick={loadData} variant="outline" className="border-red-300 text-red-600 hover:bg-red-50">
+            Try Again
+          </Button>
+        </div>
       </div>
     )
   }

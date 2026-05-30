@@ -113,7 +113,9 @@ export function PermissionGuard({ children }: { children: React.ReactNode }) {
       )
     }
 
-    const firstAllowed = allowed[0] ?? '/appointments'
+    // Pick the first allowed path that is also module-enabled to avoid redirect loops
+    const moduleEnabledAllowed = allowed.filter((p) => isModuleEnabled(p, enabledModules))
+    const firstAllowed = moduleEnabledAllowed[0] ?? '/dashboard'
 
     if (isOwnerOnlyPath) {
       if (prevPath !== null) {
