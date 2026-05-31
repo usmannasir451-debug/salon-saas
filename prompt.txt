@@ -1,195 +1,177 @@
-You are an expert SaaS developer and UI/UX designer working on "Snipforce". Make these improvements carefully. Review entire codebase before implementing. Run npm run build to confirm zero errors before finishing.
+You are an expert SaaS developer working on "Snipforce". Make these fixes and improvements carefully. Review entire codebase before implementing. Ensure no data is affected. Run npm run build to confirm zero errors before finishing.
 
-PART 1 - DASHBOARD IMPROVEMENTS
+PART 1 - DASHBOARD FIXES
 
-TILE RESTRUCTURE:
-- Remove separate "Walk-in Revenue" and "Appointment Revenue" tiles
-- Add ONE "Total Sales" tile showing: appointments + walk-ins + membership payments combined
-- Keep separate count tiles: "Appointments" (count only, no revenue) and "Walk-Ins" (count only, no revenue)
-- Add "Memberships Sold" tile (count + revenue) - only show if memberships module is enabled for this salon
-- All tiles respect Today/This Week/This Month/Custom Range filter
+ADD PREVIOUS MONTH TILE:
+- Add "Previous Month" as a filter option alongside Today/This Week/This Month/Custom Range
+- When selected: show all KPIs for the previous calendar month
+- Label should show month name: "April 2026"
 
-MODULE-BASED DASHBOARD:
-- Check enabled_modules from RoleContext
-- If memberships module disabled: hide memberships tile completely
-- If expenses module disabled: hide expenses/net profit tile
-- If reports module disabled: hide revenue chart
-- Dashboard adapts to what modules the salon has access to
+FIX CUSTOM RANGE AND PREVIOUS MONTH NUMBERS:
+- CRITICAL: Revenue calculation must include ALL three sources for ANY date range:
+  * appointments WHERE appointment_date BETWEEN range.from AND range.to AND total_amount IS NOT NULL
+  * walk_ins WHERE DATE(created_at) BETWEEN range.from AND range.to
+  * membership_transactions WHERE type='payment' AND DATE(created_at) BETWEEN range.from AND range.to
+- Current bug: custom range only shows membership data - fix appointments and walk-ins query to use correct date field
+- Appointment count: use appointment_date field
+- Walk-in count: use DATE(created_at)
+- All counts and revenue must use same date range consistently
+- Test: previous month numbers must match sum of individual days in that month
 
-WELCOME MESSAGE:
-- Add personalized welcome at top of dashboard
-- "Welcome, [Salon Name]! 👋" in large friendly text
-- Show current date below: "Saturday, May 31, 2026"
-- Show live time updating every minute: "3:45 PM"
+ADD SALES TREND CHART:
+- Monthly sales trend line chart showing last 12 months
+- X axis: months (Jan, Feb, Mar...)
+- Y axis: total revenue
+- Filter: select year (dropdown showing available years)
+- Line chart using recharts
+- Show appointments + walk-ins + membership revenue combined per month
+- Place below existing charts on dashboard
 
-BRANCH SELECTION - MAKE MANDATORY:
-- Appointments: branch field must be required (not optional) - show validation error if not selected
-- Walk-in POS: branch field must be required - cannot complete order without branch selection
-- Expenses: branch field must be required when adding expense
-- Membership sales: branch field must be required when assigning membership or selling package
-- Only show branch selector if salon has more than 1 branch (single branch salons: auto-select their only branch silently)
-- For single branch salons: automatically assign the only branch_id on save - no UI shown
+ADD DISCOUNT TILE:
+- New KPI tile: "Discounts Given" showing total discount amount for selected period
+- Source: appointments.discount_amount + walk_ins.discount_amount
+- Show in same currency format
+- Respect Today/This Week/This Month/Previous Month/Custom Range filter
 
-BRANCH REVENUE FIX:
-- Root cause: records with null branch_id are counted in "All Branches" but not in individual branches causing mismatch
-- Fix: All Branches total = sum of ALL records for this owner regardless of branch_id
-- Individual branch = sum of records WHERE branch_id = selected branch
-- Records with null branch_id: appear in "All Branches" only
-- Add a warning banner on dashboard if null branch_id records exist: "X records have no branch assigned. Please review."
+PART 2 - MANDATORY FIELDS FIX
 
-SERVICE QUANTITY IN CART:
-- Walk-in POS: when same service added multiple times OR when + button clicked:
-  * Show quantity selector on cart item: "2 x Haircut - [price x 2]"
-  * + and - buttons on each cart item
-  * Minimum quantity: 1 (cannot go below, remove with x button)
-  * Total updates automatically
-- Appointments: same quantity support for services
+WALK-IN POS - MAKE STAFF MANDATORY:
+- Staff selection must be required before completing order
+- Show validation message if staff not selected: "Please select a staff member"
+- Block "Complete & Save" button if staff not selected
 
-PART 2 - REPORTING AND NUMBERS ACCURACY
+APPOINTMENTS - MAKE ALL FIELDS MANDATORY:
+- Client name: required
+- Client phone: required
+- Staff: required
+- Branch: required (when multiple branches exist, auto-assign for single branch)
+- Show clear validation messages for each missing field
+- Block save if any required field missing
 
-Review all revenue calculations:
-- Total revenue = appointments.total_amount + walk_ins.total + membership_transactions.amount (type=payment)
-- Branch revenue = same but filtered by branch_id
-- Make sure no double counting anywhere
-- P&L report: add Membership Revenue as separate income line
-- Reports page: Sales report should show breakdown by source (Appointments/Walk-ins/Memberships)
-- Expenses report: show branch breakdown correctly
-- All CSV exports include branch column
+FIX ID/CODE SHOWING IN DROPDOWNS:
+- After selecting Staff in walk-in: show staff NAME not UUID
+- After selecting Branch in walk-in: show branch NAME not UUID
+- After selecting Staff in appointments: show staff NAME not UUID
+- After selecting Branch in appointments: show branch NAME not UUID
+- After selecting Branch in expenses: show branch NAME not UUID
+- Root cause: Select components value prop showing id but SelectValue showing code
+- Fix all Select components to display human-readable label after selection
+- Check ALL Select/dropdown components in: walkin/page.tsx, appointments/page.tsx, expenses/page.tsx, calendar/page.tsx
 
-PART 3 - LANDING PAGE COMPLETE REVAMP
+EXPENSES - BRANCH MANDATORY:
+- Branch field required when salon has multiple branches
+- Auto-assign single branch for single-branch salons
+- Show validation if branch not selected
+- Fix branch dropdown to show branch NAME not ID after selection
+- Remove "Paid By" field completely
+- Remove "Approval Status" field completely
 
-Replace the entire landing page with a bright, modern, premium design:
+PART 3 - EXPENSE MODULE IMPROVEMENTS
 
-DESIGN THEME:
-- WHITE/LIGHT background (not dark) - matching the product's light UI
-- Primary color: rose/pink (#e11d48) for accents, buttons, highlights
-- Clean, airy, premium feel - like Linear, Vercel, or Stripe website
-- Subtle light gray backgrounds for sections (#f8fafc, #f1f5f9)
-- Sharp shadows and depth
-- Professional typography - Inter font, large bold headings
-- Animations: smooth, subtle, professional
+FIX RECEIPT UPLOAD:
+- Create "expense-receipts" storage bucket in Supabase if it doesn't exist
+- Add this to the SQL migration: create the bucket via SQL or add instructions
+- Actually: add code to create bucket programmatically if it doesn't exist using admin client
+- After successful upload: store receipt_url in expenses table
+- View/Download receipt: add eye icon button on expense row that opens receipt in new tab
+- Download button: download the receipt file
 
-SECTION 1 - NAVBAR:
-- White background with subtle border bottom
-- Snipforce logo (scissors icon + text)
-- Nav links: Features, How It Works, Pricing
-- "Login" button (rose filled)
-- Sticky with subtle shadow on scroll
+FIX RECURRING EXPENSES:
+- Check if recurring expense functionality actually works
+- Recurring expense: when marked as recurring, it should auto-create the same expense next month
+- Implement a check on dashboard load: if any recurring expenses are due today or past due, auto-create them
+- Show notification when recurring expenses are auto-created
+- Add "Last Created" date to recurring expense display
 
-SECTION 2 - HERO:
-- Clean white background
-- Large headline (black): "The Complete Management Platform for Modern Salons"
-- Subheadline (gray): "Appointments, walk-ins, staff, inventory, payroll and financials — beautifully designed and effortlessly simple."
-- Two CTA buttons: "Request a Demo" (rose filled) and "See Features →" (outlined)
-- Right side: realistic browser mockup showing actual Snipforce dashboard
-  * Light themed browser chrome
-  * Show dashboard with KPI cards, charts, sidebar
-  * Subtle floating animation
-- Below hero: logos/badges row - "Trusted by salons across Pakistan, UAE, Saudi Arabia"
-- Animated stat counters: "500+ Salons" "99.9% Uptime" "24/7 Support"
+PART 4 - APPOINTMENT MODULE SIMPLIFICATION
 
-SECTION 3 - SOCIAL PROOF BANNER:
-- Light gray background
-- "Join hundreds of salons already using Snipforce"
-- Scrolling marquee of salon-type names (fade in/out at edges)
+REMOVE BILLING FROM APPOINTMENTS:
+- Remove "Mark as Paid" button from appointments completely
+- Remove payment method selection from appointments
+- Remove discount application from appointment modal
+- Appointment statuses: Pending, Confirmed, No Show only
+- Remove "Done/Completed" status from appointments (payment happens via walk-in)
+- Keep: book appointment, confirm, cancel, no-show
+- Update appointment_date filtering and calendar accordingly
 
-SECTION 4 - FEATURES (Interactive):
-- White background
-- Headline: "Everything your salon needs"
-- Left side: vertical list of feature names (clickable tabs)
-- Right side: shows feature description + mockup when tab selected
-- Features list:
-  * Smart Appointments - calendar view, staff scheduling
-  * Walk-In POS - instant checkout, multiple payment methods
-  * Staff Management - performance, attendance, payroll
-  * Client Loyalty - points system, membership plans
-  * Inventory Control - stock tracking, low stock alerts
-  * Financial Reports - P&L, expense tracking, revenue breakdown
-  * Multi-Branch - manage all locations from one dashboard
-  * Role-Based Access - control what each team member sees
-- Smooth transition animation between features
-- Right side mockup changes based on selected feature
+CONNECT APPOINTMENTS TO WALK-IN:
+- On appointments list: add "Check In / Bill" button for Confirmed appointments
+- Clicking "Check In" opens walk-in POS with client details pre-filled:
+  * Client name auto-filled
+  * Client phone auto-filled
+  * Services from appointment pre-selected in cart
+  * Staff from appointment pre-selected
+  * Branch from appointment pre-selected
+- User can add/remove services in walk-in, apply discounts, process payment
+- After walk-in completed: appointment status automatically updated to "Completed"
+- This creates a proper appointment → walk-in billing flow
 
-SECTION 5 - HOW IT WORKS:
-- Light gray background
-- 3 steps in horizontal layout with connecting line:
-  1. "We set up your account" - icon, description
-  2. "Add your team and services" - icon, description  
-  3. "Start growing your business" - icon, description
-- Clean icons, not too decorative
+ALIGN NO-SHOW STATUS:
+- Appointment statuses must be: pending, confirmed, no_show, cancelled, completed
+- completed = set automatically when linked walk-in is processed
+- Calendar filter for no_show must work correctly
+- Appointment form must have these exact status options
 
-SECTION 6 - FEATURE CHECKLIST:
-- White background
-- Headline: "Everything included, no hidden extras"
-- Two column grid of features with rose checkmarks
-- Remove "Demo request system" from list
-- Keep only real product features:
-  * Appointment booking & calendar
-  * Walk-in POS system
-  * Staff management & attendance
-  * Client profiles & loyalty points
-  * Membership & package plans
-  * Inventory management
-  * Expense tracking
-  * Payroll & commissions
-  * Profit & Loss reports
-  * Multi-branch support
-  * Role-based team access
-  * White-label branding
-  * Dark & light mode
-  * Mobile responsive
-  * PDF invoices & reports
+PART 5 - CALENDAR VIEW IMPROVEMENTS
 
-SECTION 7 - PRICING:
-- Light gray background
-- Headline: "Simple, transparent pricing"
-- 3 cards (white, clean, sharp shadow):
-  * Starter $49/month: 1 Branch, Up to 10 Staff
-  * Growth $100/month (highlighted with rose border): Up to 3 Branches, Up to 30 Staff
-  * Enterprise $200/month: Unlimited Branches, Unlimited Staff
-- Each card: feature list with checkmarks, "Get Started" button
-- All CTAs open demo request modal
+STAFF-WISE CALENDAR VIEW (like Mangomint):
+- Add a new view mode: "Staff View" toggle button alongside Day/Week
+- Staff View (Day): show one column per staff member side by side
+  * Each staff has their own column with their name as header
+  * Appointments shown as cards in respective staff column
+  * Time slots on left Y axis (8AM to 10PM)
+  * Drag and drop to reassign staff (optional, nice to have)
+- Staff View (Week): show staff selector dropdown, view one staff week at a time
+- Existing Day/Week views: show staff name ON the appointment card (currently missing)
+- Appointment card shows: client name, service name, staff name, time
 
-SECTION 8 - TESTIMONIALS:
-- White background
-- 3 clean cards with quote, name, salon name, star rating
-- Realistic testimonials
+PART 6 - TEAM MEMBER BRANCH ASSIGNMENT
 
-SECTION 9 - CTA BANNER:
-- Rose gradient background
-- "Ready to transform your salon?"
-- "Request a Demo" button (white text)
+When creating sub-user:
+- Add "Assigned Branch" field (dropdown of branches)
+- Optional: if not selected, sub-user sees all branches
+- If selected: sub-user only sees data for their assigned branch
+  * Walk-in: branch auto-selected and locked to their branch
+  * Appointments: branch auto-selected and locked
+  * Dashboard: shows only their branch data
+  * Reports: filtered to their branch
+- Store branch_id in salon_members table
+- Add branch_id column to salon_members if not exists
 
-SECTION 10 - FOOTER:
-- Dark footer (#0f172a)
-- Logo, links, copyright
-- "Powered by Snipforce"
+FIX SUB-USER PERMISSION NAVIGATION:
+- CRITICAL BUG: clicking Staff, Services, Clients redirects to Appointments
+- Root cause: PermissionGuard firstAllowed logic or ROLE_NAV missing these paths
+- Fix: when sub-user has permission for staff/services/clients, those pages must be accessible
+- Debug PermissionGuard - check if module keys match permission keys exactly
+- Check team/page.tsx ALL_PERMISSIONS list - ensure staff, services, clients keys are correct
+- Check Sidebar MODULE_HREFS - ensure staff → /staff, services → /services, clients → /clients
+- Test each permission individually after fix
 
-DEMO REQUEST MODAL:
-- Triggered by all CTA buttons
-- Clean white modal
-- Fields: Full Name, Phone, Salon Name, Number of Branches, City
-- Submit saves to leads table
-- Success message
+PART 7 - PNL IMPROVEMENTS
 
-ANIMATIONS:
-- Hero browser mockup: subtle float
-- Stats: count up on scroll
-- Sections: fade in from bottom on scroll
-- Feature tabs: smooth slide transition
-- Navbar: shadow on scroll
-- All animations subtle and professional - not overdone
+- Add separate line items in P&L:
+  * Gross Revenue (appointments + walk-ins + memberships)
+  * Less: Discounts Given (total discount_amount)
+  * Less: Loyalty Redeemed (total loyalty points redeemed as currency)
+  * Net Revenue
+- These should also show in revenue section of reports
 
-TECHNICAL:
-- Replace app/page.tsx entirely
-- Pure Next.js + Tailwind CSS
-- Mobile fully responsive
-- Fast loading
-- Keep existing demo form Supabase submission logic
+PART 8 - WALK-IN ORDERS VIEW
+
+- Walk-in POS has Orders tab showing today's orders
+- Add date navigation: < Previous Day | [Date] | Next Day >
+- Show orders for selected date
+- Default: today
+- Each order shows: time, client name/phone, services, staff, total, payment method
+- Cannot navigate to future dates
 
 TECHNICAL REQUIREMENTS:
-- Generate SQL migration if any new columns needed (branch_id on membership tables etc)
-- Run npm run build - zero TypeScript errors
-- Update CLAUDE.md
-- Mobile responsive
-- Dark mode compatible for dashboard (landing page is light only)
+- Generate SQL migration for:
+  * branch_id column on salon_members table
+  * Ensure appointment statuses are aligned (no_show, completed, pending, confirmed, cancelled)
+- Run npm run build to confirm zero TypeScript errors
+- Update CLAUDE.md with all changes
+- Mobile responsive throughout
+- Dark mode compatible
+- No breaking changes to existing data
+- All existing appointments/walk-ins data preserved

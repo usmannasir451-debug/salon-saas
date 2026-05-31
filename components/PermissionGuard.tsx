@@ -29,26 +29,17 @@ const PERM_TO_HREF: Record<string, string> = {
   memberships: '/memberships',
 }
 
-// Map of module key → path prefixes it covers
+// Only optional/premium modules that can be disabled by admin.
+// Core modules (staff, services, clients, appointments, etc.) are always accessible
+// and must NOT be gated here — including them would block core features when
+// enabled_modules only lists optional ones (e.g., memberships).
 const MODULE_PATH_MAP: Record<string, string[]> = {
-  dashboard: ['/dashboard'],
-  appointments: ['/appointments'],
-  calendar: ['/calendar'],
-  walkin: ['/walkin'],
-  services: ['/services'],
-  staff: ['/staff'],
-  performance: ['/staff/performance'],
-  reviews: ['/reviews'],
-  clients: ['/clients'],
-  inventory: ['/inventory'],
-  expenses: ['/expenses'],
-  payroll: ['/payroll'],
-  attendance: ['/attendance'],
-  reports_pnl: ['/reports/pnl', '/reports'],
-  branches: ['/branches'],
-  team_members: ['/team'],
-  settings: ['/settings'],
-  memberships: ['/memberships'],
+  inventory:    ['/inventory'],
+  expenses:     ['/expenses'],
+  payroll:      ['/payroll'],
+  attendance:   ['/attendance'],
+  reports_pnl:  ['/reports/pnl', '/reports'],
+  memberships:  ['/memberships'],
 }
 
 // Always blocked for sub-users — even if owner accidentally grants these permissions

@@ -105,6 +105,7 @@ export type SalonMember = {
   permissions?: string[] | null
   last_set_password?: string | null
   staff_id?: string | null
+  branch_id?: string | null
   status: 'pending' | 'active' | 'inactive'
   invited_at: string
   joined_at?: string | null

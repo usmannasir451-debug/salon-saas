@@ -13,7 +13,7 @@ import {
   Zap, Loader2, X, Banknote, CreditCard, User, Phone, Search,
   Star, ChevronDown, ChevronUp, CheckCircle2, Receipt, Printer,
   MessageSquare, ShoppingCart, Trash2, Package, Clock, History, LayoutGrid, List,
-  Crown, Tag, Building2, Plus, Minus,
+  Crown, Tag, Building2, Plus, Minus, ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -204,11 +204,37 @@ export default function WalkInPage() {
   const [activeMainTab, setActiveMainTab] = useState<'pos' | 'history'>('pos')
   const [todayOrders, setTodayOrders] = useState<TodayOrder[]>([])
   const [selectedOrderDetail, setSelectedOrderDetail] = useState<TodayOrder | null>(null)
+  const [ordersDate, setOrdersDate] = useState(() => format(new Date(), 'yyyy-MM-dd'))
+  const [linkedAppointmentId, setLinkedAppointmentId] = useState('')
 
   useEffect(() => {
     const saved = localStorage.getItem('walkin_view_mode')
     if (saved === 'list' || saved === 'grid') setServiceViewMode(saved)
   }, [])
+
+  // Pre-fill from appointment check-in
+  useEffect(() => {
+    const prefillRaw = localStorage.getItem('walkin_prefill')
+    if (!prefillRaw) return
+    try {
+      const data = JSON.parse(prefillRaw) as {
+        client_name?: string; client_phone?: string; staff_id?: string
+        branch_id?: string; service_ids?: string[]; appointment_id?: string
+      }
+      if (data.client_name) setClientName(data.client_name)
+      if (data.client_phone) { setClientPhone(data.client_phone) }
+      if (data.staff_id) setStaffId(data.staff_id)
+      if (data.branch_id) setBranchId(data.branch_id)
+      if (data.service_ids && data.service_ids.length > 0) {
+        const qtys: Record<string, number> = {}
+        data.service_ids.forEach((id: string) => { qtys[id] = (qtys[id] ?? 0) + 1 })
+        setServiceQuantities(qtys)
+      }
+      if (data.appointment_id) setLinkedAppointmentId(data.appointment_id)
+      localStorage.removeItem('walkin_prefill')
+      setActiveMainTab('pos')
+    } catch {}
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const hasAccess =
@@ -220,6 +246,22 @@ export default function WalkInPage() {
     }
     loadData()
   }, [role, permissions, router]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const fetchOrdersForDate = useCallback(async (dateStr: string) => {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('walk_ins')
+      .select('id, client_name, client_phone, total, payment_method, created_at, walk_in_services(services(name))')
+      .eq('user_id', ownerId)
+      .gte('created_at', dateStr + 'T00:00:00')
+      .lte('created_at', dateStr + 'T23:59:59')
+      .order('created_at', { ascending: false })
+    setTodayOrders((data as unknown as TodayOrder[]) ?? [])
+  }, [ownerId])
+
+  useEffect(() => {
+    if (!loading) fetchOrdersForDate(ordersDate)
+  }, [ordersDate, loading, fetchOrdersForDate]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadData() {
     const supabase = createClient()
@@ -460,6 +502,10 @@ export default function WalkInPage() {
       toast.error('Please select at least one service or deal')
       return
     }
+    if (!staffId) {
+      toast.error('Please select a staff member')
+      return
+    }
     if (branches.length > 1 && !branchId) {
       toast.error('Please select a branch before completing the order')
       return
@@ -620,6 +666,12 @@ export default function WalkInPage() {
       ? [selectedDeal.name + ' (Deal)', ...additionalServices.map(s => s.name)]
       : selectedServices.map(s => s.name)
 
+    // If this walk-in came from an appointment check-in, mark it completed
+    if (linkedAppointmentId) {
+      await supabase.from('appointments').update({ status: 'completed' }).eq('id', linkedAppointmentId)
+      setLinkedAppointmentId('')
+    }
+
     setCompletedServiceNames(svcNames)
     setCompletedWalkIn(walkinData)
     if (walkinData.staff_id) setFeedbackWalkIn(walkinData)
@@ -627,15 +679,8 @@ export default function WalkInPage() {
     clearOrder()
     toast.success('Walk-in recorded!')
 
-    // Refresh today's orders list
-    const refreshStr = format(new Date(), 'yyyy-MM-dd')
-    const { data: freshOrders } = await supabase
-      .from('walk_ins')
-      .select('id, client_name, client_phone, total, payment_method, created_at, walk_in_services(services(name))')
-      .eq('user_id', ownerId)
-      .gte('created_at', refreshStr + 'T00:00:00')
-      .order('created_at', { ascending: false })
-    setTodayOrders((freshOrders as unknown as TodayOrder[]) ?? [])
+    // Refresh orders list
+    await fetchOrdersForDate(ordersDate)
 
     setSubmitting(false)
   }
@@ -1062,14 +1107,40 @@ export default function WalkInPage() {
 
       {/* ── Split Layout (POS mode) ── */}
       {activeMainTab === 'history' ? (
-        /* ── Today's Orders History ── */
+        /* ── Orders History ── */
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
             <h2 className="text-sm font-bold text-gray-700 flex items-center gap-1.5">
               <History className="w-4 h-4 text-primary" />
-              Today&apos;s Orders
-              <span className="text-xs font-normal text-gray-400">({format(new Date(), 'MMM d, yyyy')})</span>
+              Orders
             </h2>
+            <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1">
+              <button
+                type="button"
+                onClick={() => {
+                  const d = new Date(ordersDate); d.setDate(d.getDate() - 1)
+                  setOrdersDate(format(d, 'yyyy-MM-dd'))
+                }}
+                className="p-0.5 rounded hover:bg-gray-200 transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4 text-gray-500" />
+              </button>
+              <span className="text-xs font-medium text-gray-700 min-w-[90px] text-center">
+                {ordersDate === format(new Date(), 'yyyy-MM-dd') ? 'Today' : format(new Date(ordersDate + 'T00:00:00'), 'MMM d, yyyy')}
+              </span>
+              <button
+                type="button"
+                disabled={ordersDate >= format(new Date(), 'yyyy-MM-dd')}
+                onClick={() => {
+                  const d = new Date(ordersDate); d.setDate(d.getDate() + 1)
+                  const next = format(d, 'yyyy-MM-dd')
+                  if (next <= format(new Date(), 'yyyy-MM-dd')) setOrdersDate(next)
+                }}
+                className="p-0.5 rounded hover:bg-gray-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <ChevronRight className="w-4 h-4 text-gray-500" />
+              </button>
+            </div>
           </div>
           {todayOrders.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -1201,25 +1272,26 @@ export default function WalkInPage() {
             })}
             {/* Staff + Branch row */}
             <div className="grid grid-cols-2 gap-2">
-              <Select value={staffId || 'none'} onValueChange={(v) => setStaffId(v === 'none' ? '' : (v ?? ''))}>
-                <SelectTrigger className="h-9 text-sm">
-                  <SelectValue placeholder="Assign staff" />
+              <Select value={staffId || ''} onValueChange={(v) => setStaffId(v ?? '')}>
+                <SelectTrigger className={cn('h-9 text-sm', !staffId ? 'border-amber-300' : '')}>
+                  <SelectValue placeholder="Staff * (required)">
+                    {staffId ? (staffList.find(s => s.id === staffId)?.name ?? 'Select staff') : undefined}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">No staff</SelectItem>
                   {staffList.map((s) => (
                     <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               {branches.length > 1 && (
-                <Select value={branchId || 'none'} onValueChange={(v) => setBranchId(v === 'none' ? '' : (v ?? ''))}>
+                <Select value={branchId || ''} onValueChange={(v) => setBranchId(v ?? '')}>
                   <SelectTrigger className={cn('h-9 text-sm', !branchId ? 'border-amber-300 text-amber-700' : '')}>
-                    <Building2 className="w-3.5 h-3.5 text-gray-400 mr-1" />
-                    <SelectValue placeholder="Branch *" />
+                    <SelectValue placeholder="Branch *">
+                      {branchId ? (branches.find(b => b.id === branchId)?.name ?? 'Select branch') : undefined}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">Select branch</SelectItem>
                     {branches.map((b) => (
                       <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
                     ))}

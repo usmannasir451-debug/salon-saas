@@ -68,13 +68,15 @@ NEXT_PUBLIC_ADMIN_EMAIL           # Email address that can access /admin page
 
 ### Appointments & Scheduling
 - Calendar-based appointment booking (by date, staff, service)
-- Appointment status management (pending, confirmed, completed, cancelled)
-- Payment status tracking per appointment
-- Discount application with role-based limits (flat / percentage)
-- Customer feedback collection on completed appointments
+- Appointment statuses: **pending, confirmed, no_show, cancelled, completed** (completed set automatically when linked walk-in is processed)
+- Required fields: client name, client phone, staff, branch (auto-assigned if single branch)
 - Notes per appointment
-- Invoice/receipt generation (PDF via jsPDF)
+- Invoice/receipt generation (PDF via jsPDF) for completed appointments
 - **Phone auto-lookup in booking dialog**: debounced 500ms — on phone entry, queries appointments + loyalty + client_memberships; shows client name (with "Use Name" button), visit count, loyalty points, and active membership below the input
+- **Check In / Bill**: Confirmed appointments have "Check In / Bill" button — pre-fills walk-in POS with client name, phone, staff, branch, and services via localStorage
+- After walk-in completed from check-in: appointment auto-updated to "completed"
+- Branch Select and Staff Select show human-readable names (not UUIDs) after selection
+- Billing (Mark as Paid, payment method, discount) removed from appointment form — payment handled via walk-in POS
 
 ### Walk-In POS (Redesigned)
 - Full-screen split-panel POS interface (60% service picker + 40% order panel)
@@ -88,12 +90,23 @@ NEXT_PUBLIC_ADMIN_EMAIL           # Email address that can access /admin page
 - Loyalty points redemption at checkout
 - Deal redemption at checkout
 - Floating quick-access button across the dashboard
+- **Staff mandatory**: Walk-in cannot be completed without selecting a staff member
+- **Orders tab date navigation**: `< Previous Day | [Date] | Next Day >` — cannot navigate to future dates
+- **Check-in prefill**: When opened from appointment Check In / Bill button, client name, phone, staff, branch, and services are pre-filled from localStorage; after completion, linked appointment is auto-updated to "completed"
 - **Membership integration**: On phone lookup, fetches active memberships and packages
   - Shows amber banner for active membership (plan name, services/balance remaining)
   - Shows blue banner for active package (sessions remaining)
   - Per-cart-item "Apply Membership" / "Redeem Package" toggle — zeroes out service price when on
   - Balance-based memberships: "Use Balance" payment option above total
   - On order completion: decrements services_remaining, expires memberships/packages at 0, creates membership_transaction records
+
+### Calendar (`/calendar`)
+- Day, Week, and Staff view modes
+- **Staff View**: one column per staff member side by side for the current day, time slots on Y axis (8AM–10PM). Each column header shows staff name and appointment count badge. Appointments shown as cards in respective staff column. Unassigned appointments shown in a separate "Unassigned" column.
+- **Day/Week views**: show all appointments with client name, service name, and staff name on cards
+- Staff filter dropdown in Day/Week views (hidden in Staff View since columns already split by staff)
+- Click any appointment to edit it in a modal (client, date/time, status, service, staff, notes)
+- Grid: 8AM–10PM (GRID_START=8, GRID_END=22), PX_PER_MIN=1.5
 
 ### Services
 - Service catalog (name, duration, price)
@@ -160,12 +173,13 @@ NEXT_PUBLIC_ADMIN_EMAIL           # Email address that can access /admin page
 - Monthly payroll entries per staff
 
 ### Expenses
-- Expense logging (category, description, amount, date, paid by)
+- Expense logging (category, description, amount, date)
 - Configurable expense categories and budgets (stored in profiles)
-- Approval workflow (pending / approved / rejected)
+- All expenses auto-approved (approval_status always set to 'approved' on save)
 - Recurring expense flag
-- Receipt URL attachment
-- Branch-level expenses
+- Receipt photo upload (expense-receipts Supabase storage bucket); eye icon opens receipt in new tab
+- Branch mandatory when salon has multiple branches; auto-assigned for single-branch salons
+- Removed "Paid By" and "Approval Status" from form (these fields are no longer user-editable)
 
 ### Inventory
 - Product/stock items (name, category, quantity, unit, cost price, supplier)
@@ -175,10 +189,15 @@ NEXT_PUBLIC_ADMIN_EMAIL           # Email address that can access /admin page
 
 ### Reports & Analytics
 - **Dashboard**: Real-time KPIs — appointments today, revenue, active clients, staff count, walk-ins
-  - Monthly revenue now includes membership payments (appointment + walk-in + membership_transactions type='payment')
-  - Additional KPI card "Membership Revenue" shown when > 0
+  - Period filters: Today / This Week / This Month / **Previous Month** (shows month name, e.g., "May 2026") / Custom Range
+  - Custom range does dynamic fetch for correct walk-in and appointment data outside current month
+  - Revenue includes ALL three sources: appointments + walk-ins + membership_transactions
+  - **Discounts Given** KPI tile: sum of discount_amount from appointments + walk-ins for the period
+  - **12-month Sales Trend Line chart** with year selector dropdown (shows appointments + walk-ins + membership revenue per month)
 - **P&L Report**: Revenue vs expense breakdown (filterable by month/branch)
+  - Income section: Gross Revenue → Less: Discounts Given → **Less: Loyalty Redeemed** → Net Revenue
   - Gross revenue = appointment revenue + walk-in revenue + membership revenue
+  - Loyalty redeemed fetched from loyalty_transactions (type='redeem'), shown as points deducted
   - Conditional "Membership Revenue" line item in income table and PDF export
 - **Staff Performance**: Per-staff revenue generated and commission earned
 - **Export**: CSV/PDF export of appointments, clients, staff data
@@ -190,6 +209,9 @@ NEXT_PUBLIC_ADMIN_EMAIL           # Email address that can access /admin page
 - Team members log in with their own credentials
 - Owner can set/reset team member passwords
 - Audit log (settings changes, member activity)
+- **Sub-user navigation fix**: PermissionGuard MODULE_PATH_MAP only gates optional modules (memberships, expenses, reports, inventory, payroll, attendance) — core modules (staff, services, clients, etc.) are always accessible when role/permission allows
+- **Branch assignment**: Owner can assign a specific branch to each sub-user in the Create/Edit dialog. Assigned branch shown as a blue badge in the member list. Stored in `salon_members.branch_id`. Optional — if not set, sub-user sees all branches.
+- `salon_members.branch_id` column added (migration: 20260601_salon_members_branch.sql)
 
 ### Settings (owner-only)
 - Salon branding: logo upload, primary color with preset swatches + live preview
@@ -269,12 +291,18 @@ NEXT_PUBLIC_ADMIN_EMAIL           # Email address that can access /admin page
 - **Phone as universal identifier**: Phone number is the primary client lookup key across walk-in POS, appointments dialog, memberships assign dialogs, and client profiles. Debounced auto-lookup (500ms) queries client history, loyalty points, and active memberships on phone entry.
 - **Membership redemption in walk-in**: Service-based memberships decrement `services_remaining` JSONB and create a `membership_transactions` record (type='service_redemption'). Balance-based memberships deduct from `client_memberships.balance`. Package redemptions only decrement `client_packages.services_remaining` (no transaction record, since `membership_id` is NOT NULL on membership_transactions).
 - **Discount section collapsed by default**: In walk-in POS, discount and loyalty sections collapsed by default; expand via Tag icon click to keep the UI clean.
-- **Dashboard KPI tiles**: Dashboard shows "Total Sales" (appt + walkin + membership revenue for the period), "Appointments" count, "Walk-Ins" count, "Avg Rating", and "Memberships Sold" (count + revenue, only if memberships module enabled). All tiles respect the active period filter (Today/Week/Month/Custom). Expenses and net profit tiles only shown if `expenses` module enabled. Revenue charts only shown if `reports` module enabled.
+- **Dashboard KPI tiles**: Dashboard shows "Total Sales", "Appointments", "Walk-Ins", "Avg Rating", "Discounts Given", and "Memberships Sold" (only if memberships module enabled). All tiles respect the active period filter (Today/This Week/This Month/Previous Month/Custom Range). Expenses and net profit tiles only shown if `expenses` module enabled. Revenue charts only shown if `reports` module enabled.
+- **Dashboard Previous Month filter**: Shows previous calendar month name (e.g., "May 2026") as a button. Stats use `lastMonthAppts` and `lastMonthWalkIns` pre-fetched on load.
+- **Dashboard 12-month trend chart**: Line chart showing monthly revenue (appt + walkin + membership) for each month of the selected year. Year selector dropdown. When year != current year, fetches data dynamically via `loadTrendData(year)`.
+- **Dashboard custom range fix**: When custom date range is selected, `loadCustomRangeData(from, to)` fetches appointments, walk-ins, and membership tx for that exact range, avoiding the month-boundary data gap.
+- **PermissionGuard MODULE_PATH_MAP**: Only optional modules gated (memberships, expenses, reports, inventory, payroll, attendance). Core modules (appointments, staff, services, clients, calendar, walkin) are NOT in the map — they pass isModuleEnabled regardless of enabled_modules array.
 - **Dashboard welcome message**: Header shows "Welcome, [Salon Name]! 👋" with current date and live time.
 - **Service quantity in walk-in POS**: Walk-in cart uses `serviceQuantities: Record<string, number>` instead of a flat array of IDs. The `+` button on service cards increments quantity; cart shows quantity controls (+ / - buttons per item). Min quantity is 1 (X button removes entirely). `selectedServiceIds` is a derived useMemo that expands quantities into a flat list for DB insertion.
 - **Branch mandatory (walk-in)**: Walk-in POS fetches branches; shows branch selector when salon has >1 branch; blocks order completion without branch selection; auto-selects silently when only 1 branch.
 - **Branch mandatory (appointments)**: Appointments form validates branch_id when salon has >1 branch; auto-assigns single branch on openCreate.
 - **walk_ins.branch_id**: Walk-in POS now saves branch_id on every transaction (was previously not sent).
+- **Calendar Staff View**: Third view mode alongside Day/Week. Shows one column per staff member for the current day. Each column header has staff name + appointment count badge. Unassigned appointments get their own column. Grid runs 8AM–10PM. Staff filter dropdown hidden in this mode (columns already segregate by staff).
+- **Team branch assignment**: `salon_members.branch_id` stores optional assigned branch. Set via dropdown in Add/Edit team member dialogs. Displayed as a blue badge in the team list. Optional — if null, sub-user sees all branches.
 - **Landing page**: Completely revamped to light-themed design (white/rose) matching Linear/Stripe aesthetic. Sections: Navbar, Hero (with dashboard mockup), Social proof marquee, Features (interactive tabs), How It Works, Feature Checklist, Pricing, Testimonials, CTA banner, Footer, Demo Request Modal. No dark theme on landing page.
 
 ## 8. FOLDER STRUCTURE

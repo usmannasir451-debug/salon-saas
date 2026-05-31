@@ -27,6 +27,13 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   UserCog,
   Plus,
   Trash2,
@@ -42,9 +49,12 @@ import {
   MessageCircle,
   Power,
   PowerOff,
+  GitBranch,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
+
+type Branch = { id: string; name: string }
 
 const ALL_PERMISSIONS = [
   { key: 'dashboard', label: 'Dashboard', description: 'View salon overview and KPIs' },
@@ -80,15 +90,16 @@ const PRESETS = [
   },
 ]
 
-const emptyCreate = { displayName: '', email: '', password: '', permissions: [] as string[] }
+const emptyCreate = { displayName: '', email: '', password: '', permissions: [] as string[], branchId: '' }
 
 type CreatedCredentials = { displayName: string; email: string; password: string }
 
 export default function TeamPage() {
-  const { role } = useUserContext()
+  const { role, ownerId } = useUserContext()
   const router = useRouter()
 
   const [members, setMembers] = useState<SalonMember[]>([])
+  const [branches, setBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(true)
 
   // Add dialog
@@ -105,6 +116,7 @@ export default function TeamPage() {
   const [editMember, setEditMember] = useState<SalonMember | null>(null)
   const [editName, setEditName] = useState('')
   const [editPerms, setEditPerms] = useState<string[]>([])
+  const [editBranchId, setEditBranchId] = useState('')
   const [editing, setEditing] = useState(false)
 
   // Reset password dialog
@@ -125,16 +137,17 @@ export default function TeamPage() {
       router.replace('/dashboard')
       return
     }
-    loadMembers()
+    loadData()
   }, [role, router])
 
-  async function loadMembers() {
+  async function loadData() {
     const supabase = createClient()
-    const { data } = await supabase
-      .from('salon_members')
-      .select('*')
-      .order('invited_at', { ascending: false })
-    setMembers((data as SalonMember[]) ?? [])
+    const [membersRes, branchesRes] = await Promise.all([
+      supabase.from('salon_members').select('*').order('invited_at', { ascending: false }),
+      supabase.from('branches').select('id, name').eq('user_id', ownerId).order('name'),
+    ])
+    setMembers((membersRes.data as SalonMember[]) ?? [])
+    setBranches((branchesRes.data ?? []) as Branch[])
     setLoading(false)
   }
 
@@ -142,6 +155,7 @@ export default function TeamPage() {
     setEditMember(m)
     setEditName(m.display_name ?? ROLE_LABELS[m.role as UserRole] ?? m.role)
     setEditPerms(m.permissions ?? [])
+    setEditBranchId(m.branch_id ?? '')
   }
 
   async function handleAdd(e: React.FormEvent) {
@@ -159,7 +173,8 @@ export default function TeamPage() {
       addForm.displayName,
       addForm.email,
       addForm.password,
-      addForm.permissions
+      addForm.permissions,
+      addForm.branchId || null
     )
     if ('error' in res) {
       toast.error(res.error)
@@ -172,7 +187,7 @@ export default function TeamPage() {
       })
       setAddForm(emptyCreate)
       setShowAddPw(false)
-      await loadMembers()
+      await loadData()
     }
     setAdding(false)
   }
@@ -185,13 +200,13 @@ export default function TeamPage() {
       return
     }
     setEditing(true)
-    const res = await updateTeamMember(editMember.id, editName, editPerms)
+    const res = await updateTeamMember(editMember.id, editName, editPerms, editBranchId || null)
     if ('error' in res) {
       toast.error(res.error)
     } else {
       toast.success('Permissions updated')
       setEditMember(null)
-      await loadMembers()
+      await loadData()
     }
     setEditing(false)
   }
@@ -211,7 +226,7 @@ export default function TeamPage() {
       toast.success('Password reset successfully')
       setResetMember(null)
       setResetPw('')
-      await loadMembers()
+      await loadData()
     }
     setResetting(false)
   }
@@ -272,6 +287,38 @@ export default function TeamPage() {
     )
     window.open(`https://wa.me/?text=${msg}`, '_blank')
   }
+
+  const BranchSelect = ({
+    value,
+    onChange,
+  }: {
+    value: string
+    onChange: (v: string) => void
+  }) => (
+    <div className="space-y-1.5">
+      <Label className="flex items-center gap-1.5">
+        <GitBranch className="w-3.5 h-3.5 text-gray-400" />
+        Assigned Branch
+        <span className="text-gray-400 font-normal text-xs">(optional)</span>
+      </Label>
+      <Select value={value || '_all'} onValueChange={(v) => onChange((v ?? '') === '_all' ? '' : (v ?? ''))}>
+        <SelectTrigger className="h-9">
+          <SelectValue placeholder="All branches">
+            {value ? (branches.find(b => b.id === value)?.name ?? undefined) : 'All branches'}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="_all">All branches</SelectItem>
+          {branches.map((b) => (
+            <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <p className="text-xs text-gray-400">
+        If assigned, this member will only see data for that branch
+      </p>
+    </div>
+  )
 
   const PermissionsGrid = ({
     perms,
@@ -392,6 +439,7 @@ export default function TeamPage() {
                 const hasCustomPerms = member.permissions && member.permissions.length > 0
                 const showPw = visiblePws.has(member.id)
                 const isInactive = member.status === 'inactive'
+                const assignedBranch = member.branch_id ? branches.find(b => b.id === member.branch_id) : null
                 return (
                   <div
                     key={member.id}
@@ -417,6 +465,12 @@ export default function TeamPage() {
                         ) : (
                           <Badge className={cn('text-xs', ROLE_COLORS[member.role as UserRole])}>
                             {ROLE_LABELS[member.role as UserRole]}
+                          </Badge>
+                        )}
+                        {assignedBranch && (
+                          <Badge className="text-xs bg-blue-50 text-blue-700 border-blue-200 gap-1">
+                            <GitBranch className="w-3 h-3" />
+                            {assignedBranch.name}
                           </Badge>
                         )}
                         {isInactive ? (
@@ -573,6 +627,13 @@ export default function TeamPage() {
               </div>
             </div>
 
+            {branches.length > 0 && (
+              <BranchSelect
+                value={addForm.branchId}
+                onChange={(v) => setAddForm({ ...addForm, branchId: v })}
+              />
+            )}
+
             <PermissionsGrid
               perms={addForm.permissions}
               setPerms={(perms) => setAddForm({ ...addForm, permissions: perms })}
@@ -684,6 +745,13 @@ export default function TeamPage() {
                 required
               />
             </div>
+
+            {branches.length > 0 && (
+              <BranchSelect
+                value={editBranchId}
+                onChange={setEditBranchId}
+              />
+            )}
 
             <PermissionsGrid perms={editPerms} setPerms={setEditPerms} />
 

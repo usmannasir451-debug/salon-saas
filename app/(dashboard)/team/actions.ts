@@ -25,7 +25,8 @@ export async function createTeamMember(
   displayName: string,
   email: string,
   password: string,
-  permissions: string[]
+  permissions: string[],
+  branchId?: string | null
 ) {
   const user = await getOwnerUser()
   if (!user) return { error: 'Only salon owners can create team members' }
@@ -78,6 +79,7 @@ export async function createTeamMember(
     last_set_password: storedPassword,
     status: 'active',
     joined_at: new Date().toISOString(),
+    branch_id: branchId || null,
   })
 
   if (insertError) return { error: insertError.message }
@@ -89,7 +91,8 @@ export async function createTeamMember(
 export async function updateTeamMember(
   memberId: string,
   displayName: string,
-  permissions: string[]
+  permissions: string[],
+  branchId?: string | null
 ) {
   const user = await getOwnerUser()
   if (!user) return { error: 'Only salon owners can edit team members' }
@@ -97,7 +100,7 @@ export async function updateTeamMember(
   const supabase = await createClient()
   const { error } = await supabase
     .from('salon_members')
-    .update({ display_name: displayName.trim(), permissions })
+    .update({ display_name: displayName.trim(), permissions, branch_id: branchId ?? null })
     .eq('id', memberId)
     .eq('owner_id', user.id)
 

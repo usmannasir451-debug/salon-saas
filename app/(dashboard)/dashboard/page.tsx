@@ -38,6 +38,7 @@ type AppRow = {
   payment_method?: string | null
   notes?: string
   total_amount?: number | null
+  discount_amount?: number | null
   services?: ServiceRef | null
   staff?: StaffRef | null
 }
@@ -49,6 +50,7 @@ type WalkInRow = {
   total: number
   created_at: string
   payment_method?: string | null
+  discount_amount?: number | null
   services?: ServiceRef | null
 }
 
@@ -107,20 +109,25 @@ export default function DashboardPage() {
   const [allAppointments, setAllAppointments] = useState<AppRow[]>([])
   const [walkIns, setWalkIns] = useState<WalkInRow[]>([])
   const [allExpenses, setAllExpenses] = useState<ExpenseRow[]>([])
-  const [sixMonthAppts, setSixMonthAppts] = useState<{ appointment_date: string; status: string; branch_id?: string; total_amount?: number | null; services?: { price: number } | null }[]>([])
-  const [sixMonthWalkIns, setSixMonthWalkIns] = useState<{ total: number; created_at: string; branch_id?: string }[]>([])
   const [sixMonthClients, setSixMonthClients] = useState<{ created_at: string }[]>([])
   const [lowStockItems, setLowStockItems] = useState<LowStockItem[]>([])
-  const [lastMonthAppts, setLastMonthAppts] = useState<{ status: string; branch_id?: string; total_amount?: number | null; services?: { price: number } | null }[]>([])
-  const [lastMonthWalkIns, setLastMonthWalkIns] = useState<{ total: number; branch_id?: string }[]>([])
+  const [lastMonthAppts, setLastMonthAppts] = useState<{ status: string; branch_id?: string; total_amount?: number | null; discount_amount?: number | null; services?: { price: number } | null }[]>([])
+  const [lastMonthWalkIns, setLastMonthWalkIns] = useState<{ total: number; branch_id?: string; discount_amount?: number | null }[]>([])
   const [salonName, setSalonName] = useState('')
   const [currency, setCurrency] = useState('USD')
   const [branches, setBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeFilter, setActiveFilter] = useState<'today' | 'week' | 'month' | 'custom'>('month')
+  const [activeFilter, setActiveFilter] = useState<'today' | 'week' | 'month' | 'prev_month' | 'custom'>('month')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
   const [showCustomPicker, setShowCustomPicker] = useState(false)
+  const [trendYear, setTrendYear] = useState(() => new Date().getFullYear())
+  const [trendAppts, setTrendAppts] = useState<{ appointment_date: string; total_amount?: number | null; branch_id?: string }[]>([])
+  const [trendWalkIns, setTrendWalkIns] = useState<{ total: number; created_at: string; branch_id?: string }[]>([])
+  const [trendMembershipTx, setTrendMembershipTx] = useState<{ amount: number; created_at: string }[]>([])
+  const [customAppts, setCustomAppts] = useState<AppRow[]>([])
+  const [customWalkIns, setCustomWalkIns] = useState<WalkInRow[]>([])
+  const [customMembershipTx, setCustomMembershipTx] = useState<{ amount: number; created_at: string }[]>([])
   const [liveTime, setLiveTime] = useState(() => format(new Date(), 'h:mm a'))
   const [activeBranch, setActiveBranch] = useState('all')
   const [pdfLoading, setPdfLoading] = useState(false)
@@ -143,19 +150,29 @@ export default function DashboardPage() {
     loadDashboard()
   }, [role, router]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    if (loading || trendYear === new Date().getFullYear()) return
+    loadTrendData(trendYear)
+  }, [trendYear, loading, ownerId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (loading || activeFilter !== 'custom' || !customFrom || !customTo) return
+    loadCustomRangeData(customFrom, customTo)
+  }, [activeFilter, customFrom, customTo, loading, ownerId]) // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!['owner', 'regional_manager', 'manager'].includes(role)) return null
 
   async function loadDashboard() {
     const supabase = createClient()
 
-    const todayStr       = format(new Date(), 'yyyy-MM-dd')
-    const monthStart     = format(startOfMonth(new Date()), 'yyyy-MM-dd')
-    const monthEnd       = format(endOfMonth(new Date()), 'yyyy-MM-dd')
-    const lastMonthStart = format(startOfMonth(subMonths(new Date(), 1)), 'yyyy-MM-dd')
-    const lastMonthEnd   = format(endOfMonth(subMonths(new Date(), 1)), 'yyyy-MM-dd')
-    const sevenDaysAgo   = format(subDays(new Date(), 6), 'yyyy-MM-dd')
-    const sixMonthsAgo   = format(startOfMonth(subMonths(new Date(), 5)), 'yyyy-MM-dd')
-    const queryStart     = monthStart < sevenDaysAgo ? monthStart : sevenDaysAgo
+    const todayStr        = format(new Date(), 'yyyy-MM-dd')
+    const monthStart      = format(startOfMonth(new Date()), 'yyyy-MM-dd')
+    const monthEnd        = format(endOfMonth(new Date()), 'yyyy-MM-dd')
+    const lastMonthStart  = format(startOfMonth(subMonths(new Date(), 1)), 'yyyy-MM-dd')
+    const lastMonthEnd    = format(endOfMonth(subMonths(new Date(), 1)), 'yyyy-MM-dd')
+    const sevenDaysAgo    = format(subDays(new Date(), 6), 'yyyy-MM-dd')
+    const queryStart      = monthStart < sevenDaysAgo ? monthStart : sevenDaysAgo
+    const trendYearStart  = `${new Date().getFullYear()}-01-01`
 
     const [
       profileRes, apptRes, walkInRes, branchRes, expenseRes,
@@ -166,47 +183,47 @@ export default function DashboardPage() {
     ] = await Promise.all([
       supabase.from('profiles').select('salon_name, salon_currency').eq('id', ownerId).single(),
       supabase.from('appointments')
-        .select('id, client_name, client_phone, service_id, staff_id, branch_id, appointment_date, appointment_time, status, payment_method, notes, total_amount, services(id, name, price), staff(id, name)')
+        .select('id, client_name, client_phone, service_id, staff_id, branch_id, appointment_date, appointment_time, status, payment_method, notes, total_amount, discount_amount, services(id, name, price), staff(id, name)')
         .eq('user_id', ownerId)
         .gte('appointment_date', queryStart)
         .order('appointment_date', { ascending: false })
         .order('appointment_time', { ascending: true }),
       supabase.from('walk_ins')
-        .select('id, staff_id, branch_id, total, created_at, payment_method, services(id, name, price)')
+        .select('id, staff_id, branch_id, total, created_at, payment_method, discount_amount, services(id, name, price)')
         .eq('user_id', ownerId)
         .gte('created_at', monthStart + 'T00:00:00'),
       supabase.from('branches').select('*').eq('user_id', ownerId).order('name'),
       supabase.from('expenses').select('amount, branch_id').eq('user_id', ownerId)
         .gte('expense_date', monthStart).lte('expense_date', monthEnd),
       supabase.from('appointments')
-        .select('status, branch_id, total_amount, services(price)')
+        .select('status, branch_id, total_amount, discount_amount, services(price)')
         .eq('user_id', ownerId)
         .gte('appointment_date', lastMonthStart)
         .lte('appointment_date', lastMonthEnd),
-      supabase.from('walk_ins').select('total, branch_id').eq('user_id', ownerId)
+      supabase.from('walk_ins').select('total, branch_id, discount_amount').eq('user_id', ownerId)
         .gte('created_at', lastMonthStart + 'T00:00:00').lte('created_at', lastMonthEnd + 'T23:59:59'),
       supabase.from('inventory_items').select('id, name, quantity, reorder_level, unit').eq('user_id', ownerId),
       supabase.from('reviews').select('rating').eq('user_id', ownerId),
       supabase.from('clients').select('name, phone, birthday').eq('user_id', ownerId).not('birthday', 'is', null),
       supabase.from('staff').select('id, name, birthday').eq('user_id', ownerId).not('birthday', 'is', null),
-      // 6-month data for trend charts
+      // 12-month trend data for current year
       supabase.from('appointments')
-        .select('appointment_date, status, branch_id, total_amount, services(price)')
+        .select('appointment_date, branch_id, total_amount')
         .eq('user_id', ownerId)
         .eq('status', 'completed')
-        .gte('appointment_date', sixMonthsAgo),
+        .gte('appointment_date', trendYearStart),
       supabase.from('walk_ins')
         .select('total, created_at, branch_id')
         .eq('user_id', ownerId)
-        .gte('created_at', sixMonthsAgo + 'T00:00:00'),
+        .gte('created_at', trendYearStart + 'T00:00:00'),
       supabase.from('clients')
         .select('created_at')
         .eq('user_id', ownerId)
-        .gte('created_at', sixMonthsAgo + 'T00:00:00'),
-      // Membership transactions for period stats (wide range covering queryStart)
+        .gte('created_at', trendYearStart + 'T00:00:00'),
+      // Membership transactions for period stats (covers this month + last month)
       supabase.from('membership_transactions').select('amount, created_at')
         .eq('owner_id', ownerId).eq('type', 'payment')
-        .gte('created_at', queryStart + 'T00:00:00'),
+        .gte('created_at', lastMonthStart + 'T00:00:00'),
     ])
 
     setSalonName(profileRes.data?.salon_name ?? '')
@@ -215,16 +232,17 @@ export default function DashboardPage() {
     setWalkIns((walkInRes.data as unknown as WalkInRow[]) ?? [])
     setBranches((branchRes.data as Branch[]) ?? [])
     setAllExpenses((expenseRes.data as unknown as ExpenseRow[]) ?? [])
-    setSixMonthAppts((sixMonthApptRes.data as unknown as typeof sixMonthAppts) ?? [])
-    setSixMonthWalkIns((sixMonthWalkInRes.data as unknown as typeof sixMonthWalkIns) ?? [])
+    setTrendAppts((sixMonthApptRes.data as unknown as typeof trendAppts) ?? [])
+    setTrendWalkIns((sixMonthWalkInRes.data as unknown as typeof trendWalkIns) ?? [])
     setSixMonthClients((sixMonthClientRes.data as unknown as typeof sixMonthClients) ?? [])
+    setTrendMembershipTx((membershipTxRes.data as unknown as typeof trendMembershipTx) ?? [])
 
     // Membership transactions for period stats
     const allTx = (membershipTxRes.data ?? []) as { amount: number; created_at: string }[]
     setAllMembershipTx(allTx)
     // Monthly revenue from memberships (this calendar month)
     const memRev = allTx
-      .filter(t => t.created_at >= monthStart + 'T00:00:00' && t.created_at <= format(endOfMonth(new Date()), 'yyyy-MM-dd') + 'T23:59:59')
+      .filter(t => t.created_at.slice(0, 7) === monthStart.slice(0, 7))
       .reduce((s, t) => s + Number(t.amount ?? 0), 0)
     setMembershipMonthlyRevenue(memRev)
 
@@ -287,6 +305,46 @@ export default function DashboardPage() {
     setLoading(false)
   }
 
+  async function loadTrendData(year: number) {
+    const supabase = createClient()
+    const yearStart = `${year}-01-01`
+    const yearEnd   = `${year}-12-31`
+    const [apptRes, walkinRes, memTxRes] = await Promise.all([
+      supabase.from('appointments').select('appointment_date, branch_id, total_amount')
+        .eq('user_id', ownerId).eq('status', 'completed')
+        .gte('appointment_date', yearStart).lte('appointment_date', yearEnd),
+      supabase.from('walk_ins').select('total, created_at, branch_id')
+        .eq('user_id', ownerId)
+        .gte('created_at', yearStart + 'T00:00:00').lte('created_at', yearEnd + 'T23:59:59'),
+      supabase.from('membership_transactions').select('amount, created_at')
+        .eq('owner_id', ownerId).eq('type', 'payment')
+        .gte('created_at', yearStart + 'T00:00:00').lte('created_at', yearEnd + 'T23:59:59'),
+    ])
+    setTrendAppts((apptRes.data as unknown as typeof trendAppts) ?? [])
+    setTrendWalkIns((walkinRes.data as unknown as typeof trendWalkIns) ?? [])
+    setTrendMembershipTx((memTxRes.data as unknown as typeof trendMembershipTx) ?? [])
+  }
+
+  async function loadCustomRangeData(from: string, to: string) {
+    const supabase = createClient()
+    const [apptRes, walkinRes, memTxRes] = await Promise.all([
+      supabase.from('appointments')
+        .select('id, client_name, client_phone, service_id, staff_id, branch_id, appointment_date, appointment_time, status, payment_method, notes, total_amount, discount_amount, services(id, name, price), staff(id, name)')
+        .eq('user_id', ownerId)
+        .gte('appointment_date', from).lte('appointment_date', to),
+      supabase.from('walk_ins')
+        .select('id, staff_id, branch_id, total, created_at, payment_method, discount_amount')
+        .eq('user_id', ownerId)
+        .gte('created_at', from + 'T00:00:00').lte('created_at', to + 'T23:59:59'),
+      supabase.from('membership_transactions').select('amount, created_at')
+        .eq('owner_id', ownerId).eq('type', 'payment')
+        .gte('created_at', from + 'T00:00:00').lte('created_at', to + 'T23:59:59'),
+    ])
+    setCustomAppts((apptRes.data as unknown as AppRow[]) ?? [])
+    setCustomWalkIns((walkinRes.data as unknown as WalkInRow[]) ?? [])
+    setCustomMembershipTx((memTxRes.data as unknown as typeof customMembershipTx) ?? [])
+  }
+
   // ── Branch filter ──────────────────────────────────────────────────────────
 
   const branchFiltered = useMemo(() => {
@@ -318,15 +376,18 @@ export default function DashboardPage() {
     const weekStart  = startOfWeek(new Date(), { weekStartsOn: 1 })
     const monthStart = startOfMonth(new Date())
     switch (activeFilter) {
-      case 'today': return branchFiltered.filter(a => a.appointment_date === todayStr)
-      case 'week':  return branchFiltered.filter(a => new Date(a.appointment_date + 'T00:00:00') >= weekStart)
+      case 'today':      return branchFiltered.filter(a => a.appointment_date === todayStr)
+      case 'week':       return branchFiltered.filter(a => new Date(a.appointment_date + 'T00:00:00') >= weekStart)
+      case 'prev_month': return lastMonthAppts.filter(a => activeBranch === 'all' || a.branch_id === activeBranch) as unknown as AppRow[]
       case 'custom': {
         if (!customFrom || !customTo) return branchFiltered.filter(a => new Date(a.appointment_date + 'T00:00:00') >= monthStart)
-        return branchFiltered.filter(a => a.appointment_date >= customFrom && a.appointment_date <= customTo)
+        return customAppts.length > 0
+          ? customAppts.filter(a => activeBranch === 'all' || a.branch_id === activeBranch)
+          : branchFiltered.filter(a => a.appointment_date >= customFrom && a.appointment_date <= customTo)
       }
-      default:      return branchFiltered.filter(a => new Date(a.appointment_date + 'T00:00:00') >= monthStart)
+      default:           return branchFiltered.filter(a => new Date(a.appointment_date + 'T00:00:00') >= monthStart)
     }
-  }, [branchFiltered, activeFilter, customFrom, customTo])
+  }, [branchFiltered, lastMonthAppts, customAppts, activeFilter, customFrom, customTo, activeBranch])
 
   // ── Today walk-ins ──────────────────────────────────────────────────────────
 
@@ -358,33 +419,59 @@ export default function DashboardPage() {
   // ── Summary stats ─────────────────────────────────────────────────────────
 
   const stats = useMemo(() => {
+    const todayStr  = format(new Date(), 'yyyy-MM-dd')
+    const weekStart = format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd')
+    const mthStart  = format(startOfMonth(new Date()), 'yyyy-MM-dd')
+    const lmStart   = format(startOfMonth(subMonths(new Date(), 1)), 'yyyy-MM-dd')
+    const lmEnd     = format(endOfMonth(subMonths(new Date(), 1)), 'yyyy-MM-dd')
+
+    if (activeFilter === 'prev_month') {
+      const brAppts    = lastMonthAppts.filter(a => activeBranch === 'all' || a.branch_id === activeBranch)
+      const brWalkIns  = lastMonthWalkIns.filter(w => activeBranch === 'all' || w.branch_id === activeBranch)
+      const completed  = brAppts.filter(a => a.status === 'completed')
+      const apptRev    = completed.reduce((s, a) => s + Number(a.total_amount ?? (a.services as {price?:number}|null)?.price ?? 0), 0)
+      const walkinRev  = brWalkIns.reduce((s, w) => s + Number(w.total ?? 0), 0)
+      const memRev     = allMembershipTx.filter(t => { const d = t.created_at.slice(0, 10); return d >= lmStart && d <= lmEnd }).reduce((s, t) => s + Number(t.amount ?? 0), 0)
+      const discAppts  = brAppts.reduce((s, a) => s + Number((a as {discount_amount?:number|null}).discount_amount ?? 0), 0)
+      const discWalkin = brWalkIns.reduce((s, w) => s + Number((w as {discount_amount?:number|null}).discount_amount ?? 0), 0)
+      const revenue    = apptRev + walkinRev + memRev
+      return {
+        total: brAppts.length, completed: completed.length, walkins: brWalkIns.length,
+        revenue, membershipRevenue: memRev, membershipsSold: 0,
+        avgBill: completed.length + brWalkIns.length > 0 ? Math.round(revenue / (completed.length + brWalkIns.length)) : 0,
+        clients: 0, discounts: discAppts + discWalkin,
+      }
+    }
+
     const completed     = periodFiltered.filter(a => a.status === 'completed')
     const apptRevenue   = completed.reduce((sum, a) => sum + Number(a.total_amount ?? a.services?.price ?? 0), 0)
     const periodWalkIns = activeFilter === 'today' ? todayWalkIns
       : activeFilter === 'week' ? weekWalkIns
       : activeFilter === 'custom' && customFrom && customTo
-        ? branchFilteredWalkIns.filter(w => { const d = w.created_at.slice(0, 10); return d >= customFrom && d <= customTo })
+        ? (customWalkIns.length > 0 ? customWalkIns.filter(w => activeBranch === 'all' || w.branch_id === activeBranch)
+          : branchFilteredWalkIns.filter(w => { const d = w.created_at.slice(0, 10); return d >= customFrom && d <= customTo }))
         : branchFilteredWalkIns
     const walkinRevenue = periodWalkIns.reduce((sum, w) => sum + Number(w.total ?? 0), 0)
 
-    // Membership revenue for the active period
-    const todayStr  = format(new Date(), 'yyyy-MM-dd')
-    const weekStart = format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd')
-    const mthStart  = format(startOfMonth(new Date()), 'yyyy-MM-dd')
-    const membershipPeriodRevenue = allMembershipTx.filter(t => {
+    const membershipSource = (activeFilter === 'custom' && customFrom && customTo && customMembershipTx.length > 0)
+      ? customMembershipTx : allMembershipTx
+    const membershipPeriodRevenue = membershipSource.filter(t => {
       const d = t.created_at.slice(0, 10)
       if (activeFilter === 'today')  return d === todayStr
       if (activeFilter === 'week')   return d >= weekStart
       if (activeFilter === 'custom' && customFrom && customTo) return d >= customFrom && d <= customTo
       return d >= mthStart
     }).reduce((s, t) => s + Number(t.amount ?? 0), 0)
-    const membershipsSold = allMembershipTx.filter(t => {
+    const membershipsSold = membershipSource.filter(t => {
       const d = t.created_at.slice(0, 10)
       if (activeFilter === 'today')  return d === todayStr
       if (activeFilter === 'week')   return d >= weekStart
       if (activeFilter === 'custom' && customFrom && customTo) return d >= customFrom && d <= customTo
       return d >= mthStart
     }).length
+
+    const discAppts  = periodFiltered.reduce((s, a) => s + Number(a.discount_amount ?? 0), 0)
+    const discWalkin = periodWalkIns.reduce((s, w) => s + Number(w.discount_amount ?? 0), 0)
 
     const revenue       = apptRevenue + walkinRevenue + membershipPeriodRevenue
     const totalClients  = new Set(periodFiltered.map(a => a.client_name)).size
@@ -400,8 +487,9 @@ export default function DashboardPage() {
         ? Math.round(revenue / (completed.length + walkInCount))
         : 0,
       clients:  totalClients,
+      discounts: discAppts + discWalkin,
     }
-  }, [periodFiltered, activeFilter, todayWalkIns, weekWalkIns, branchFilteredWalkIns, customFrom, customTo, allMembershipTx])
+  }, [periodFiltered, activeFilter, todayWalkIns, weekWalkIns, branchFilteredWalkIns, customWalkIns, customFrom, customTo, allMembershipTx, customMembershipTx, lastMonthAppts, lastMonthWalkIns, activeBranch])
 
   // ── Monthly revenue & net profit (branch-filtered expenses) ──────────────
 
@@ -428,21 +516,24 @@ export default function DashboardPage() {
     ? Math.round(((monthlyRevenue - lastMonthRevenue) / lastMonthRevenue) * 100)
     : null
 
-  // ── 6-month revenue trend ────────────────────────────────────────────────
+  // ── 12-month revenue trend ────────────────────────────────────────────────
 
   const revenueTrendData = useMemo(() => {
-    return Array.from({ length: 6 }, (_, i) => {
-      const monthDate = startOfMonth(subMonths(new Date(), 5 - i))
+    return Array.from({ length: 12 }, (_, i) => {
+      const monthDate = new Date(trendYear, i, 1)
       const monthStr  = format(monthDate, 'yyyy-MM')
-      const apptRev   = sixMonthAppts
+      const apptRev   = trendAppts
         .filter(a => a.appointment_date.startsWith(monthStr) && (activeBranch === 'all' || a.branch_id === activeBranch))
-        .reduce((s, a) => s + Number(a.total_amount ?? (a.services as { price?: number } | null)?.price ?? 0), 0)
-      const walkinRev = sixMonthWalkIns
+        .reduce((s, a) => s + Number(a.total_amount ?? 0), 0)
+      const walkinRev = trendWalkIns
         .filter(w => w.created_at.startsWith(monthStr) && (activeBranch === 'all' || w.branch_id === activeBranch))
         .reduce((s, w) => s + Number(w.total ?? 0), 0)
-      return { month: format(monthDate, 'MMM yy'), revenue: apptRev + walkinRev }
+      const memRev = trendMembershipTx
+        .filter(t => t.created_at.startsWith(monthStr))
+        .reduce((s, t) => s + Number(t.amount ?? 0), 0)
+      return { month: format(monthDate, 'MMM'), revenue: apptRev + walkinRev + memRev }
     })
-  }, [sixMonthAppts, sixMonthWalkIns, activeBranch])
+  }, [trendAppts, trendWalkIns, trendMembershipTx, activeBranch, trendYear])
 
   // ── Client growth (6 months) ─────────────────────────────────────────────
 
@@ -682,7 +773,8 @@ export default function DashboardPage() {
     )
   }
 
-  const filterLabels: Record<string, string> = { today: 'Today', week: 'This Week', month: 'This Month', custom: 'Custom' }
+  const prevMonthName = format(subMonths(new Date(), 1), 'MMMM yyyy')
+  const filterLabels: Record<string, string> = { today: 'Today', week: 'This Week', month: 'This Month', prev_month: prevMonthName, custom: 'Custom' }
 
   const customLabel = activeFilter === 'custom' && customFrom && customTo
     ? `${format(parseISO(customFrom), 'MMM d')} – ${format(parseISO(customTo), 'MMM d, yyyy')}`
@@ -767,7 +859,7 @@ export default function DashboardPage() {
       {/* Filters */}
       <div className="space-y-2">
         <div className="flex items-center gap-2 flex-wrap">
-          {(['today', 'week', 'month'] as const).map(f => (
+          {(['today', 'week', 'month', 'prev_month'] as const).map(f => (
             <button key={f} onClick={() => { setActiveFilter(f); setShowCustomPicker(false) }}
               className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
                 activeFilter === f
@@ -861,7 +953,7 @@ export default function DashboardPage() {
       )}
 
       {/* KPI Cards */}
-      <div className={`grid grid-cols-2 gap-4 ${modulesEnabled('memberships') ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}`}>
+      <div className={`grid grid-cols-2 gap-4 ${modulesEnabled('memberships') ? 'lg:grid-cols-6' : 'lg:grid-cols-5'}`}>
         <Card className="border-gray-100 hover:shadow-md transition-shadow">
           <CardContent className="pt-5 pb-4">
             <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center mb-3">
@@ -909,6 +1001,15 @@ export default function DashboardPage() {
             </div>
             <p className="text-xs text-gray-500">Avg Rating</p>
             {totalReviews > 0 && <p className="text-[10px] text-gray-400 mt-0.5">{totalReviews} review{totalReviews !== 1 ? 's' : ''}</p>}
+          </CardContent>
+        </Card>
+        <Card className="border-gray-100 hover:shadow-md transition-shadow">
+          <CardContent className="pt-5 pb-4">
+            <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center mb-3">
+              <ReceiptText className="w-5 h-5 text-orange-500" />
+            </div>
+            <p className="text-xl font-bold text-gray-900 mb-0.5 leading-tight">{formatCurrency(stats.discounts ?? 0, currency)}</p>
+            <p className="text-xs text-gray-500">Discounts Given</p>
           </CardContent>
         </Card>
         {modulesEnabled('memberships') && (
@@ -977,29 +1078,40 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Revenue Trend — 6 months (Line Chart) */}
+      {/* Revenue Trend — 12 months (Line Chart) */}
       {modulesEnabled('reports') && <Card className="border-gray-100">
         <CardHeader className="pb-2 border-b border-gray-50">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <CardTitle className="text-base flex items-center gap-2">
-              <Activity className="w-4 h-4 text-primary" /> Revenue Trend — Last 6 Months
+              <Activity className="w-4 h-4 text-primary" /> Monthly Sales Trend
             </CardTitle>
-            <Badge className="bg-primary/10 text-primary border-primary/20 text-xs">
-              {formatCurrency(revenueTrendData.reduce((s, d) => s + d.revenue, 0), currency)} total
-            </Badge>
+            <div className="flex items-center gap-2">
+              <select
+                value={trendYear}
+                onChange={(e) => setTrendYear(Number(e.target.value))}
+                className="h-7 px-2 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-primary/50"
+              >
+                {[new Date().getFullYear(), new Date().getFullYear() - 1, new Date().getFullYear() - 2].map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+              <Badge className="bg-primary/10 text-primary border-primary/20 text-xs">
+                {formatCurrency(revenueTrendData.reduce((s, d) => s + d.revenue, 0), currency)} total
+              </Badge>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="pt-4">
           {revenueTrendData.every(d => d.revenue === 0) ? (
             <div className="flex flex-col items-center justify-center h-40 text-gray-400">
               <TrendingUp className="w-8 h-8 mb-2 opacity-30" />
-              <p className="text-sm">No revenue data yet</p>
+              <p className="text-sm">No revenue data for {trendYear}</p>
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={200}>
               <LineChart data={revenueTrendData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false}
                   tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} width={36} />
                 <Tooltip content={<RevenueTooltip currency={currency} />} />

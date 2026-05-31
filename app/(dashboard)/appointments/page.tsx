@@ -3,9 +3,10 @@
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useUserContext } from '@/components/RoleContext'
-import { canCreate, canEdit, canDelete, canMarkPayment } from '@/lib/roles'
+import { canCreate, canEdit, canDelete } from '@/lib/roles'
 import type { Appointment, Service, StaffMember, AppointmentStatus, Branch } from '@/lib/types'
 import FeedbackModal from '@/components/FeedbackModal'
 import InvoiceModal, { type InvoiceData } from '@/components/InvoiceModal'
@@ -41,13 +42,13 @@ import {
   ChevronRight,
   MessageCircle,
   Building2,
-  CreditCard,
   MessageSquare,
   Lock,
   FileText,
   X,
   Crown,
   Star,
+  Zap,
 } from 'lucide-react'
 
 type ServiceRef = { id: string; name: string; price: number; duration: number }
@@ -61,20 +62,11 @@ type DealItem = {
   deal_services: { services: ServiceRef | null }[]
 }
 
-type PaymentMethodConfig = { value: string; label: string; enabled: boolean }
-
 type AppointmentRow = Appointment & {
   services?: { id: string; name: string; price: number } | null
   staff?: { id: string; name: string } | null
   appointment_services?: { services: ServiceRef }[]
 }
-
-const DEFAULT_PAYMENT_METHODS: PaymentMethodConfig[] = [
-  { value: 'cash', label: 'Cash', enabled: true },
-  { value: 'card', label: 'Card', enabled: true },
-  { value: 'easypaisa', label: 'EasyPaisa', enabled: true },
-  { value: 'jazzcash', label: 'JazzCash', enabled: true },
-]
 
 const statusConfig: Record<AppointmentStatus, { label: string; className: string }> = {
   pending: { label: 'Pending', className: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
@@ -123,6 +115,7 @@ function getServicesTotal(svcs: ServiceRef[]): number {
 
 export default function AppointmentsPage() {
   const { role, ownerId, staffId } = useUserContext()
+  const router = useRouter()
   const isStaffRole = role === 'staff'
 
   const [appointments, setAppointments] = useState<AppointmentRow[]>([])
@@ -130,7 +123,6 @@ export default function AppointmentsPage() {
   const [staff, setStaff] = useState<StaffMember[]>([])
   const [branches, setBranches] = useState<Branch[]>([])
   const [deals, setDeals] = useState<DealItem[]>([])
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodConfig[]>(DEFAULT_PAYMENT_METHODS)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
@@ -139,10 +131,6 @@ export default function AppointmentsPage() {
   const [form, setForm] = useState(emptyForm)
   const [filterDate, setFilterDate] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [filterAll, setFilterAll] = useState(false)
-
-  const [payDialog, setPayDialog] = useState<{ open: boolean; appt: AppointmentRow | null }>({ open: false, appt: null })
-  const [payForm, setPayForm] = useState({ discount: '', payment_method: 'cash', feedback: '' })
-  const [paying, setPaying] = useState(false)
 
   const [feedbackAppt, setFeedbackAppt] = useState<AppointmentRow | null>(null)
   const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(null)
@@ -213,7 +201,7 @@ export default function AppointmentsPage() {
       supabase.from('services').select('id, name, price, duration').eq('user_id', ownerId).order('name'),
       supabase.from('staff').select('*').eq('user_id', ownerId).eq('is_active', true).order('name'),
       supabase.from('branches').select('*').eq('user_id', ownerId).order('name'),
-      supabase.from('profiles').select('salon_name, salon_address, salon_currency, tax_percentage, payment_methods').eq('id', ownerId).single(),
+      supabase.from('profiles').select('salon_name, salon_address, salon_currency, tax_percentage').eq('id', ownerId).single(),
       supabase.from('deals').select('id, name, description, price, is_active, deal_services(services(id, name, price, duration))').eq('user_id', ownerId).eq('is_active', true).order('name'),
     ])
 
@@ -226,9 +214,6 @@ export default function AppointmentsPage() {
     setCurrency(profileRes.data?.salon_currency ?? 'PKR')
     setTaxPercentage(profileRes.data?.tax_percentage ?? 0)
     setDeals((dealsRes.data as unknown as DealItem[]) ?? [])
-    const pm = profileRes.data?.payment_methods
-    if (pm && Array.isArray(pm) && pm.length > 0) setPaymentMethods(pm as PaymentMethodConfig[])
-    else setPaymentMethods(DEFAULT_PAYMENT_METHODS)
 
     if (isStaffRole) {
       setFilterDate(today)
@@ -310,8 +295,11 @@ export default function AppointmentsPage() {
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
-    if (!form.client_name.trim() || !form.appointment_date || !form.appointment_time) {
-      toast.error('Please fill required fields')
+    if (!form.client_name.trim()) { toast.error('Client name is required'); return }
+    if (!form.client_phone.trim()) { toast.error('Client phone is required'); return }
+    if (!form.staff_id) { toast.error('Please select a staff member'); return }
+    if (!form.appointment_date || !form.appointment_time) {
+      toast.error('Please fill in date and time')
       return
     }
     if (branches.length > 1 && !form.branch_id) {
@@ -444,41 +432,18 @@ export default function AppointmentsPage() {
     await loadData()
   }
 
-  async function handleMarkPaid(e: React.FormEvent) {
-    e.preventDefault()
-    if (!payDialog.appt) return
-    setPaying(true)
-    const supabase = createClient()
-    const { error } = await supabase
-      .from('appointments')
-      .update({
-        payment_status: 'paid',
-        payment_method: payForm.payment_method,
-        discount_amount: parseFloat(payForm.discount) || 0,
-        feedback: payForm.feedback.trim() || null,
-      })
-      .eq('id', payDialog.appt.id)
-
-    if (error) {
-      toast.error(error.message)
-    } else {
-      toast.success('Payment recorded')
-      const discountVal = parseFloat(payForm.discount) || 0
-      if (discountVal > 0) {
-        void supabase.from('audit_log').insert({
-          user_id: ownerId,
-          actor_role: role,
-          action: 'discount_applied',
-          entity_type: 'appointment',
-          entity_id: payDialog.appt!.id,
-          details: { client: payDialog.appt!.client_name, discount_amount: discountVal },
-        })
-      }
-      setPayDialog({ open: false, appt: null })
-      setPayForm({ discount: '', payment_method: 'cash', feedback: '' })
-      await loadData()
+  function handleCheckIn(appt: AppointmentRow) {
+    const apptServices = getAppointmentServices(appt, services)
+    const checkInData = {
+      client_name: appt.client_name,
+      client_phone: appt.client_phone ?? '',
+      staff_id: appt.staff_id ?? '',
+      branch_id: appt.branch_id ?? '',
+      service_ids: apptServices.map(s => s.id),
+      appointment_id: appt.id,
     }
-    setPaying(false)
+    localStorage.setItem('walkin_prefill', JSON.stringify(checkInData))
+    router.push('/walkin')
   }
 
   function shiftDate(days: number) {
@@ -609,11 +574,6 @@ export default function AppointmentsPage() {
                           <User className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
                           <span className="font-semibold text-gray-900 text-sm">{appt.client_name}</span>
                           <Badge className={`text-xs border ${sc.className}`}>{sc.label}</Badge>
-                          {canMarkPayment(role) && (
-                            <Badge className={`text-xs border ${isPaid ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>
-                              {isPaid ? '✓ Paid' : 'Unpaid'}
-                            </Badge>
-                          )}
                         </div>
                         <div className="flex items-start gap-3 mt-1 flex-wrap">
                           {apptServices.length > 0 && (
@@ -625,14 +585,7 @@ export default function AppointmentsPage() {
                                     {svc.name}
                                   </span>
                                 ))}
-                                {isPaid && discountAmt > 0 ? (
-                                  <>
-                                    <span className="line-through text-gray-400">{currency} {serviceTotal.toLocaleString()}</span>
-                                    <span className="text-primary font-medium">{currency} {netAmount.toLocaleString()}</span>
-                                  </>
-                                ) : (
-                                  <span className="text-primary font-medium">{currency} {serviceTotal.toLocaleString()}</span>
-                                )}
+                                <span className="text-primary font-medium">{currency} {serviceTotal.toLocaleString()}</span>
                               </div>
                             </div>
                           )}
@@ -642,16 +595,16 @@ export default function AppointmentsPage() {
                               <span>{appt.staff.name}</span>
                             </div>
                           )}
-                          {appt.feedback && (
+                          {appt.notes && (
                             <div className="flex items-center gap-1 text-xs text-gray-400">
                               <MessageSquare className="w-3 h-3" />
-                              <span className="italic">&quot;{appt.feedback}&quot;</span>
+                              <span className="italic truncate max-w-[160px]">{appt.notes}</span>
                             </div>
                           )}
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-1 flex-shrink-0">
+                      <div className="flex items-center gap-1 flex-shrink-0 flex-wrap justify-end">
                         {appt.client_phone && (
                           <a
                             href={whatsappUrl(appt.client_phone, appt.client_name, appt.appointment_date, appt.appointment_time)}
@@ -663,28 +616,28 @@ export default function AppointmentsPage() {
                           </a>
                         )}
 
-                        {canMarkPayment(role) && !isPaid && (
+                        {/* Check In / Bill button for confirmed appointments */}
+                        {appt.status === 'confirmed' && canCreate(role) && (
                           <button
-                            onClick={() => { setPayDialog({ open: true, appt }); setPayForm({ discount: '', payment_method: 'cash', feedback: '' }) }}
-                            className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors font-medium"
+                            onClick={() => handleCheckIn(appt)}
+                            className="flex items-center gap-1 text-[10px] px-2 py-1.5 rounded-md bg-primary text-white hover:bg-primary/90 transition-colors font-semibold"
                           >
-                            <CreditCard className="w-3 h-3" />
-                            Mark Paid
+                            <Zap className="w-3 h-3" /> Check In / Bill
                           </button>
                         )}
 
                         {canEdit(role) && (
                           <div className="hidden sm:flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            {appt.status !== 'completed' && (
-                              <button onClick={() => updateStatus(appt.id, 'completed')}
-                                className="text-[10px] px-2 py-1 rounded-md bg-green-50 text-green-600 hover:bg-green-100 transition-colors font-medium">
-                                ✓ Done
-                              </button>
-                            )}
                             {appt.status === 'pending' && (
                               <button onClick={() => updateStatus(appt.id, 'confirmed')}
                                 className="text-[10px] px-2 py-1 rounded-md bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors font-medium">
                                 Confirm
+                              </button>
+                            )}
+                            {['pending', 'confirmed'].includes(appt.status) && (
+                              <button onClick={() => updateStatus(appt.id, 'no_show')}
+                                className="text-[10px] px-2 py-1 rounded-md bg-gray-50 text-gray-600 hover:bg-gray-100 transition-colors font-medium">
+                                No Show
                               </button>
                             )}
                           </div>
@@ -912,13 +865,15 @@ export default function AppointmentsPage() {
 
               {branches.length > 0 && (
                 <div className="space-y-1.5">
-                  <Label>Branch</Label>
+                  <Label>Branch{branches.length > 1 ? ' *' : ''}</Label>
                   <Select
                     value={form.branch_id}
                     onValueChange={(v) => setForm({ ...form, branch_id: v ?? '' })}
                   >
                     <SelectTrigger className="h-9 w-full">
-                      <SelectValue placeholder="Select branch" />
+                      <SelectValue placeholder="Select branch">
+                        {form.branch_id ? (branches.find(b => b.id === form.branch_id)?.name ?? undefined) : undefined}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {branches.map((b) => (
@@ -977,7 +932,7 @@ export default function AppointmentsPage() {
                   <SelectContent>
                     <SelectItem value="pending">Pending</SelectItem>
                     <SelectItem value="confirmed">Confirmed</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="no_show">No Show</SelectItem>
                     <SelectItem value="cancelled">Cancelled</SelectItem>
                   </SelectContent>
                 </Select>
@@ -1004,102 +959,6 @@ export default function AppointmentsPage() {
                 </Button>
               </DialogFooter>
             </form>
-          </DialogContent>
-        </Dialog>
-      )}
-
-      {/* Payment Dialog */}
-      {canMarkPayment(role) && (
-        <Dialog open={payDialog.open} onOpenChange={(open) => setPayDialog({ open, appt: open ? payDialog.appt : null })}>
-          <DialogContent className="sm:max-w-sm">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <CreditCard className="w-4 h-4 text-primary" />
-                Record Payment
-              </DialogTitle>
-            </DialogHeader>
-            {payDialog.appt && (() => {
-              const apptSvcs = getAppointmentServices(payDialog.appt, services)
-              const svcTotal = getServicesTotal(apptSvcs) || payDialog.appt.services?.price || 0
-              return (
-                <form onSubmit={handleMarkPaid} className="space-y-4">
-                  <div className="rounded-lg bg-gray-50 border border-gray-100 p-3 text-sm space-y-1">
-                    <p className="font-semibold text-gray-800">{payDialog.appt.client_name}</p>
-                    {apptSvcs.length > 0 ? (
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {apptSvcs.map(s => (
-                          <span key={s.id} className="bg-primary/10 text-primary text-xs rounded px-1.5 py-0.5">{s.name}</span>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-gray-500 text-xs">{payDialog.appt.services?.name ?? 'No service'}</p>
-                    )}
-                    <p className="text-xs text-gray-400">
-                      {format(new Date(payDialog.appt.appointment_date + 'T00:00:00'), 'MMM d, yyyy')} at {payDialog.appt.appointment_time.slice(0, 5)}
-                    </p>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label>Payment Method</Label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {paymentMethods.filter(pm => pm.enabled).map(pm => (
-                        <button
-                          key={pm.value}
-                          type="button"
-                          onClick={() => setPayForm({ ...payForm, payment_method: pm.value })}
-                          className={`py-2 px-3 rounded-lg text-sm font-medium border transition-all ${
-                            payForm.payment_method === pm.value
-                              ? 'bg-primary text-white border-primary'
-                              : 'bg-gray-50 text-gray-700 border-gray-200 hover:border-primary/40'
-                          }`}
-                        >
-                          {pm.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label htmlFor="discount">Discount (PKR) <span className="text-xs text-gray-400 font-normal">(optional)</span></Label>
-                    <Input id="discount" type="number" min="0" placeholder="0" value={payForm.discount}
-                      onChange={(e) => setPayForm({ ...payForm, discount: e.target.value })} className="h-9" />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label htmlFor="payFeedback">Client Feedback <span className="text-xs text-gray-400 font-normal">(optional)</span></Label>
-                    <Input id="payFeedback" placeholder="Rating or comments..." value={payForm.feedback}
-                      onChange={(e) => setPayForm({ ...payForm, feedback: e.target.value })} className="h-9" />
-                  </div>
-
-                  <div className="rounded-lg bg-primary/5 border border-primary/15 p-3 text-sm">
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Services total</span>
-                      <span className="font-medium">{currency} {svcTotal.toLocaleString()}</span>
-                    </div>
-                    {payForm.discount && parseFloat(payForm.discount) > 0 && (
-                      <div className="flex justify-between items-center mt-1">
-                        <span className="text-gray-600">Discount</span>
-                        <span className="font-medium text-red-600">− {currency} {parseFloat(payForm.discount).toLocaleString()}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between items-center mt-2 pt-2 border-t border-primary/15">
-                      <span className="font-semibold text-gray-800">Total due</span>
-                      <span className="font-bold text-primary">
-                        {currency} {Math.max(0, svcTotal - (parseFloat(payForm.discount) || 0)).toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
-
-                  <DialogFooter>
-                    <Button type="button" variant="outline" onClick={() => setPayDialog({ open: false, appt: null })} size="sm">Cancel</Button>
-                    <Button type="submit" className="bg-primary hover:bg-primary/90" size="sm" disabled={paying}>
-                      {paying && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
-                      Confirm Payment
-                    </Button>
-                  </DialogFooter>
-                </form>
-              )
-            })()}
           </DialogContent>
         </Dialog>
       )}

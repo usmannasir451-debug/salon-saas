@@ -34,8 +34,6 @@ const PRESET_CATEGORIES: { value: string; label: string; color: string }[] = [
   { value: 'miscellaneous',      label: 'Miscellaneous',      color: '#6b7280' },
 ]
 
-const PAID_BY_OPTIONS = ['Owner', 'Petty Cash', 'Card', 'Bank Transfer', 'Other']
-
 function getCategoryMeta(cat: string, customCategories: string[]) {
   const preset = PRESET_CATEGORIES.find(c => c.value === cat)
   if (preset) return preset
@@ -48,16 +46,14 @@ function formatCurrency(n: number, currency = 'USD') {
 }
 
 const emptyForm = {
-  category:        '',
-  description:     '',
-  amount:          '',
-  expense_date:    format(new Date(), 'yyyy-MM-dd'),
-  branch_id:       '',
-  paid_by:         '',
-  notes:           '',
-  is_recurring:    false,
-  approval_status: 'pending' as 'pending' | 'approved',
-  receipt_url:     '' as string,
+  category:     '',
+  description:  '',
+  amount:       '',
+  expense_date: format(new Date(), 'yyyy-MM-dd'),
+  branch_id:    '',
+  notes:        '',
+  is_recurring: false,
+  receipt_url:  '' as string,
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -175,7 +171,8 @@ export default function ExpensesPage() {
 
   function openCreate() {
     setEditingId(null)
-    setForm({ ...emptyForm, expense_date: format(new Date(), 'yyyy-MM-dd') })
+    const autoBranch = branches.length === 1 ? branches[0].id : ''
+    setForm({ ...emptyForm, expense_date: format(new Date(), 'yyyy-MM-dd'), branch_id: autoBranch })
     setReceiptPreview(null)
     setShowCustomInput(false)
     setDialogOpen(true)
@@ -184,16 +181,14 @@ export default function ExpensesPage() {
   function openEdit(exp: Expense) {
     setEditingId(exp.id)
     setForm({
-      category:        exp.category,
-      description:     exp.description,
-      amount:          String(exp.amount),
-      expense_date:    exp.expense_date,
-      branch_id:       exp.branch_id ?? '',
-      paid_by:         exp.paid_by ?? '',
-      notes:           exp.notes ?? '',
-      is_recurring:    exp.is_recurring,
-      approval_status: exp.approval_status ?? 'pending',
-      receipt_url:     exp.receipt_url ?? '',
+      category:     exp.category,
+      description:  exp.description,
+      amount:       String(exp.amount),
+      expense_date: exp.expense_date,
+      branch_id:    exp.branch_id ?? '',
+      notes:        exp.notes ?? '',
+      is_recurring: exp.is_recurring,
+      receipt_url:  exp.receipt_url ?? '',
     })
     setReceiptPreview(exp.receipt_url ?? null)
     setShowCustomInput(false)
@@ -206,6 +201,11 @@ export default function ExpensesPage() {
       toast.error('Please fill required fields')
       return
     }
+    if (branches.length > 1 && !form.branch_id) {
+      toast.error('Please select a branch')
+      return
+    }
+    const resolvedBranchId = form.branch_id || (branches.length === 1 ? branches[0].id : null)
     setSaving(true)
     const supabase = createClient()
     const payload = {
@@ -214,11 +214,10 @@ export default function ExpensesPage() {
       description:     form.description.trim(),
       amount:          parseFloat(form.amount),
       expense_date:    form.expense_date,
-      branch_id:       form.branch_id || null,
-      paid_by:         form.paid_by || null,
+      branch_id:       resolvedBranchId,
       notes:           form.notes.trim() || null,
       is_recurring:    form.is_recurring,
-      approval_status: form.approval_status,
+      approval_status: 'approved' as const,
       receipt_url:     form.receipt_url || null,
     }
 
@@ -628,38 +627,15 @@ export default function ExpensesPage() {
             {/* Branch (only if multi-branch) */}
             {branches.length > 1 && (
               <div className="space-y-1.5">
-                <Label>Branch</Label>
-                <Select value={form.branch_id} onValueChange={v => setForm(f => ({ ...f, branch_id: (!v || v === 'none') ? '' : v }))}>
-                  <SelectTrigger><SelectValue placeholder="Select branch (optional)" /></SelectTrigger>
+                <Label>Branch *</Label>
+                <Select value={form.branch_id} onValueChange={v => setForm(f => ({ ...f, branch_id: v ?? '' }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select branch">
+                      {form.branch_id ? (branches.find(b => b.id === form.branch_id)?.name ?? undefined) : undefined}
+                    </SelectValue>
+                  </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">No specific branch</SelectItem>
                     {branches.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {/* Paid By */}
-            <div className="space-y-1.5">
-              <Label>Paid By</Label>
-              <Select value={form.paid_by} onValueChange={v => setForm(f => ({ ...f, paid_by: (!v || v === 'none') ? '' : v }))}>
-                <SelectTrigger><SelectValue placeholder="Who paid?" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Not specified</SelectItem>
-                  {PAID_BY_OPTIONS.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Approval status (owner only) */}
-            {isOwner && (
-              <div className="space-y-1.5">
-                <Label>Approval Status</Label>
-                <Select value={form.approval_status} onValueChange={v => setForm(f => ({ ...f, approval_status: v as 'pending' | 'approved' }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="approved">Approved</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

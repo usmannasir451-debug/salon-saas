@@ -15,6 +15,7 @@ import {
   X,
   Save,
   Trash2,
+  Users,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -39,7 +40,7 @@ import {
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
 const GRID_START = 8   // 8am
-const GRID_END = 21    // 9pm
+const GRID_END = 22    // 10pm
 const GRID_HOURS = GRID_END - GRID_START
 const PX_PER_MIN = 1.5 // pixels per minute
 
@@ -72,7 +73,7 @@ type ApptRow = {
 export default function CalendarPage() {
   const { role, ownerId, staffId } = useUserContext()
 
-  const [view, setView] = useState<'day' | 'week'>('week')
+  const [view, setView] = useState<'day' | 'week' | 'staff'>('week')
   const [currentDate, setCurrentDate] = useState(new Date())
   const [appointments, setAppointments] = useState<ApptRow[]>([])
   const [staffList, setStaffList] = useState<Pick<StaffMember, 'id' | 'name'>[]>([])
@@ -95,9 +96,9 @@ export default function CalendarPage() {
     notes: '',
   })
 
-  // Visible days
+  // Visible days for day/week view; staff view always uses currentDate
   const days = useMemo(() => {
-    if (view === 'day') return [currentDate]
+    if (view === 'day' || view === 'staff') return [currentDate]
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 })
     return Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
   }, [view, currentDate])
@@ -131,7 +132,7 @@ export default function CalendarPage() {
 
   useEffect(() => { loadData() }, [loadData])
 
-  // Staff-filtered appointments
+  // Staff-filtered appointments (day/week views)
   const filteredAppts = useMemo(() => {
     let list = appointments
     if (role === 'staff' && staffId) {
@@ -147,14 +148,24 @@ export default function CalendarPage() {
     return filteredAppts.filter((a) => a.appointment_date === dateStr)
   }
 
+  function getApptsByStaff(sId: string) {
+    const dateStr = format(currentDate, 'yyyy-MM-dd')
+    return appointments.filter((a) => a.appointment_date === dateStr && a.staff?.id === sId)
+  }
+
+  function getUnassignedAppts() {
+    const dateStr = format(currentDate, 'yyyy-MM-dd')
+    return appointments.filter((a) => a.appointment_date === dateStr && !a.staff)
+  }
+
   function timeToMinutes(time: string) {
     const [h, m] = time.split(':').map(Number)
     return h * 60 + m
   }
 
   function navigate(dir: -1 | 1) {
-    if (view === 'day') setCurrentDate((d) => (dir === 1 ? addDays(d, 1) : subDays(d, 1)))
-    else setCurrentDate((d) => (dir === 1 ? addDays(d, 7) : subDays(d, 7)))
+    if (view === 'week') setCurrentDate((d) => (dir === 1 ? addDays(d, 7) : subDays(d, 7)))
+    else setCurrentDate((d) => (dir === 1 ? addDays(d, 1) : subDays(d, 1)))
   }
 
   function openAppt(appt: ApptRow) {
@@ -217,12 +228,65 @@ export default function CalendarPage() {
   const gridHeight = GRID_HOURS * 60 * PX_PER_MIN
 
   const headerLabel =
-    view === 'day'
-      ? format(currentDate, 'EEEE, MMMM d, yyyy')
-      : `${format(days[0], 'MMM d')} – ${format(days[days.length - 1], 'MMM d, yyyy')}`
+    view === 'week'
+      ? `${format(days[0], 'MMM d')} – ${format(days[days.length - 1], 'MMM d, yyyy')}`
+      : format(currentDate, 'EEEE, MMMM d, yyyy')
+
+  // ── Appointment block renderer (shared) ────────────────────────────────────
+  function renderApptBlock(appt: ApptRow, showStaffName = true) {
+    const startMin = timeToMinutes(appt.appointment_time)
+    const duration = appt.services?.duration ?? 30
+    const top = (startMin - GRID_START * 60) * PX_PER_MIN
+    const height = Math.max(duration * PX_PER_MIN, 28)
+    const c = STATUS_COLORS[appt.status] ?? STATUS_COLORS.pending
+
+    if (startMin < GRID_START * 60 || startMin >= GRID_END * 60) return null
+
+    return (
+      <button
+        key={appt.id}
+        onClick={() => openAppt(appt)}
+        className={`absolute inset-x-0.5 rounded-md border-l-2 ${c.bg} ${c.border} ${c.text} px-1.5 py-1 text-left overflow-hidden hover:brightness-95 transition-all shadow-sm`}
+        style={{ top, height }}
+      >
+        <p className="text-[10px] font-bold leading-tight truncate">{appt.client_name}</p>
+        {height > 30 && (
+          <p className="text-[9px] leading-tight truncate opacity-80">{appt.services?.name}</p>
+        )}
+        {height > 44 && showStaffName && appt.staff?.name && (
+          <p className="text-[9px] leading-tight truncate opacity-70">{appt.staff.name}</p>
+        )}
+      </button>
+    )
+  }
+
+  // ── Time column (shared) ────────────────────────────────────────────────────
+  function TimeColumn() {
+    return (
+      <div className="flex-shrink-0 w-14 border-r border-gray-100 bg-gray-50">
+        <div className="h-10 border-b border-gray-100" />
+        <div className="relative" style={{ height: gridHeight }}>
+          {Array.from({ length: GRID_HOURS }, (_, i) => {
+            const hour = GRID_START + i
+            return (
+              <div
+                key={hour}
+                className="absolute w-full flex items-start pl-1 pr-1"
+                style={{ top: i * 60 * PX_PER_MIN }}
+              >
+                <span className="text-[10px] text-gray-400 -mt-1.5 leading-none">
+                  {hour === 12 ? '12pm' : hour > 12 ? `${hour - 12}pm` : `${hour}am`}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-full mx-auto">
       {/* ── Header ── */}
       <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
         <div>
@@ -234,8 +298,8 @@ export default function CalendarPage() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Staff filter */}
-          {role !== 'staff' && staffList.length > 0 && (
+          {/* Staff filter — day/week views only */}
+          {view !== 'staff' && role !== 'staff' && staffList.length > 0 && (
             <select
               value={staffFilter}
               onChange={(e) => setStaffFilter(e.target.value)}
@@ -250,15 +314,16 @@ export default function CalendarPage() {
 
           {/* View toggle */}
           <div className="flex rounded-lg border border-gray-200 overflow-hidden bg-white">
-            {(['day', 'week'] as const).map((v) => (
+            {(['day', 'week', 'staff'] as const).map((v) => (
               <button
                 key={v}
                 onClick={() => setView(v)}
-                className={`px-4 py-1.5 text-sm font-medium transition-colors capitalize ${
+                className={`px-4 py-1.5 text-sm font-medium transition-colors capitalize flex items-center gap-1 ${
                   view === v ? 'bg-primary text-white' : 'text-gray-600 hover:bg-gray-50'
                 }`}
               >
-                {v}
+                {v === 'staff' && <Users className="w-3.5 h-3.5" />}
+                {v === 'staff' ? 'Staff' : v}
               </button>
             ))}
           </div>
@@ -282,7 +347,7 @@ export default function CalendarPage() {
       <div className="flex flex-wrap gap-2 mb-4">
         {Object.entries(STATUS_COLORS).map(([status, c]) => (
           <span key={status} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${c.badge}`}>
-            <span className={`w-2 h-2 rounded-full border ${c.border}`} style={{ backgroundColor: '' }} />
+            <span className={`w-2 h-2 rounded-full border ${c.border}`} />
             {status.replace('_', ' ')}
           </span>
         ))}
@@ -293,39 +358,95 @@ export default function CalendarPage() {
         <div className="flex items-center justify-center h-64">
           <Loader2 className="w-6 h-6 text-primary animate-spin" />
         </div>
-      ) : (
+      ) : view === 'staff' ? (
+        /* ── Staff View ── */
         <Card className="border-gray-100 overflow-hidden">
           <div className="flex overflow-x-auto">
-            {/* Time column */}
-            <div className="flex-shrink-0 w-14 border-r border-gray-100 bg-gray-50">
-              <div className="h-10 border-b border-gray-100" /> {/* header spacer */}
-              <div className="relative" style={{ height: gridHeight }}>
-                {Array.from({ length: GRID_HOURS }, (_, i) => {
-                  const hour = GRID_START + i
-                  return (
-                    <div
-                      key={hour}
-                      className="absolute w-full flex items-start pl-1 pr-1"
-                      style={{ top: i * 60 * PX_PER_MIN }}
-                    >
-                      <span className="text-[10px] text-gray-400 -mt-1.5 leading-none">
-                        {hour === 12 ? '12pm' : hour > 12 ? `${hour - 12}pm` : `${hour}am`}
+            <TimeColumn />
+
+            {/* Staff columns */}
+            <div className="flex flex-1 min-w-0">
+              {staffList.map((staff) => {
+                const staffAppts = getApptsByStaff(staff.id)
+                return (
+                  <div
+                    key={staff.id}
+                    className="flex-1 min-w-[140px] border-r border-gray-100 last:border-r-0"
+                  >
+                    {/* Staff header */}
+                    <div className="h-10 border-b border-gray-100 flex items-center justify-center sticky top-0 z-10 bg-primary/5 px-2">
+                      <span className="text-xs font-semibold text-primary truncate">{staff.name}</span>
+                      {staffAppts.length > 0 && (
+                        <span className="ml-1.5 text-[10px] bg-primary text-white rounded-full px-1.5 py-0.5 flex-shrink-0">
+                          {staffAppts.length}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Time grid */}
+                    <div className="relative" style={{ height: gridHeight }}>
+                      {Array.from({ length: GRID_HOURS }, (_, i) => (
+                        <div
+                          key={i}
+                          className="absolute w-full border-t border-gray-100"
+                          style={{ top: i * 60 * PX_PER_MIN }}
+                        />
+                      ))}
+                      {staffAppts.map((appt) => renderApptBlock(appt, false))}
+                    </div>
+                  </div>
+                )
+              })}
+
+              {/* Unassigned column */}
+              {(() => {
+                const unassigned = getUnassignedAppts()
+                if (unassigned.length === 0) return null
+                return (
+                  <div className="flex-1 min-w-[140px] border-r border-gray-100 last:border-r-0">
+                    <div className="h-10 border-b border-gray-100 flex items-center justify-center sticky top-0 z-10 bg-gray-50 px-2">
+                      <span className="text-xs font-semibold text-gray-500 truncate">Unassigned</span>
+                      <span className="ml-1.5 text-[10px] bg-gray-400 text-white rounded-full px-1.5 py-0.5 flex-shrink-0">
+                        {unassigned.length}
                       </span>
                     </div>
-                  )
-                })}
-              </div>
+                    <div className="relative" style={{ height: gridHeight }}>
+                      {Array.from({ length: GRID_HOURS }, (_, i) => (
+                        <div
+                          key={i}
+                          className="absolute w-full border-t border-gray-100"
+                          style={{ top: i * 60 * PX_PER_MIN }}
+                        />
+                      ))}
+                      {unassigned.map((appt) => renderApptBlock(appt, false))}
+                    </div>
+                  </div>
+                )
+              })()}
+
+              {staffList.length === 0 && (
+                <div className="flex-1 flex items-center justify-center text-sm text-gray-400 p-8">
+                  No staff members found
+                </div>
+              )}
             </div>
+          </div>
+        </Card>
+      ) : (
+        /* ── Day / Week View ── */
+        <Card className="border-gray-100 overflow-hidden">
+          <div className="flex overflow-x-auto">
+            <TimeColumn />
 
             {/* Day columns */}
-            <div className={`flex flex-1 min-w-0 ${view === 'week' ? '' : ''}`}>
+            <div className="flex flex-1 min-w-0">
               {days.map((day) => {
                 const dayAppts = getApptsByDay(day)
                 const isToday = isSameDay(day, new Date())
                 return (
                   <div
                     key={day.toISOString()}
-                    className={`flex-1 min-w-[120px] border-r border-gray-100 last:border-r-0 ${view === 'week' ? '' : 'max-w-full'}`}
+                    className="flex-1 min-w-[120px] border-r border-gray-100 last:border-r-0"
                   >
                     {/* Day header */}
                     <div className={`h-10 border-b border-gray-100 flex flex-col items-center justify-center sticky top-0 z-10 ${isToday ? 'bg-primary/5' : 'bg-white'}`}>
@@ -337,7 +458,6 @@ export default function CalendarPage() {
 
                     {/* Time grid */}
                     <div className="relative" style={{ height: gridHeight }}>
-                      {/* Hour lines */}
                       {Array.from({ length: GRID_HOURS }, (_, i) => (
                         <div
                           key={i}
@@ -345,34 +465,7 @@ export default function CalendarPage() {
                           style={{ top: i * 60 * PX_PER_MIN }}
                         />
                       ))}
-
-                      {/* Appointment blocks */}
-                      {dayAppts.map((appt) => {
-                        const startMin = timeToMinutes(appt.appointment_time)
-                        const duration = appt.services?.duration ?? 30
-                        const top = (startMin - GRID_START * 60) * PX_PER_MIN
-                        const height = Math.max(duration * PX_PER_MIN, 28)
-                        const c = STATUS_COLORS[appt.status] ?? STATUS_COLORS.pending
-
-                        if (startMin < GRID_START * 60 || startMin >= GRID_END * 60) return null
-
-                        return (
-                          <button
-                            key={appt.id}
-                            onClick={() => openAppt(appt)}
-                            className={`absolute inset-x-0.5 rounded-md border-l-2 ${c.bg} ${c.border} ${c.text} px-1.5 py-1 text-left overflow-hidden hover:brightness-95 transition-all shadow-sm`}
-                            style={{ top, height }}
-                          >
-                            <p className="text-[10px] font-bold leading-tight truncate">{appt.client_name}</p>
-                            {height > 36 && (
-                              <p className="text-[9px] leading-tight truncate opacity-80">{appt.services?.name}</p>
-                            )}
-                            {height > 50 && (
-                              <p className="text-[9px] leading-tight truncate opacity-70">{appt.staff?.name}</p>
-                            )}
-                          </button>
-                        )
-                      })}
+                      {dayAppts.map((appt) => renderApptBlock(appt, true))}
                     </div>
                   </div>
                 )

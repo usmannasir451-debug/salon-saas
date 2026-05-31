@@ -47,6 +47,7 @@ export default function PnLPage() {
   const [membershipRevenue, setMembershipRevenue] = useState(0)
   const [apptDiscounts, setApptDiscounts] = useState(0)
   const [walkinDiscounts, setWalkinDiscounts] = useState(0)
+  const [loyaltyRedeemed, setLoyaltyRedeemed] = useState(0)
   const [salaryExpense, setSalaryExpense] = useState(0)
   const [otherExpenses, setOtherExpenses] = useState<OtherExpenses>(emptyOther)
   const [trendData, setTrendData] = useState<TrendMonth[]>([])
@@ -59,7 +60,7 @@ export default function PnLPage() {
     const mEnd = format(endOfMonth(month), 'yyyy-MM-dd')
     const mStr = format(month, 'yyyy-MM-01')
 
-    const [ta, tw, te, tp, tm] = await Promise.all([
+    const [ta, tw, te, tp, tm, tl] = await Promise.all([
       supabase.from('appointments').select('total_amount, services(price), discount_amount, status')
         .eq('user_id', ownerId).gte('appointment_date', mStart).lte('appointment_date', mEnd),
       supabase.from('walk_ins').select('subtotal, discount_amount, total')
@@ -70,6 +71,9 @@ export default function PnLPage() {
         .eq('user_id', ownerId).eq('month', mStr),
       supabase.from('membership_transactions').select('amount')
         .eq('owner_id', ownerId).eq('type', 'payment')
+        .gte('created_at', mStart + 'T00:00:00').lte('created_at', mEnd + 'T23:59:59'),
+      supabase.from('loyalty_transactions').select('points')
+        .eq('user_id', ownerId).eq('type', 'redeem')
         .gte('created_at', mStart + 'T00:00:00').lte('created_at', mEnd + 'T23:59:59'),
     ])
 
@@ -94,10 +98,12 @@ export default function PnLPage() {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sal = (tp.data ?? []).reduce((s: number, p: any) => s + Number(p.total_payable ?? 0), 0)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const loyaltyPts = (tl.data ?? []).reduce((s: number, t: any) => s + Number(t.points ?? 0), 0)
     const totalExp = sal + Object.values(expMap).reduce((s, v) => s + v, 0)
-    const netRev = aRev + wRev + mRev - aDisc - wDisc
+    const netRev = aRev + wRev + mRev - aDisc - wDisc - loyaltyPts
 
-    return { aRev, wRev, mRev, aDisc, wDisc, expMap, sal, totalExp, netRev }
+    return { aRev, wRev, mRev, aDisc, wDisc, loyaltyPts, expMap, sal, totalExp, netRev }
   }
 
   async function loadAll() {
@@ -109,12 +115,13 @@ export default function PnLPage() {
     setSalonName(profileRes.data?.salon_name ?? '')
     setCurrency(profileRes.data?.salon_currency ?? 'USD')
 
-    const { aRev, wRev, mRev, aDisc, wDisc, expMap, sal } = await loadMonthData(supabase, selectedMonth)
+    const { aRev, wRev, mRev, aDisc, wDisc, loyaltyPts, expMap, sal } = await loadMonthData(supabase, selectedMonth)
     setApptRevenue(aRev)
     setWalkinRevenue(wRev)
     setMembershipRevenue(mRev)
     setApptDiscounts(aDisc)
     setWalkinDiscounts(wDisc)
+    setLoyaltyRedeemed(loyaltyPts)
     setOtherExpenses(expMap)
     setSalaryExpense(sal)
 
@@ -162,7 +169,7 @@ export default function PnLPage() {
 
   const grossRevenue = apptRevenue + walkinRevenue + membershipRevenue
   const totalDiscounts = apptDiscounts + walkinDiscounts
-  const netRevenue = grossRevenue - totalDiscounts
+  const netRevenue = grossRevenue - totalDiscounts - loyaltyRedeemed
   const totalOtherExpenses = Object.values(otherExpenses).reduce((s, v) => s + v, 0)
   const totalExpenses = salaryExpense + totalOtherExpenses
   const netProfit = netRevenue - totalExpenses
@@ -215,7 +222,8 @@ export default function PnLPage() {
           ['Walk-In Revenue', fmt(walkinRevenue, currency)],
           ...(membershipRevenue > 0 ? [['Membership Revenue', fmt(membershipRevenue, currency)]] : []),
           ['Gross Revenue', fmt(grossRevenue, currency)],
-          ['Less: Discounts', `(${fmt(totalDiscounts, currency)})`],
+          ['Less: Discounts Given', `(${fmt(totalDiscounts, currency)})`],
+          ...(loyaltyRedeemed > 0 ? [['Less: Loyalty Redeemed', `(${fmt(loyaltyRedeemed, currency)})`]] : []),
           ['Net Revenue', fmt(netRevenue, currency)],
         ],
         theme: 'striped',
@@ -338,7 +346,8 @@ export default function PnLPage() {
                     { label: 'Walk-In Revenue', value: walkinRevenue, sub: false },
                     ...(membershipRevenue > 0 ? [{ label: 'Membership Revenue', value: membershipRevenue, sub: false }] : []),
                     { label: 'Gross Revenue', value: grossRevenue, bold: true },
-                    { label: 'Less: Discounts', value: totalDiscounts, sub: true },
+                    { label: 'Less: Discounts Given', value: totalDiscounts, sub: true },
+                    ...(loyaltyRedeemed > 0 ? [{ label: 'Less: Loyalty Redeemed', value: loyaltyRedeemed, sub: true }] : []),
                     { label: 'Net Revenue', value: netRevenue, bold: true, highlight: true },
                   ].map(row => (
                     <div key={row.label} className={`flex items-center justify-between py-2 ${row.highlight ? 'border-t border-green-200 mt-1' : ''}`}>
