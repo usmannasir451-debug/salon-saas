@@ -126,6 +126,7 @@ export default function DashboardPage() {
   const [avgRating, setAvgRating] = useState(0)
   const [totalReviews, setTotalReviews] = useState(0)
   const [birthdayClients, setBirthdayClients] = useState<{ name: string; phone: string | null }[]>([])
+  const [membershipMonthlyRevenue, setMembershipMonthlyRevenue] = useState(0)
 
   useEffect(() => {
     const timer = setInterval(() => setLiveTime(format(new Date(), 'h:mm a')), 60000)
@@ -210,6 +211,14 @@ export default function DashboardPage() {
     setSixMonthAppts((sixMonthApptRes.data as unknown as typeof sixMonthAppts) ?? [])
     setSixMonthWalkIns((sixMonthWalkInRes.data as unknown as typeof sixMonthWalkIns) ?? [])
     setSixMonthClients((sixMonthClientRes.data as unknown as typeof sixMonthClients) ?? [])
+
+    // Membership revenue this month
+    const { data: memTxData } = await supabase.from('membership_transactions').select('amount')
+      .eq('owner_id', ownerId).eq('type', 'payment')
+      .gte('created_at', monthStart + 'T00:00:00').lte('created_at', format(endOfMonth(new Date()), 'yyyy-MM-dd') + 'T23:59:59')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const memRev = (memTxData ?? []).reduce((s: number, t: any) => s + Number(t.amount ?? 0), 0)
+    setMembershipMonthlyRevenue(memRev)
 
     // Last month data (stored for branch-aware comparison)
     setLastMonthAppts((lastMonthApptRes.data as unknown as typeof lastMonthAppts) ?? [])
@@ -369,8 +378,8 @@ export default function DashboardPage() {
   const monthlyRevenue = useMemo(() => {
     const apptRev   = monthlyAppts.filter(a => a.status === 'completed').reduce((s, a) => s + Number(a.total_amount ?? a.services?.price ?? 0), 0)
     const walkinRev = branchFilteredWalkIns.reduce((s, w) => s + Number(w.total ?? 0), 0)
-    return apptRev + walkinRev
-  }, [monthlyAppts, branchFilteredWalkIns])
+    return apptRev + walkinRev + membershipMonthlyRevenue
+  }, [monthlyAppts, branchFilteredWalkIns, membershipMonthlyRevenue])
 
   const monthExpenses = useMemo(() => branchFilteredExpenses.reduce((s, e) => s + Number(e.amount), 0), [branchFilteredExpenses])
   const netProfit     = monthlyRevenue - monthExpenses
@@ -883,7 +892,7 @@ export default function DashboardPage() {
 
       {/* Monthly KPIs (expenses + profit) */}
       {activeFilter === 'month' && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           <Card className="border-gray-100">
             <CardContent className="pt-5 pb-4">
               <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center mb-3">
@@ -924,6 +933,17 @@ export default function DashboardPage() {
               <p className="text-xs text-gray-500">Clients Served</p>
             </CardContent>
           </Card>
+          {membershipMonthlyRevenue > 0 && (
+            <Card className="border-gray-100">
+              <CardContent className="pt-5 pb-4">
+                <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center mb-3">
+                  <CreditCard className="w-5 h-5 text-amber-600" />
+                </div>
+                <p className="text-xl font-bold text-gray-900 leading-tight">{formatCurrency(membershipMonthlyRevenue, currency)}</p>
+                <p className="text-xs text-gray-500">Membership Revenue</p>
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
 

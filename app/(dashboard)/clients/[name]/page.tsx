@@ -20,6 +20,7 @@ import {
   Crown,
   Package,
   Calendar,
+  Star,
 } from 'lucide-react'
 import Link from 'next/link'
 import type { ClientMembership, ClientPackage } from '@/lib/types'
@@ -58,6 +59,7 @@ export default function ClientProfilePage({ params }: { params: Promise<{ name: 
   const [appointments, setAppointments] = useState<AppRow[]>([])
   const [memberships, setMemberships] = useState<ClientMembership[]>([])
   const [clientPackages, setClientPackages] = useState<ClientPackage[]>([])
+  const [loyaltyData, setLoyaltyData] = useState<{ earned: number; redeemed: number; balance: number } | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -78,10 +80,10 @@ export default function ClientProfilePage({ params }: { params: Promise<{ name: 
 
     setAppointments((data as unknown as AppRow[]) ?? [])
 
-    // Load memberships and packages by phone (if we have the phone)
+    // Load memberships, packages, and loyalty by phone (if we have the phone)
     const phone = (data as unknown as AppRow[])?.find(a => a.client_phone)?.client_phone
     if (phone) {
-      const [membRes, pkgRes] = await Promise.all([
+      const [membRes, pkgRes, loyaltyRes] = await Promise.all([
         supabase
           .from('client_memberships')
           .select('*, membership_plans(id, name, type, price, billing_period, discount_percentage)')
@@ -94,9 +96,18 @@ export default function ClientProfilePage({ params }: { params: Promise<{ name: 
           .eq('owner_id', ownerId)
           .eq('client_phone', phone)
           .order('created_at', { ascending: false }),
+        supabase
+          .from('loyalty_transactions')
+          .select('points, type')
+          .eq('user_id', ownerId)
+          .eq('client_phone', phone),
       ])
       setMemberships((membRes.data ?? []) as unknown as ClientMembership[])
       setClientPackages((pkgRes.data ?? []) as unknown as ClientPackage[])
+      const txns = loyaltyRes.data ?? []
+      const earned = txns.filter(t => t.type === 'earn').reduce((s, t) => s + t.points, 0)
+      const redeemed = txns.filter(t => t.type === 'redeem').reduce((s, t) => s + t.points, 0)
+      setLoyaltyData({ earned, redeemed, balance: Math.max(0, earned - redeemed) })
     }
 
     setLoading(false)
@@ -194,6 +205,30 @@ export default function ClientProfilePage({ params }: { params: Promise<{ name: 
           <div>
             <p className="text-sm font-semibold text-gray-800">Favourite Service</p>
             <p className="text-xs text-gray-500">{favoriteService}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Loyalty Points Balance */}
+      {loyaltyData && loyaltyData.earned > 0 && (
+        <div className="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200">
+          <div className="flex items-center gap-2 mb-3">
+            <Star className="w-4 h-4 text-amber-600" />
+            <h3 className="text-sm font-semibold text-amber-800">Loyalty Points</h3>
+          </div>
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <div>
+              <p className="text-lg font-bold text-amber-800">{loyaltyData.earned.toLocaleString()}</p>
+              <p className="text-xs text-amber-600">Earned</p>
+            </div>
+            <div>
+              <p className="text-lg font-bold text-amber-800">{loyaltyData.redeemed.toLocaleString()}</p>
+              <p className="text-xs text-amber-600">Redeemed</p>
+            </div>
+            <div className="border-l border-amber-200">
+              <p className="text-lg font-bold text-amber-900">{loyaltyData.balance.toLocaleString()}</p>
+              <p className="text-xs text-amber-600 font-medium">Balance</p>
+            </div>
           </div>
         </div>
       )}

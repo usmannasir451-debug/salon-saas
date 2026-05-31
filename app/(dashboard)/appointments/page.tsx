@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
@@ -46,6 +46,8 @@ import {
   Lock,
   FileText,
   X,
+  Crown,
+  Star,
 } from 'lucide-react'
 
 type ServiceRef = { id: string; name: string; price: number; duration: number }
@@ -149,6 +151,45 @@ export default function AppointmentsPage() {
   const [currency, setCurrency] = useState('USD')
   const [taxPercentage, setTaxPercentage] = useState(0)
 
+  type PhoneClientInfo = {
+    name: string
+    totalVisits: number
+    loyaltyPoints: number
+    activeMembership: string | null
+  }
+  const [phoneClientInfo, setPhoneClientInfo] = useState<PhoneClientInfo | null>(null)
+  const [phoneSearching, setPhoneSearching] = useState(false)
+  const phoneTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const lookupPhone = useCallback(async (phone: string) => {
+    if (phone.replace(/\D/g, '').length < 7) { setPhoneClientInfo(null); return }
+    setPhoneSearching(true)
+    const supabase = createClient()
+    const [clientRes, loyaltyRes, membershipRes] = await Promise.all([
+      supabase.from('appointments').select('client_name').eq('user_id', ownerId).eq('client_phone', phone).limit(1).maybeSingle(),
+      supabase.from('loyalty_transactions').select('points, type').eq('user_id', ownerId).eq('client_phone', phone),
+      supabase.from('client_memberships').select('membership_plans(name)').eq('user_id', ownerId).eq('client_phone', phone).eq('status', 'active').limit(1).maybeSingle(),
+    ])
+    if (!clientRes.data) { setPhoneClientInfo(null); setPhoneSearching(false); return }
+    const allAppts = await supabase.from('appointments').select('id', { count: 'exact', head: true }).eq('user_id', ownerId).eq('client_phone', phone)
+    const pts = (loyaltyRes.data ?? []).reduce((sum, t) => t.type === 'earn' ? sum + t.points : sum - t.points, 0)
+    const mem = membershipRes.data?.membership_plans as { name?: string } | null
+    setPhoneClientInfo({
+      name: clientRes.data.client_name,
+      totalVisits: allAppts.count ?? 0,
+      loyaltyPoints: Math.max(0, pts),
+      activeMembership: mem?.name ?? null,
+    })
+    setPhoneSearching(false)
+  }, [ownerId])
+
+  function handlePhoneChange(phone: string) {
+    setForm(f => ({ ...f, client_phone: phone }))
+    setPhoneClientInfo(null)
+    if (phoneTimerRef.current) clearTimeout(phoneTimerRef.current)
+    phoneTimerRef.current = setTimeout(() => { void lookupPhone(phone) }, 500)
+  }
+
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { loadData() }, [])
 
@@ -241,10 +282,12 @@ export default function AppointmentsPage() {
   function openCreate() {
     setEditingId(null)
     setForm({ ...emptyForm, appointment_date: filterDate })
+    setPhoneClientInfo(null)
     setDialogOpen(true)
   }
 
   function openEdit(appt: AppointmentRow) {
+    setPhoneClientInfo(null)
     setEditingId(appt.id)
     const existingSvcIds = appt.appointment_services && appt.appointment_services.length > 0
       ? appt.appointment_services.map(as => as.services?.id).filter(Boolean) as string[]
@@ -713,8 +756,8 @@ export default function AppointmentsPage() {
 
               <div className="space-y-1.5">
                 <Label htmlFor="clientPhone">
-                  WhatsApp Number
-                  <span className="ml-1 text-xs text-gray-400 font-normal">(optional)</span>
+                  WhatsApp / Phone Number
+                  <span className="ml-1 text-xs text-gray-400 font-normal">(auto-lookup client)</span>
                 </Label>
                 <div className="relative">
                   <MessageCircle className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-green-500 pointer-events-none" />
@@ -722,10 +765,43 @@ export default function AppointmentsPage() {
                     id="clientPhone"
                     placeholder="03001234567"
                     value={form.client_phone}
-                    onChange={(e) => setForm({ ...form, client_phone: e.target.value })}
+                    onChange={(e) => handlePhoneChange(e.target.value)}
                     className="h-9 pl-8"
                   />
+                  {phoneSearching && (
+                    <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 animate-spin" />
+                  )}
                 </div>
+                {phoneClientInfo && (
+                  <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs space-y-1">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 font-semibold text-blue-800">
+                        <User className="w-3.5 h-3.5" />
+                        {phoneClientInfo.name}
+                        <button
+                          type="button"
+                          onClick={() => setForm(f => ({ ...f, client_name: phoneClientInfo.name }))}
+                          className="ml-1 text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded"
+                        >
+                          Use Name
+                        </button>
+                      </div>
+                      <span className="text-blue-600">{phoneClientInfo.totalVisits} visit{phoneClientInfo.totalVisits !== 1 ? 's' : ''}</span>
+                    </div>
+                    {phoneClientInfo.loyaltyPoints > 0 && (
+                      <div className="flex items-center gap-1 text-amber-700">
+                        <Star className="w-3 h-3" />
+                        {phoneClientInfo.loyaltyPoints} loyalty pts
+                      </div>
+                    )}
+                    {phoneClientInfo.activeMembership && (
+                      <div className="flex items-center gap-1 text-purple-700">
+                        <Crown className="w-3 h-3" />
+                        Active: {phoneClientInfo.activeMembership}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Deal selection */}

@@ -1,39 +1,146 @@
-You are an expert SaaS developer working on "Snipforce". Fix these two issues in Snipforce:
+You are an expert SaaS developer working on "Snipforce". Make these improvements carefully. Review entire codebase before implementing. Run npm run build to confirm zero errors before finishing.
 
-PART 1 - SUB-USER NAVIGATION FIX
+PART 1 - MEMBERSHIP INTEGRATION IN WALK-IN POS
 
-Problem: Sub-user has access to services, staff, clients but clicking them redirects to appointments page.
+When client phone number is entered in walk-in POS:
+- Query client_memberships and client_packages for that phone number
+- If active membership found: show a prominent banner in right panel
+  * "Active Membership: [Plan Name] - X services remaining"
+  * For service-based: show which services are included and how many remaining
+  * For balance-based: show current balance available
+- If active package found: show package banner with services remaining
+- When a service is added to cart that is covered by membership/package:
+  * Show "Apply Membership" or "Redeem Package" toggle button on that cart item
+  * If toggled on: price becomes 0 or discounted based on membership discount_percentage
+  * Deduct from services_remaining when order is completed
+- For balance-based membership: show "Use Balance" option in payment section
+  * Input: how much balance to use (max = available balance)
+  * Deduct from client_memberships.balance on completion
 
-Root cause investigation:
-- Check lib/roles.ts - the custom permission system uses salon_members.permissions (JSONB array of page keys)
-- The permissions array likely has keys like "appointments", "calendar", "walkin" but services/staff/clients keys may be different or missing
-- Check what keys are being saved when owner creates sub-user permissions in team page
-- Check PermissionGuard.tsx MODULE_PATH_MAP - verify services, staff, clients are mapped correctly
-- Check Sidebar.tsx - verify services, staff, clients nav items are shown when permissions include them
+ON ORDER COMPLETION WITH MEMBERSHIP/PACKAGE REDEMPTION:
+- Update client_memberships.services_remaining (decrement redeemed services)
+- Update client_memberships.balance (deduct used balance)
+- Create membership_transactions record: type='service_redemption', amount=value_of_service
+- If services_remaining reaches 0 for all services: update status to 'expired'
+- Membership redemption should appear in sales reports as revenue (use full service price for reporting)
 
-Fix:
-- Make sure permission keys exactly match the module keys used in PermissionGuard and Sidebar
-- Services permission key should map to /services path
-- Staff permission key should map to /staff path  
-- Clients permission key should map to /clients path
-- Test that sub-user with these permissions can navigate to all three pages without redirect
+PART 2 - MEMBERSHIP SALES IN REPORTS AND DASHBOARD
 
-PART 2 - MEMBERSHIPS PAGE NOT SHOWING CONTENT
+When membership is purchased (assigned to client):
+- Record in membership_transactions: type='payment', amount=plan.price
+- This should count as revenue in:
+  * Dashboard total revenue
+  * Sales report
+  * P&L income section
+- Add "Membership Revenue" as a separate line in reports
+- Reports breakdown should show:
+  * Appointment Revenue
+  * Walk-in Revenue  
+  * Membership Revenue
+  * Total Revenue
+- Dashboard KPI card: show membership revenue this month
 
-Problem: Memberships page exists but shows nothing - no plans, no packages, no UI visible.
+PART 3 - WALK-IN POS UX IMPROVEMENTS
 
-Possible causes to check:
-- SQL migration may not have been run yet - check if tables exist
-- Module may not be enabled for the salon account
-- Page may have a loading/error state that shows blank
-- RoleContext may not be providing correct ownerId
+Layout improvements for cleaner single-screen experience:
 
-Fix:
-- Add proper empty states: "No membership plans yet. Create your first plan."
-- Add loading spinner while data fetches
-- Add error boundary to show what went wrong
-- Make sure page works even if memberships tables do not exist yet (graceful error handling)
-- Check if memberships module needs to be enabled in admin panel for the account
-- Add a visible error message if Supabase query fails
+LEFT PANEL:
+- Services/deals grid: use smaller cards (compact mode)
+  * Show: service name (truncated if long), price, small + button
+  * 2-3 columns on desktop, 2 on mobile
+  * Reduce padding - make cards more compact
+  * Category filter tabs: scrollable horizontal tabs, not wrapping
+  * Search bar: smaller, inline with category tabs
+- Reduce font sizes throughout left panel by one size
+- Limit left panel height to viewport - internal scroll only for service grid
 
-Also: Run npm run build to confirm zero TypeScript errors after fixes.
+RIGHT PANEL (Order Summary):
+- Make entire right panel fixed height = viewport height minus header
+- Internal scroll for order items only (not the whole panel)
+- Payment buttons: 2x2 grid instead of vertical stack to save space
+- Compact discount and loyalty sections - collapsed by default, expand on click
+- Total amount: always visible at bottom, sticky
+- "Complete & Save" button: always visible, not scrolled out of view
+- Font sizes: slightly smaller throughout right panel
+
+OVERALL:
+- No full page scroll - everything fits in viewport
+- Left panel scrolls internally for services
+- Right panel scrolls internally for order items
+- Header row (client phone, staff) stays fixed at top of left panel
+
+PART 4 - PHONE NUMBER AS UNIVERSAL UNIQUE IDENTIFIER
+
+Make phone number the universal client identifier across the entire app:
+
+WALK-IN: Already has phone lookup - ensure it works perfectly
+APPOINTMENTS: When adding appointment, phone field should auto-lookup client name
+- As user types phone: debounced search in clients table
+- If match found: auto-fill client name field, show loyalty points, show active membership
+- If no match: allow creating new client with that phone
+
+MEMBERSHIPS PAGE - Assign membership/package:
+- Phone number field: auto-lookup and show client name
+- Show existing memberships for that phone
+- Prevent duplicate active memberships for same plan
+
+EVERYWHERE PHONE IS ENTERED:
+- Consistent UX: type phone → see client info appear below input
+- Show: client name, total visits, loyalty points balance, active memberships
+
+CLIENT CREATION:
+- Enforce unique phone number at UI level (check before saving)
+- If phone exists: offer to update existing client or view their profile
+- Backend: unique constraint already exists - handle the error gracefully with clear message
+
+PART 5 - CLIENT PROFILE PAGE IMPROVEMENTS
+
+Add to client detail page:
+- Loyalty Points Balance: prominent card showing current points balance in currency value
+  * How many points earned total
+  * How many redeemed
+  * Current balance
+  * Points expiry date if set
+- Active Memberships section (already partially done - ensure it shows correctly):
+  * Plan name, status, services remaining, next billing date
+  * Quick action: pause/cancel membership
+- Active Packages section:
+  * Package name, services remaining, expiry date
+- All of above should load correctly using phone number as identifier
+
+CLIENT LIST PAGE:
+- Add loyalty points column showing current balance
+- Add membership status column (Active Member badge if they have active membership)
+- These should be computed from loyalty_transactions and client_memberships tables
+
+PART 6 - ARCHITECTURE REVIEW AND ALIGNMENT
+
+Review these specific areas:
+
+1. OWNER_ID CONSISTENCY
+- Every table query must use get_effective_owner_id() pattern
+- Sub-users must see owner's data for all new tables (membership_plans, client_memberships, etc.)
+- Verify RLS policies on all 5 new membership tables use get_effective_owner_id()
+
+2. PHONE NUMBER DEDUPLICATION
+- clients table: ensure unique constraint on (owner_id, phone)
+- client_memberships: queries by phone should work correctly
+- loyalty_transactions: queries by phone should work correctly
+- Walk-in client lookup: consistent behavior everywhere
+
+3. REVENUE TRACKING
+- All revenue sources stored with total_amount at time of transaction
+- Membership payments stored in membership_transactions
+- Dashboard aggregates from: appointments.total_amount + walk_ins.total + membership_transactions.amount (type=payment)
+
+4. DATE-FNS IMPORTS
+- Ensure date-fns is imported correctly in all files using it
+- Use format, addDays, addMonths, addYears consistently
+
+TECHNICAL REQUIREMENTS:
+- Run npm run build to confirm zero TypeScript errors
+- Update CLAUDE.md with all changes
+- Mobile responsive throughout
+- Dark mode compatible
+- No breaking changes to existing features
+- Generate SQL migration if any new columns/tables needed

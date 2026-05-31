@@ -6,13 +6,14 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { useUserContext } from '@/components/RoleContext'
-import type { DiscountType, DiscountReason, PaymentMethod, WalkIn, Service, StaffMember } from '@/lib/types'
+import type { DiscountType, DiscountReason, PaymentMethod, WalkIn, Service, StaffMember, ClientMembership, ClientPackage } from '@/lib/types'
 import FeedbackModal from '@/components/FeedbackModal'
 import InvoiceModal, { type InvoiceData } from '@/components/InvoiceModal'
 import {
   Zap, Loader2, X, Banknote, CreditCard, User, Phone, Search,
   Star, ChevronDown, ChevronUp, CheckCircle2, Receipt, Printer,
   MessageSquare, ShoppingCart, Trash2, Package, Clock, History, LayoutGrid, List,
+  Crown, Tag,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -181,6 +182,14 @@ export default function WalkInPage() {
   const [clientProfile, setClientProfile] = useState<ClientProfile | null>(null)
   const [lookingUp, setLookingUp] = useState(false)
 
+  // Membership / package
+  const [activeMemberships, setActiveMemberships] = useState<ClientMembership[]>([])
+  const [activePackages, setActivePackages] = useState<ClientPackage[]>([])
+  const [membershipRedemptions, setMembershipRedemptions] = useState<Record<string, string>>({})
+  const [packageRedemptions, setPackageRedemptions] = useState<Record<string, string>>({})
+  const [balanceUse, setBalanceUse] = useState('')
+  const [showDiscountSection, setShowDiscountSection] = useState(false)
+
   // After completion
   const [completedWalkIn, setCompletedWalkIn] = useState<WalkIn | null>(null)
   const [completedServiceNames, setCompletedServiceNames] = useState<string[]>([])
@@ -243,24 +252,57 @@ export default function WalkInPage() {
   }
 
   const lookupClient = useCallback(async (phone: string) => {
-    if (!phone || phone.length < 7) { setClientProfile(null); return }
+    if (!phone || phone.length < 7) {
+      setClientProfile(null)
+      setActiveMemberships([])
+      setActivePackages([])
+      return
+    }
     setLookingUp(true)
     const supabase = createClient()
-    const { data } = await supabase
-      .from('clients')
-      .select('name, loyalty_balance')
-      .eq('user_id', ownerId)
-      .eq('phone', phone)
-      .maybeSingle()
-    setClientProfile(data ? { name: data.name, loyalty_balance: data.loyalty_balance ?? 0 } : null)
-    if (data && !clientName) setClientName(data.name)
+    const [clientRes, membRes, pkgRes] = await Promise.all([
+      supabase.from('clients').select('name, loyalty_balance').eq('user_id', ownerId).eq('phone', phone).maybeSingle(),
+      supabase.from('client_memberships')
+        .select('*, membership_plans(id, name, type, price, billing_period, discount_percentage)')
+        .eq('owner_id', ownerId).eq('client_phone', phone).eq('status', 'active'),
+      supabase.from('client_packages')
+        .select('*, packages(id, name, price, validity_days)')
+        .eq('owner_id', ownerId).eq('client_phone', phone).eq('status', 'active'),
+    ])
+    setClientProfile(clientRes.data ? { name: clientRes.data.name, loyalty_balance: clientRes.data.loyalty_balance ?? 0 } : null)
+    if (clientRes.data && !clientName) setClientName(clientRes.data.name)
+    setActiveMemberships((membRes.data ?? []) as unknown as ClientMembership[])
+    setActivePackages((pkgRes.data ?? []) as unknown as ClientPackage[])
     setLookingUp(false)
   }, [ownerId, clientName])
 
   function toggleService(id: string) {
-    setSelectedServiceIds(prev =>
-      prev.includes(id) ? prev.filter(sid => sid !== id) : [...prev, id]
-    )
+    setSelectedServiceIds(prev => {
+      if (prev.includes(id)) {
+        setMembershipRedemptions(m => { const n = { ...m }; delete n[id]; return n })
+        setPackageRedemptions(p => { const n = { ...p }; delete n[id]; return n })
+        return prev.filter(sid => sid !== id)
+      }
+      return [...prev, id]
+    })
+  }
+
+  function toggleMembershipRedemption(serviceId: string, membershipId: string) {
+    setMembershipRedemptions(prev => {
+      const n = { ...prev }
+      if (n[serviceId] === membershipId) { delete n[serviceId]; return n }
+      return { ...n, [serviceId]: membershipId }
+    })
+    setPackageRedemptions(prev => { const n = { ...prev }; delete n[serviceId]; return n })
+  }
+
+  function togglePackageRedemption(serviceId: string, pkgId: string) {
+    setPackageRedemptions(prev => {
+      const n = { ...prev }
+      if (n[serviceId] === pkgId) { delete n[serviceId]; return n }
+      return { ...n, [serviceId]: pkgId }
+    })
+    setMembershipRedemptions(prev => { const n = { ...prev }; delete n[serviceId]; return n })
   }
 
   function selectDeal(id: string) {
@@ -285,9 +327,15 @@ export default function WalkInPage() {
     setDiscountValue('')
     setDiscountReason('')
     setLoyaltyRedeem('')
+    setBalanceUse('')
     setNotes('')
     setClientProfile(null)
+    setActiveMemberships([])
+    setActivePackages([])
+    setMembershipRedemptions({})
+    setPackageRedemptions({})
     setShowNotes(false)
+    setShowDiscountSection(false)
   }
 
   // Computed values
@@ -312,9 +360,15 @@ export default function WalkInPage() {
   )
 
   const subtotal = useMemo(() => {
-    if (selectedDeal) return Number(selectedDeal.price) + additionalServices.reduce((s, svc) => s + Number(svc.price), 0)
-    return selectedServices.reduce((s, svc) => s + Number(svc.price), 0)
-  }, [selectedDeal, selectedServices, additionalServices])
+    if (selectedDeal) return Number(selectedDeal.price) + additionalServices.reduce((s, svc) => {
+      const isRedeemed = !!membershipRedemptions[svc.id] || !!packageRedemptions[svc.id]
+      return s + (isRedeemed ? 0 : Number(svc.price))
+    }, 0)
+    return selectedServices.reduce((s, svc) => {
+      const isRedeemed = !!membershipRedemptions[svc.id] || !!packageRedemptions[svc.id]
+      return s + (isRedeemed ? 0 : Number(svc.price))
+    }, 0)
+  }, [selectedDeal, selectedServices, additionalServices, membershipRedemptions, packageRedemptions])
 
   const discountAmount = useMemo(() => {
     const val = parseFloat(discountValue) || 0
@@ -328,7 +382,16 @@ export default function WalkInPage() {
     return Math.min(redeem, clientProfile.loyalty_balance, subtotal - discountAmount)
   }, [loyaltyEnabled, clientProfile, loyaltyRedeem, subtotal, discountAmount])
 
-  const total = Math.max(subtotal - discountAmount - loyaltyRedeemAmount, 0)
+  const totalBeforeBalance = Math.max(subtotal - discountAmount - loyaltyRedeemAmount, 0)
+
+  const balanceUseAmount = useMemo(() => {
+    const bm = activeMemberships.find(m => (m.membership_plans as { type?: string } | undefined)?.type === 'balance_based')
+    if (!bm || !balanceUse) return 0
+    const requested = parseFloat(balanceUse) || 0
+    return Math.min(requested, bm.balance, totalBeforeBalance)
+  }, [activeMemberships, balanceUse, totalBeforeBalance])
+
+  const total = Math.max(totalBeforeBalance - balanceUseAmount, 0)
 
   const loyaltyEarned = useMemo(() => {
     if (!loyaltyEnabled) return 0
@@ -431,6 +494,64 @@ export default function WalkInPage() {
       await Promise.all(loyaltyTasks)
     }
 
+    // Handle membership service redemptions
+    const membRedEntries = Object.entries(membershipRedemptions)
+    if (membRedEntries.length > 0) {
+      for (const [serviceId, membershipId] of membRedEntries) {
+        const membership = activeMemberships.find(m => m.id === membershipId)
+        if (!membership) continue
+        const currentRemaining = { ...membership.services_remaining }
+        currentRemaining[serviceId] = Math.max((Number(currentRemaining[serviceId]) || 0) - 1, 0)
+        const allZero = Object.values(currentRemaining).every(v => Number(v) === 0)
+        await supabase.from('client_memberships').update({
+          services_remaining: currentRemaining,
+          ...(allZero ? { status: 'expired' } : {}),
+        }).eq('id', membershipId)
+        const svcPrice = services.find(s => s.id === serviceId)?.price ?? 0
+        const svcName = services.find(s => s.id === serviceId)?.name ?? 'Service'
+        await supabase.from('membership_transactions').insert({
+          owner_id: ownerId,
+          membership_id: membershipId,
+          type: 'service_redemption',
+          amount: svcPrice,
+          description: `Service redeemed at walk-in: ${svcName}`,
+        })
+      }
+    }
+
+    // Handle package service redemptions
+    const pkgRedEntries = Object.entries(packageRedemptions)
+    if (pkgRedEntries.length > 0) {
+      for (const [serviceId, clientPkgId] of pkgRedEntries) {
+        const clientPkg = activePackages.find(p => p.id === clientPkgId)
+        if (!clientPkg) continue
+        const currentRemaining = { ...clientPkg.services_remaining }
+        currentRemaining[serviceId] = Math.max((Number(currentRemaining[serviceId]) || 0) - 1, 0)
+        const allZero = Object.values(currentRemaining).every(v => Number(v) === 0)
+        await supabase.from('client_packages').update({
+          services_remaining: currentRemaining,
+          ...(allZero ? { status: 'used' } : {}),
+        }).eq('id', clientPkgId)
+      }
+    }
+
+    // Handle balance-based membership usage
+    if (balanceUseAmount > 0) {
+      const bm = activeMemberships.find(m => (m.membership_plans as { type?: string } | undefined)?.type === 'balance_based')
+      if (bm) {
+        await supabase.from('client_memberships').update({
+          balance: Math.max(bm.balance - balanceUseAmount, 0),
+        }).eq('id', bm.id)
+        await supabase.from('membership_transactions').insert({
+          owner_id: ownerId,
+          membership_id: bm.id,
+          type: 'balance_credit',
+          amount: balanceUseAmount,
+          description: 'Balance used for walk-in payment',
+        })
+      }
+    }
+
     void Promise.all([
       supabase.from('notifications').insert({
         user_id: ownerId, type: 'payment_received',
@@ -525,23 +646,73 @@ export default function WalkInPage() {
                 </div>
               </div>
             ))}
-            {!selectedDeal && selectedServices.map(svc => (
-              <div key={svc.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
-                <div className="flex items-center gap-2 min-w-0">
-                  <Zap className="w-4 h-4 text-primary flex-shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-gray-900 truncate">{svc.name}</p>
-                    <p className="text-xs text-gray-400">{svc.duration} min</p>
+            {!selectedDeal && selectedServices.map(svc => {
+              const coveringMembership = activeMemberships.find(m =>
+                (m.membership_plans as { type?: string } | undefined)?.type === 'service_based' &&
+                Number(m.services_remaining[svc.id] ?? 0) > 0
+              )
+              const coveringPkg = activePackages.find(p => Number(p.services_remaining[svc.id] ?? 0) > 0)
+              const redeemedByMembership = membershipRedemptions[svc.id]
+              const redeemedByPkg = packageRedemptions[svc.id]
+              const isRedeemed = !!redeemedByMembership || !!redeemedByPkg
+              return (
+                <div key={svc.id} className="p-3 rounded-xl bg-gray-50 border border-gray-100 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Zap className="w-4 h-4 text-primary flex-shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate">{svc.name}</p>
+                        <p className="text-xs text-gray-400">{svc.duration} min</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {isRedeemed ? (
+                        <span className="text-xs text-gray-400 line-through">{formatCurrency(Number(svc.price), currency)}</span>
+                      ) : (
+                        <span className="text-sm font-bold text-primary">{formatCurrency(Number(svc.price), currency)}</span>
+                      )}
+                      <button onClick={() => toggleService(svc.id)} className="text-gray-400 hover:text-red-500 p-0.5">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
+                  {(coveringMembership || coveringPkg) && (
+                    <div className="flex gap-1 flex-wrap">
+                      {coveringMembership && (
+                        <button
+                          type="button"
+                          onClick={() => toggleMembershipRedemption(svc.id, coveringMembership.id)}
+                          className={cn(
+                            'flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border font-medium transition-colors',
+                            redeemedByMembership
+                              ? 'bg-amber-500 text-white border-amber-500'
+                              : 'bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100'
+                          )}
+                        >
+                          <Crown className="w-2.5 h-2.5" />
+                          {redeemedByMembership ? 'Membership Applied' : 'Apply Membership'}
+                        </button>
+                      )}
+                      {coveringPkg && (
+                        <button
+                          type="button"
+                          onClick={() => togglePackageRedemption(svc.id, coveringPkg.id)}
+                          className={cn(
+                            'flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border font-medium transition-colors',
+                            redeemedByPkg
+                              ? 'bg-blue-500 text-white border-blue-500'
+                              : 'bg-blue-50 text-blue-700 border-blue-300 hover:bg-blue-100'
+                          )}
+                        >
+                          <Package className="w-2.5 h-2.5" />
+                          {redeemedByPkg ? 'Package Redeemed' : 'Redeem Package'}
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="text-sm font-bold text-primary">{formatCurrency(Number(svc.price), currency)}</span>
-                  <button onClick={() => toggleService(svc.id)} className="text-gray-400 hover:text-red-500 p-0.5">
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </>
         )}
       </div>
@@ -554,45 +725,63 @@ export default function WalkInPage() {
           <span className="font-medium">{formatCurrency(subtotal, currency)}</span>
         </div>
 
-        {/* Discount section */}
-        <div className="space-y-2">
-          <div className="flex gap-2">
-            <select
-              value={discountType}
-              onChange={(e) => setDiscountType(e.target.value as DiscountType)}
-              className="h-9 rounded-lg border border-gray-200 bg-white px-2 text-sm text-gray-700 focus:outline-none focus:ring-1 focus:ring-primary/50 w-28 flex-shrink-0"
-            >
-              <option value="percentage">% Off</option>
-              <option value="fixed">Fixed</option>
-            </select>
-            <Input
-              type="number"
-              min="0"
-              value={discountValue}
-              onChange={(e) => setDiscountValue(e.target.value)}
-              placeholder={discountType === 'percentage' ? 'Discount %' : `Discount ${currency}`}
-              className="h-9 flex-1"
-            />
-            {discountValue && (
-              <button onClick={() => { setDiscountValue(''); setDiscountReason('') }} className="text-gray-400 hover:text-gray-600 p-1 flex-shrink-0">
-                <X className="w-4 h-4" />
-              </button>
+        {/* Discount section — collapsible */}
+        <div className="space-y-1">
+          <button
+            type="button"
+            onClick={() => setShowDiscountSection(v => !v)}
+            className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 transition-colors w-full"
+          >
+            <Tag className="w-3 h-3" />
+            <span>Add Discount</span>
+            {discountAmount > 0 && (
+              <span className="text-green-600 font-semibold ml-1">
+                (-{formatCurrency(discountAmount, currency)})
+              </span>
             )}
-          </div>
-          {discountValue && (
-            <Select value={discountReason} onValueChange={(v) => setDiscountReason(v as DiscountReason | '')}>
-              <SelectTrigger className="h-9 text-sm">
-                <SelectValue placeholder="Discount reason" />
-              </SelectTrigger>
-              <SelectContent>
-                {DISCOUNT_REASONS.map(r => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          )}
-          {discountAmount > 0 && (
-            <div className="flex justify-between text-sm text-green-600">
-              <span>Discount applied</span>
-              <span>-{formatCurrency(discountAmount, currency)}</span>
+            {showDiscountSection ? <ChevronUp className="w-3 h-3 ml-auto" /> : <ChevronDown className="w-3 h-3 ml-auto" />}
+          </button>
+          {showDiscountSection && (
+            <div className="space-y-2 pt-1">
+              <div className="flex gap-2">
+                <select
+                  value={discountType}
+                  onChange={(e) => setDiscountType(e.target.value as DiscountType)}
+                  className="h-9 rounded-lg border border-gray-200 bg-white px-2 text-sm text-gray-700 focus:outline-none focus:ring-1 focus:ring-primary/50 w-28 flex-shrink-0"
+                >
+                  <option value="percentage">% Off</option>
+                  <option value="fixed">Fixed</option>
+                </select>
+                <Input
+                  type="number"
+                  min="0"
+                  value={discountValue}
+                  onChange={(e) => setDiscountValue(e.target.value)}
+                  placeholder={discountType === 'percentage' ? 'Discount %' : `Discount ${currency}`}
+                  className="h-9 flex-1"
+                />
+                {discountValue && (
+                  <button onClick={() => { setDiscountValue(''); setDiscountReason('') }} className="text-gray-400 hover:text-gray-600 p-1 flex-shrink-0">
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+              {discountValue && (
+                <Select value={discountReason} onValueChange={(v) => setDiscountReason(v as DiscountReason | '')}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="Discount reason" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DISCOUNT_REASONS.map(r => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
+              {discountAmount > 0 && (
+                <div className="flex justify-between text-sm text-green-600">
+                  <span>Discount applied</span>
+                  <span>-{formatCurrency(discountAmount, currency)}</span>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -631,6 +820,48 @@ export default function WalkInPage() {
             )}
           </div>
         )}
+
+        {/* Balance-based membership payment */}
+        {(() => {
+          const bm = activeMemberships.find(m => (m.membership_plans as { type?: string } | undefined)?.type === 'balance_based')
+          if (!bm || bm.balance <= 0) return null
+          const planName = (bm.membership_plans as { name?: string } | undefined)?.name ?? 'Membership'
+          return (
+            <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Crown className="w-3.5 h-3.5 text-amber-500" />
+                  <span className="text-xs font-semibold text-amber-800">{planName} Balance</span>
+                </div>
+                <span className="text-xs font-bold text-amber-700">
+                  Available: {formatCurrency(bm.balance, currency)}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number" min="0" max={bm.balance}
+                  value={balanceUse}
+                  onChange={e => setBalanceUse(e.target.value)}
+                  placeholder="Use balance amount"
+                  className="h-8 flex-1 text-sm"
+                />
+                <Button
+                  type="button" size="sm" variant="outline"
+                  onClick={() => setBalanceUse(String(Math.min(bm.balance, totalBeforeBalance)))}
+                  className="h-8 border-amber-300 text-amber-700 hover:bg-amber-100 text-xs px-2"
+                >
+                  Max
+                </Button>
+              </div>
+              {balanceUseAmount > 0 && (
+                <div className="flex justify-between text-xs text-amber-600">
+                  <span>Balance used</span>
+                  <span>-{formatCurrency(balanceUseAmount, currency)}</span>
+                </div>
+              )}
+            </div>
+          )
+        })()}
 
         {/* Total */}
         <div className="flex justify-between items-center py-2 border-t border-gray-100">
@@ -860,6 +1091,50 @@ export default function WalkInPage() {
                 </span>
               </div>
             )}
+            {/* Active membership banners */}
+            {activeMemberships.map(m => {
+              const plan = m.membership_plans as { name?: string; type?: string } | undefined
+              return (
+                <div key={m.id} className="rounded-lg bg-amber-50 border border-amber-200 px-2.5 py-1.5 space-y-0.5">
+                  <div className="flex items-center gap-1.5">
+                    <Crown className="w-3 h-3 text-amber-600 flex-shrink-0" />
+                    <span className="text-xs font-semibold text-amber-800 truncate">
+                      Active Membership: {plan?.name ?? 'Membership'}
+                    </span>
+                  </div>
+                  {plan?.type === 'service_based' ? (
+                    <p className="text-[10px] text-amber-700 truncate">
+                      {Object.entries(m.services_remaining).map(([sid, qty]) => {
+                        const svcName = services.find(s => s.id === sid)?.name ?? sid
+                        return `${svcName}: ${qty} left`
+                      }).join(' · ')}
+                    </p>
+                  ) : (
+                    <p className="text-[10px] text-amber-700">Balance: {formatCurrency(m.balance, currency)}</p>
+                  )}
+                </div>
+              )
+            })}
+            {/* Active package banners */}
+            {activePackages.map(p => {
+              const pkg = p.packages as { name?: string } | undefined
+              return (
+                <div key={p.id} className="rounded-lg bg-blue-50 border border-blue-200 px-2.5 py-1.5 space-y-0.5">
+                  <div className="flex items-center gap-1.5">
+                    <Package className="w-3 h-3 text-blue-600 flex-shrink-0" />
+                    <span className="text-xs font-semibold text-blue-800 truncate">
+                      Package: {pkg?.name ?? 'Package'}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-blue-700 truncate">
+                    {Object.entries(p.services_remaining).map(([sid, qty]) => {
+                      const svcName = services.find(s => s.id === sid)?.name ?? sid
+                      return `${svcName}: ${qty} left`
+                    }).join(' · ')}
+                  </p>
+                </div>
+              )
+            })}
             {/* Staff select */}
             <Select value={staffId || 'none'} onValueChange={(v) => setStaffId(v === 'none' ? '' : (v ?? ''))}>
               <SelectTrigger className="h-9 text-sm">

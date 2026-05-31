@@ -44,6 +44,7 @@ export default function PnLPage() {
 
   const [apptRevenue, setApptRevenue] = useState(0)
   const [walkinRevenue, setWalkinRevenue] = useState(0)
+  const [membershipRevenue, setMembershipRevenue] = useState(0)
   const [apptDiscounts, setApptDiscounts] = useState(0)
   const [walkinDiscounts, setWalkinDiscounts] = useState(0)
   const [salaryExpense, setSalaryExpense] = useState(0)
@@ -58,7 +59,7 @@ export default function PnLPage() {
     const mEnd = format(endOfMonth(month), 'yyyy-MM-dd')
     const mStr = format(month, 'yyyy-MM-01')
 
-    const [ta, tw, te, tp] = await Promise.all([
+    const [ta, tw, te, tp, tm] = await Promise.all([
       supabase.from('appointments').select('total_amount, services(price), discount_amount, status')
         .eq('user_id', ownerId).gte('appointment_date', mStart).lte('appointment_date', mEnd),
       supabase.from('walk_ins').select('subtotal, discount_amount, total')
@@ -67,6 +68,9 @@ export default function PnLPage() {
         .eq('user_id', ownerId).gte('expense_date', mStart).lte('expense_date', mEnd),
       supabase.from('payroll_entries').select('total_payable')
         .eq('user_id', ownerId).eq('month', mStr),
+      supabase.from('membership_transactions').select('amount')
+        .eq('owner_id', ownerId).eq('type', 'payment')
+        .gte('created_at', mStart + 'T00:00:00').lte('created_at', mEnd + 'T23:59:59'),
     ])
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -79,6 +83,8 @@ export default function PnLPage() {
     const wRev = (tw.data ?? []).reduce((s: number, w: any) => s + Number(w.subtotal ?? 0), 0)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const wDisc = (tw.data ?? []).reduce((s: number, w: any) => s + Number(w.discount_amount ?? 0), 0)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mRev = (tm.data ?? []).reduce((s: number, t: any) => s + Number(t.amount ?? 0), 0)
 
     const expMap = { ...emptyOther }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -89,9 +95,9 @@ export default function PnLPage() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sal = (tp.data ?? []).reduce((s: number, p: any) => s + Number(p.total_payable ?? 0), 0)
     const totalExp = sal + Object.values(expMap).reduce((s, v) => s + v, 0)
-    const netRev = aRev + wRev - aDisc - wDisc
+    const netRev = aRev + wRev + mRev - aDisc - wDisc
 
-    return { aRev, wRev, aDisc, wDisc, expMap, sal, totalExp, netRev }
+    return { aRev, wRev, mRev, aDisc, wDisc, expMap, sal, totalExp, netRev }
   }
 
   async function loadAll() {
@@ -103,9 +109,10 @@ export default function PnLPage() {
     setSalonName(profileRes.data?.salon_name ?? '')
     setCurrency(profileRes.data?.salon_currency ?? 'USD')
 
-    const { aRev, wRev, aDisc, wDisc, expMap, sal } = await loadMonthData(supabase, selectedMonth)
+    const { aRev, wRev, mRev, aDisc, wDisc, expMap, sal } = await loadMonthData(supabase, selectedMonth)
     setApptRevenue(aRev)
     setWalkinRevenue(wRev)
+    setMembershipRevenue(mRev)
     setApptDiscounts(aDisc)
     setWalkinDiscounts(wDisc)
     setOtherExpenses(expMap)
@@ -141,18 +148,19 @@ export default function PnLPage() {
     const months = Array.from({ length: 6 }, (_, i) => subMonths(selectedMonth, 5 - i))
     const trend: TrendMonth[] = await Promise.all(months.map(async m => {
       const d = await loadMonthData(supabase, m)
+      const rev = Math.round(d.netRev)
       return {
         month: format(m, 'MMM yy'),
-        revenue: Math.round(d.netRev),
+        revenue: rev,
         expenses: Math.round(d.totalExp),
-        profit: Math.round(d.netRev - d.totalExp),
+        profit: Math.round(rev - d.totalExp),
       }
     }))
     setTrendData(trend)
     setLoading(false)
   }
 
-  const grossRevenue = apptRevenue + walkinRevenue
+  const grossRevenue = apptRevenue + walkinRevenue + membershipRevenue
   const totalDiscounts = apptDiscounts + walkinDiscounts
   const netRevenue = grossRevenue - totalDiscounts
   const totalOtherExpenses = Object.values(otherExpenses).reduce((s, v) => s + v, 0)
@@ -205,6 +213,7 @@ export default function PnLPage() {
         body: [
           ['Appointment Revenue', fmt(apptRevenue, currency)],
           ['Walk-In Revenue', fmt(walkinRevenue, currency)],
+          ...(membershipRevenue > 0 ? [['Membership Revenue', fmt(membershipRevenue, currency)]] : []),
           ['Gross Revenue', fmt(grossRevenue, currency)],
           ['Less: Discounts', `(${fmt(totalDiscounts, currency)})`],
           ['Net Revenue', fmt(netRevenue, currency)],
@@ -327,6 +336,7 @@ export default function PnLPage() {
                   {[
                     { label: 'Appointment Revenue', value: apptRevenue, sub: false },
                     { label: 'Walk-In Revenue', value: walkinRevenue, sub: false },
+                    ...(membershipRevenue > 0 ? [{ label: 'Membership Revenue', value: membershipRevenue, sub: false }] : []),
                     { label: 'Gross Revenue', value: grossRevenue, bold: true },
                     { label: 'Less: Discounts', value: totalDiscounts, sub: true },
                     { label: 'Net Revenue', value: netRevenue, bold: true, highlight: true },

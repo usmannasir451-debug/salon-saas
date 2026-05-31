@@ -29,6 +29,8 @@ type ClientSummary = {
   firstVisit: string | null
   favoriteService: string | null
   segment: 'VIP' | 'Regular' | 'New' | 'Inactive'
+  loyaltyBalance: number
+  activeMembership: string | null
 }
 
 const SEGMENT_CONFIG = {
@@ -103,7 +105,7 @@ export default function ClientsPage() {
   async function loadClients() {
     const supabase = createClient()
 
-    const [apptRes, walkRes, clientsRes] = await Promise.all([
+    const [apptRes, walkRes, clientsRes, loyaltyRes, membershipRes] = await Promise.all([
       supabase
         .from('appointments')
         .select('client_name, client_phone, appointment_date, status, services(name, price)')
@@ -118,7 +120,32 @@ export default function ClientsPage() {
         .from('clients')
         .select('name, phone, birthday')
         .eq('user_id', ownerId),
+      supabase
+        .from('loyalty_transactions')
+        .select('client_phone, points, type')
+        .eq('user_id', ownerId),
+      supabase
+        .from('client_memberships')
+        .select('client_phone, membership_plans(name)')
+        .eq('owner_id', ownerId)
+        .eq('status', 'active'),
     ])
+
+    // Build loyalty balance map by phone
+    const loyaltyMap = new Map<string, number>()
+    for (const t of loyaltyRes.data ?? []) {
+      if (!t.client_phone) continue
+      const cur = loyaltyMap.get(t.client_phone) ?? 0
+      loyaltyMap.set(t.client_phone, cur + (t.type === 'earn' ? t.points : -t.points))
+    }
+
+    // Build active membership map by phone (first active plan name)
+    const membershipMap = new Map<string, string>()
+    for (const m of membershipRes.data ?? []) {
+      if (!m.client_phone || membershipMap.has(m.client_phone)) continue
+      const mp = m.membership_plans as { name?: string } | null
+      if (mp?.name) membershipMap.set(m.client_phone, mp.name)
+    }
 
     const map = new Map<string, Omit<ClientSummary, 'segment'>>()
 
@@ -145,6 +172,8 @@ export default function ClientsPage() {
           lastVisit: null,
           firstVisit: null,
           favoriteService: null,
+          loyaltyBalance: 0,
+          activeMembership: null,
         })
       }
       const c = map.get(name)!
@@ -176,6 +205,8 @@ export default function ClientsPage() {
           lastVisit: null,
           firstVisit: null,
           favoriteService: null,
+          loyaltyBalance: 0,
+          activeMembership: null,
         })
       }
       const c = map.get(name)!
@@ -187,13 +218,17 @@ export default function ClientsPage() {
       if (!c.firstVisit || wDate < c.firstVisit) c.firstVisit = wDate
     }
 
-    // Calculate avg bill and segment
+    // Calculate avg bill, segment, loyalty, and membership
     const result: ClientSummary[] = Array.from(map.values()).map((c) => {
       const avgBill = c.completedVisits > 0 ? c.totalSpend / c.completedVisits : 0
+      const loyaltyBalance = c.phone ? Math.max(0, loyaltyMap.get(c.phone) ?? 0) : 0
+      const activeMembership = c.phone ? (membershipMap.get(c.phone) ?? null) : null
       return {
         ...c,
         avgBill,
         segment: getSegment(c),
+        loyaltyBalance,
+        activeMembership,
       }
     })
 
@@ -344,7 +379,7 @@ export default function ClientsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50">
-                  {['Client', 'Segment', 'Visits', 'Total Spend', 'Avg Bill', 'Last Visit', ''].map((h) => (
+                  {['Client', 'Segment', 'Visits', 'Total Spend', 'Avg Bill', 'Loyalty Pts', 'Membership', 'Last Visit', ''].map((h) => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500">{h}</th>
                   ))}
                 </tr>
@@ -389,6 +424,26 @@ export default function ClientsPage() {
                       </td>
                       <td className="px-4 py-3 font-medium text-gray-900">{formatAmount(c.totalSpend)}</td>
                       <td className="px-4 py-3 text-gray-700">{formatAmount(c.avgBill)}</td>
+                      <td className="px-4 py-3">
+                        {c.loyaltyBalance > 0 ? (
+                          <span className="inline-flex items-center gap-1 text-xs text-amber-700">
+                            <Star className="w-3 h-3" />
+                            {c.loyaltyBalance.toLocaleString()}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-300">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {c.activeMembership ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full border bg-purple-50 text-purple-700 border-purple-200 max-w-[120px] truncate">
+                            <Crown className="w-2.5 h-2.5 flex-shrink-0" />
+                            {c.activeMembership}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-300">—</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-gray-500 text-xs">
                         {c.lastVisit ? format(parseISO(c.lastVisit), 'MMM d, yyyy') : '—'}
                       </td>
@@ -419,7 +474,7 @@ export default function ClientsPage() {
                 })}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-4 py-12 text-center">
+                    <td colSpan={9} className="px-4 py-12 text-center">
                       <UserSearch className="w-8 h-8 text-gray-200 mx-auto mb-2" />
                       <p className="text-sm text-gray-400">
                         {clients.length === 0

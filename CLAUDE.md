@@ -74,6 +74,7 @@ NEXT_PUBLIC_ADMIN_EMAIL           # Email address that can access /admin page
 - Customer feedback collection on completed appointments
 - Notes per appointment
 - Invoice/receipt generation (PDF via jsPDF)
+- **Phone auto-lookup in booking dialog**: debounced 500ms — on phone entry, queries appointments + loyalty + client_memberships; shows client name (with "Use Name" button), visit count, loyalty points, and active membership below the input
 
 ### Walk-In POS (Redesigned)
 - Full-screen split-panel POS interface (60% service picker + 40% order panel)
@@ -83,10 +84,16 @@ NEXT_PUBLIC_ADMIN_EMAIL           # Email address that can access /admin page
 - Instant walk-in checkout (no prior booking needed)
 - Multi-service selection per transaction
 - Multiple payment methods
-- Discount support with discount reasons
+- Discount support (collapsed by default, expand on click with Tag icon)
 - Loyalty points redemption at checkout
 - Deal redemption at checkout
 - Floating quick-access button across the dashboard
+- **Membership integration**: On phone lookup, fetches active memberships and packages
+  - Shows amber banner for active membership (plan name, services/balance remaining)
+  - Shows blue banner for active package (sessions remaining)
+  - Per-cart-item "Apply Membership" / "Redeem Package" toggle — zeroes out service price when on
+  - Balance-based memberships: "Use Balance" payment option above total
+  - On order completion: decrements services_remaining, expires memberships/packages at 0, creates membership_transaction records
 
 ### Services
 - Service catalog (name, duration, price)
@@ -110,6 +117,7 @@ NEXT_PUBLIC_ADMIN_EMAIL           # Email address that can access /admin page
 - Dashboard stats: active members count, monthly recurring revenue (MRR), packages sold this month, expiring soon alert
 - Client profile page shows active memberships and packages for that client
 - Module key: `memberships` — disabled by default for existing accounts, admin enables per salon
+- **Phone auto-lookup in Assign Membership/Sell Package dialogs**: As user types phone, queries appointments + loyalty + client_memberships; auto-fills client name, shows visit count, loyalty points, and existing active memberships below the phone input
 
 ### Staff Management
 - Staff directory (name, phone, gender, designation, joining date)
@@ -129,6 +137,8 @@ NEXT_PUBLIC_ADMIN_EMAIL           # Email address that can access /admin page
 - Auto-built from appointments and walk-ins (by phone number)
 - Individual client detail page with full visit history
 - Loyalty points balance per client
+- **Client list**: loyalty points balance column (amber star), active membership badge column (purple Crown) loaded in single parallel query
+- **Client profile**: loyalty points section showing earned / redeemed / balance; memberships and packages with services remaining; all loaded via phone number lookup
 
 ### Loyalty System
 - Points earned on each appointment/walk-in (configurable earn %)
@@ -165,7 +175,11 @@ NEXT_PUBLIC_ADMIN_EMAIL           # Email address that can access /admin page
 
 ### Reports & Analytics
 - **Dashboard**: Real-time KPIs — appointments today, revenue, active clients, staff count, walk-ins
+  - Monthly revenue now includes membership payments (appointment + walk-in + membership_transactions type='payment')
+  - Additional KPI card "Membership Revenue" shown when > 0
 - **P&L Report**: Revenue vs expense breakdown (filterable by month/branch)
+  - Gross revenue = appointment revenue + walk-in revenue + membership revenue
+  - Conditional "Membership Revenue" line item in income table and PDF export
 - **Staff Performance**: Per-staff revenue generated and commission earned
 - **Export**: CSV/PDF export of appointments, clients, staff data
 
@@ -251,6 +265,10 @@ NEXT_PUBLIC_ADMIN_EMAIL           # Email address that can access /admin page
 - **PermissionGuard silent redirect**: On initial page load (e.g., sub-user lands on /dashboard), the guard redirects silently without showing a toast. Toast only fires on subsequent navigations to restricted pages, preventing spurious "Access denied" errors at login.
 - **Busy hours heatmap**: Extended to 8AM–10PM (was 7AM–8PM), now includes walk-in data (via `created_at` timestamp) in addition to appointments. Uses `get_effective_owner_id()` for branch filtering.
 - **Server vs client Supabase**: `lib/supabase/client.ts` for browser, `lib/supabase/server.ts` for server components/actions, `lib/supabase/admin.ts` for privileged operations using SERVICE_ROLE_KEY.
+- **Revenue aggregation**: Dashboard and P&L aggregate from three sources: `appointments.total_amount` + `walk_ins.total` + `membership_transactions.amount` (where type='payment'). Membership revenue shown separately in reports.
+- **Phone as universal identifier**: Phone number is the primary client lookup key across walk-in POS, appointments dialog, memberships assign dialogs, and client profiles. Debounced auto-lookup (500ms) queries client history, loyalty points, and active memberships on phone entry.
+- **Membership redemption in walk-in**: Service-based memberships decrement `services_remaining` JSONB and create a `membership_transactions` record (type='service_redemption'). Balance-based memberships deduct from `client_memberships.balance`. Package redemptions only decrement `client_packages.services_remaining` (no transaction record, since `membership_id` is NOT NULL on membership_transactions).
+- **Discount section collapsed by default**: In walk-in POS, discount and loyalty sections collapsed by default; expand via Tag icon click to keep the UI clean.
 
 ## 8. FOLDER STRUCTURE
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { format, addDays, addMonths, addQuarters, addYears } from 'date-fns'
 import { createClient } from '@/lib/supabase/client'
 import { useUserContext } from '@/components/RoleContext'
@@ -43,6 +43,8 @@ import {
   RefreshCw,
   Calendar,
   Phone,
+  Star,
+  User,
 } from 'lucide-react'
 import type { MembershipPlan, Package as PkgType, ClientMembership, ClientPackage, Service } from '@/lib/types'
 
@@ -171,6 +173,15 @@ export default function MembershipsPage() {
   const [updatingMembershipId, setUpdatingMembershipId] = useState<string | null>(null)
   const [updatingPackageId, setUpdatingPackageId] = useState<string | null>(null)
 
+  // Phone auto-lookup
+  type PhoneInfo = { name: string; totalVisits: number; loyaltyPoints: number; activeMemberships: string[] }
+  const [memberPhoneInfo, setMemberPhoneInfo] = useState<PhoneInfo | null>(null)
+  const [memberPhoneSearching, setMemberPhoneSearching] = useState(false)
+  const [pkgPhoneInfo, setPkgPhoneInfo] = useState<PhoneInfo | null>(null)
+  const [pkgPhoneSearching, setPkgPhoneSearching] = useState(false)
+  const memberPhoneTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pkgPhoneTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   const loadData = useCallback(async () => {
     if (!ownerId) {
       setLoadError('Unable to identify your account. Please refresh the page or log out and back in.')
@@ -296,6 +307,52 @@ export default function MembershipsPage() {
     } finally {
       setSavingPlan(false)
     }
+  }
+
+  async function lookupPhoneInfo(phone: string): Promise<PhoneInfo | null> {
+    if (phone.replace(/\D/g, '').length < 7) return null
+    const supabase = createClient()
+    const [clientRes, loyaltyRes, membershipRes] = await Promise.all([
+      supabase.from('appointments').select('client_name').eq('user_id', ownerId).eq('client_phone', phone).limit(1).maybeSingle(),
+      supabase.from('loyalty_transactions').select('points, type').eq('user_id', ownerId).eq('client_phone', phone),
+      supabase.from('client_memberships').select('membership_plans(name)').eq('owner_id', ownerId).eq('client_phone', phone).eq('status', 'active'),
+    ])
+    if (!clientRes.data) return null
+    const countRes = await supabase.from('appointments').select('id', { count: 'exact', head: true }).eq('user_id', ownerId).eq('client_phone', phone)
+    const pts = (loyaltyRes.data ?? []).reduce((sum, t) => t.type === 'earn' ? sum + t.points : sum - t.points, 0)
+    const activeMems = (membershipRes.data ?? []).map(m => {
+      const mp = m.membership_plans as { name?: string } | null
+      return mp?.name ?? ''
+    }).filter(Boolean)
+    return { name: clientRes.data.client_name, totalVisits: countRes.count ?? 0, loyaltyPoints: Math.max(0, pts), activeMemberships: activeMems }
+  }
+
+  function handleMemberPhoneChange(phone: string) {
+    setAssignMemberForm(f => ({ ...f, client_phone: phone }))
+    setMemberPhoneInfo(null)
+    if (memberPhoneTimer.current) clearTimeout(memberPhoneTimer.current)
+    if (phone.replace(/\D/g, '').length < 7) return
+    setMemberPhoneSearching(true)
+    memberPhoneTimer.current = setTimeout(async () => {
+      const info = await lookupPhoneInfo(phone)
+      setMemberPhoneInfo(info)
+      if (info && !assignMemberForm.client_name) setAssignMemberForm(f => ({ ...f, client_name: info.name }))
+      setMemberPhoneSearching(false)
+    }, 500)
+  }
+
+  function handlePkgPhoneChange(phone: string) {
+    setAssignPkgForm(f => ({ ...f, client_phone: phone }))
+    setPkgPhoneInfo(null)
+    if (pkgPhoneTimer.current) clearTimeout(pkgPhoneTimer.current)
+    if (phone.replace(/\D/g, '').length < 7) return
+    setPkgPhoneSearching(true)
+    pkgPhoneTimer.current = setTimeout(async () => {
+      const info = await lookupPhoneInfo(phone)
+      setPkgPhoneInfo(info)
+      if (info && !assignPkgForm.client_name) setAssignPkgForm(f => ({ ...f, client_name: info.name }))
+      setPkgPhoneSearching(false)
+    }, 500)
   }
 
   async function togglePlan(plan: MembershipPlan) {
@@ -1385,7 +1442,7 @@ export default function MembershipsPage() {
       </Dialog>
 
       {/* ── Assign Membership Dialog ──────────────────────────────────────── */}
-      <Dialog open={assignMemberOpen} onOpenChange={open => { if (!open) setAssignMemberOpen(false) }}>
+      <Dialog open={assignMemberOpen} onOpenChange={open => { if (!open) { setAssignMemberOpen(false); setMemberPhoneInfo(null) } }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -1395,19 +1452,43 @@ export default function MembershipsPage() {
           <form onSubmit={assignMembership} className="space-y-4">
             <div className="space-y-1.5">
               <Label>Client Phone *</Label>
-              <Input
-                value={assignMemberForm.client_phone}
-                onChange={e => setAssignMemberForm(f => ({ ...f, client_phone: e.target.value }))}
-                placeholder="+92 300 0000000"
-                required
-              />
+              <div className="relative">
+                <Phone className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+                <Input
+                  value={assignMemberForm.client_phone}
+                  onChange={e => handleMemberPhoneChange(e.target.value)}
+                  placeholder="+92 300 0000000"
+                  required
+                  className="pl-8"
+                />
+                {memberPhoneSearching && <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 animate-spin" />}
+              </div>
+              {memberPhoneInfo && (
+                <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs space-y-1">
+                  <div className="flex items-center gap-1.5 font-semibold text-blue-800">
+                    <User className="w-3.5 h-3.5" />
+                    {memberPhoneInfo.name}
+                    <span className="text-blue-500 font-normal">· {memberPhoneInfo.totalVisits} visits</span>
+                  </div>
+                  {memberPhoneInfo.loyaltyPoints > 0 && (
+                    <div className="flex items-center gap-1 text-amber-700">
+                      <Star className="w-3 h-3" /> {memberPhoneInfo.loyaltyPoints} loyalty pts
+                    </div>
+                  )}
+                  {memberPhoneInfo.activeMemberships.length > 0 && (
+                    <div className="flex items-center gap-1 text-purple-700">
+                      <Crown className="w-3 h-3" /> Active: {memberPhoneInfo.activeMemberships.join(', ')}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label>Client Name</Label>
               <Input
                 value={assignMemberForm.client_name}
                 onChange={e => setAssignMemberForm(f => ({ ...f, client_name: e.target.value }))}
-                placeholder="Optional"
+                placeholder="Optional — auto-filled from phone lookup"
               />
             </div>
             <div className="space-y-1.5">
@@ -1449,7 +1530,7 @@ export default function MembershipsPage() {
       </Dialog>
 
       {/* ── Assign Package Dialog ─────────────────────────────────────────── */}
-      <Dialog open={assignPkgOpen} onOpenChange={open => { if (!open) setAssignPkgOpen(false) }}>
+      <Dialog open={assignPkgOpen} onOpenChange={open => { if (!open) { setAssignPkgOpen(false); setPkgPhoneInfo(null) } }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -1459,19 +1540,43 @@ export default function MembershipsPage() {
           <form onSubmit={assignPackage} className="space-y-4">
             <div className="space-y-1.5">
               <Label>Client Phone *</Label>
-              <Input
-                value={assignPkgForm.client_phone}
-                onChange={e => setAssignPkgForm(f => ({ ...f, client_phone: e.target.value }))}
-                placeholder="+92 300 0000000"
-                required
-              />
+              <div className="relative">
+                <Phone className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+                <Input
+                  value={assignPkgForm.client_phone}
+                  onChange={e => handlePkgPhoneChange(e.target.value)}
+                  placeholder="+92 300 0000000"
+                  required
+                  className="pl-8"
+                />
+                {pkgPhoneSearching && <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 animate-spin" />}
+              </div>
+              {pkgPhoneInfo && (
+                <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs space-y-1">
+                  <div className="flex items-center gap-1.5 font-semibold text-blue-800">
+                    <User className="w-3.5 h-3.5" />
+                    {pkgPhoneInfo.name}
+                    <span className="text-blue-500 font-normal">· {pkgPhoneInfo.totalVisits} visits</span>
+                  </div>
+                  {pkgPhoneInfo.loyaltyPoints > 0 && (
+                    <div className="flex items-center gap-1 text-amber-700">
+                      <Star className="w-3 h-3" /> {pkgPhoneInfo.loyaltyPoints} loyalty pts
+                    </div>
+                  )}
+                  {pkgPhoneInfo.activeMemberships.length > 0 && (
+                    <div className="flex items-center gap-1 text-purple-700">
+                      <Crown className="w-3 h-3" /> Memberships: {pkgPhoneInfo.activeMemberships.join(', ')}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label>Client Name</Label>
               <Input
                 value={assignPkgForm.client_name}
                 onChange={e => setAssignPkgForm(f => ({ ...f, client_name: e.target.value }))}
-                placeholder="Optional"
+                placeholder="Optional — auto-filled from phone lookup"
               />
             </div>
             <div className="space-y-1.5">
