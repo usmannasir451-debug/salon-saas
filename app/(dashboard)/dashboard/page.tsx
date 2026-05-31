@@ -100,7 +100,8 @@ const DONUT_COLORS = ['#f43f5e', '#ec4899', '#a855f7', '#3b82f6', '#f97316', '#1
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const { role, ownerId } = useUserContext()
+  const { role, ownerId, enabledModules } = useUserContext()
+  const modulesEnabled = (mod: string) => !enabledModules || enabledModules.includes(mod)
   const router = useRouter()
 
   const [allAppointments, setAllAppointments] = useState<AppRow[]>([])
@@ -127,6 +128,7 @@ export default function DashboardPage() {
   const [totalReviews, setTotalReviews] = useState(0)
   const [birthdayClients, setBirthdayClients] = useState<{ name: string; phone: string | null }[]>([])
   const [membershipMonthlyRevenue, setMembershipMonthlyRevenue] = useState(0)
+  const [allMembershipTx, setAllMembershipTx] = useState<{ amount: number; created_at: string }[]>([])
 
   useEffect(() => {
     const timer = setInterval(() => setLiveTime(format(new Date(), 'h:mm a')), 60000)
@@ -160,6 +162,7 @@ export default function DashboardPage() {
       lastMonthApptRes, lastMonthWalkinRes, inventoryRes, reviewRes,
       clientBdayRes, staffBdayRes,
       sixMonthApptRes, sixMonthWalkInRes, sixMonthClientRes,
+      membershipTxRes,
     ] = await Promise.all([
       supabase.from('profiles').select('salon_name, salon_currency').eq('id', ownerId).single(),
       supabase.from('appointments')
@@ -200,6 +203,10 @@ export default function DashboardPage() {
         .select('created_at')
         .eq('user_id', ownerId)
         .gte('created_at', sixMonthsAgo + 'T00:00:00'),
+      // Membership transactions for period stats (wide range covering queryStart)
+      supabase.from('membership_transactions').select('amount, created_at')
+        .eq('owner_id', ownerId).eq('type', 'payment')
+        .gte('created_at', queryStart + 'T00:00:00'),
     ])
 
     setSalonName(profileRes.data?.salon_name ?? '')
@@ -212,12 +219,13 @@ export default function DashboardPage() {
     setSixMonthWalkIns((sixMonthWalkInRes.data as unknown as typeof sixMonthWalkIns) ?? [])
     setSixMonthClients((sixMonthClientRes.data as unknown as typeof sixMonthClients) ?? [])
 
-    // Membership revenue this month
-    const { data: memTxData } = await supabase.from('membership_transactions').select('amount')
-      .eq('owner_id', ownerId).eq('type', 'payment')
-      .gte('created_at', monthStart + 'T00:00:00').lte('created_at', format(endOfMonth(new Date()), 'yyyy-MM-dd') + 'T23:59:59')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const memRev = (memTxData ?? []).reduce((s: number, t: any) => s + Number(t.amount ?? 0), 0)
+    // Membership transactions for period stats
+    const allTx = (membershipTxRes.data ?? []) as { amount: number; created_at: string }[]
+    setAllMembershipTx(allTx)
+    // Monthly revenue from memberships (this calendar month)
+    const memRev = allTx
+      .filter(t => t.created_at >= monthStart + 'T00:00:00' && t.created_at <= format(endOfMonth(new Date()), 'yyyy-MM-dd') + 'T23:59:59')
+      .reduce((s, t) => s + Number(t.amount ?? 0), 0)
     setMembershipMonthlyRevenue(memRev)
 
     // Last month data (stored for branch-aware comparison)
@@ -358,7 +366,27 @@ export default function DashboardPage() {
         ? branchFilteredWalkIns.filter(w => { const d = w.created_at.slice(0, 10); return d >= customFrom && d <= customTo })
         : branchFilteredWalkIns
     const walkinRevenue = periodWalkIns.reduce((sum, w) => sum + Number(w.total ?? 0), 0)
-    const revenue       = apptRevenue + walkinRevenue
+
+    // Membership revenue for the active period
+    const todayStr  = format(new Date(), 'yyyy-MM-dd')
+    const weekStart = format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd')
+    const mthStart  = format(startOfMonth(new Date()), 'yyyy-MM-dd')
+    const membershipPeriodRevenue = allMembershipTx.filter(t => {
+      const d = t.created_at.slice(0, 10)
+      if (activeFilter === 'today')  return d === todayStr
+      if (activeFilter === 'week')   return d >= weekStart
+      if (activeFilter === 'custom' && customFrom && customTo) return d >= customFrom && d <= customTo
+      return d >= mthStart
+    }).reduce((s, t) => s + Number(t.amount ?? 0), 0)
+    const membershipsSold = allMembershipTx.filter(t => {
+      const d = t.created_at.slice(0, 10)
+      if (activeFilter === 'today')  return d === todayStr
+      if (activeFilter === 'week')   return d >= weekStart
+      if (activeFilter === 'custom' && customFrom && customTo) return d >= customFrom && d <= customTo
+      return d >= mthStart
+    }).length
+
+    const revenue       = apptRevenue + walkinRevenue + membershipPeriodRevenue
     const totalClients  = new Set(periodFiltered.map(a => a.client_name)).size
     const walkInCount   = periodWalkIns.length
     return {
@@ -366,12 +394,14 @@ export default function DashboardPage() {
       completed: completed.length,
       walkins:  walkInCount,
       revenue,
+      membershipRevenue: membershipPeriodRevenue,
+      membershipsSold,
       avgBill:  completed.length + walkInCount > 0
         ? Math.round(revenue / (completed.length + walkInCount))
         : 0,
       clients:  totalClients,
     }
-  }, [periodFiltered, activeFilter, todayWalkIns, weekWalkIns, branchFilteredWalkIns, customFrom, customTo])
+  }, [periodFiltered, activeFilter, todayWalkIns, weekWalkIns, branchFilteredWalkIns, customFrom, customTo, allMembershipTx])
 
   // ── Monthly revenue & net profit (branch-filtered expenses) ──────────────
 
@@ -666,7 +696,9 @@ export default function DashboardPage() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Sparkles className="w-5 h-5 text-primary" />
-            <h1 className="text-2xl font-bold text-gray-900">{salonName || 'Dashboard'}</h1>
+            <h1 className="text-2xl font-bold text-gray-900">
+              Welcome, {salonName || 'Dashboard'}! 👋
+            </h1>
           </div>
           <p className="text-gray-500 text-sm">
             {format(new Date(), 'EEEE, MMMM d, yyyy')}
@@ -829,7 +861,7 @@ export default function DashboardPage() {
       )}
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className={`grid grid-cols-2 gap-4 ${modulesEnabled('memberships') ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}`}>
         <Card className="border-gray-100 hover:shadow-md transition-shadow">
           <CardContent className="pt-5 pb-4">
             <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center mb-3">
@@ -838,7 +870,7 @@ export default function DashboardPage() {
             <div className="flex items-start justify-between gap-1">
               <div>
                 <p className="text-xl font-bold text-gray-900 mb-0.5 leading-tight">{formatCurrency(stats.revenue, currency)}</p>
-                <p className="text-xs text-gray-500">Revenue</p>
+                <p className="text-xs text-gray-500">Total Sales</p>
               </div>
               {revenueChangePct !== null && activeFilter === 'month' && (
                 <Badge className={`text-xs flex-shrink-0 ${revenueChangePct >= 0 ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
@@ -868,15 +900,6 @@ export default function DashboardPage() {
         </Card>
         <Card className="border-gray-100 hover:shadow-md transition-shadow">
           <CardContent className="pt-5 pb-4">
-            <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center mb-3">
-              <ReceiptText className="w-5 h-5 text-purple-600" />
-            </div>
-            <p className="text-xl font-bold text-gray-900 mb-0.5 leading-tight">{formatCurrency(stats.avgBill, currency)}</p>
-            <p className="text-xs text-gray-500">Avg Bill</p>
-          </CardContent>
-        </Card>
-        <Card className="border-gray-100 hover:shadow-md transition-shadow">
-          <CardContent className="pt-5 pb-4">
             <div className="w-10 h-10 rounded-xl bg-yellow-50 flex items-center justify-center mb-3">
               <Star className="w-5 h-5 text-yellow-500" />
             </div>
@@ -888,11 +911,25 @@ export default function DashboardPage() {
             {totalReviews > 0 && <p className="text-[10px] text-gray-400 mt-0.5">{totalReviews} review{totalReviews !== 1 ? 's' : ''}</p>}
           </CardContent>
         </Card>
+        {modulesEnabled('memberships') && (
+          <Card className="border-gray-100 hover:shadow-md transition-shadow">
+            <CardContent className="pt-5 pb-4">
+              <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center mb-3">
+                <CreditCard className="w-5 h-5 text-amber-600" />
+              </div>
+              <p className="text-xl font-bold text-gray-900 mb-0.5 leading-tight">{stats.membershipsSold}</p>
+              <p className="text-xs text-gray-500">Memberships Sold</p>
+              {stats.membershipRevenue > 0 && (
+                <p className="text-[10px] text-amber-600 mt-0.5">{formatCurrency(stats.membershipRevenue, currency)}</p>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Monthly KPIs (expenses + profit) */}
       {activeFilter === 'month' && (
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="border-gray-100">
             <CardContent className="pt-5 pb-4">
               <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center mb-3">
@@ -904,28 +941,6 @@ export default function DashboardPage() {
           </Card>
           <Card className="border-gray-100">
             <CardContent className="pt-5 pb-4">
-              <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center mb-3">
-                <TrendingDown className="w-5 h-5 text-red-500" />
-              </div>
-              <p className="text-xl font-bold text-gray-900 leading-tight">{formatCurrency(monthExpenses, currency)}</p>
-              <p className="text-xs text-gray-500">Expenses{activeBranch !== 'all' ? ' (Branch)' : ''}</p>
-            </CardContent>
-          </Card>
-          <Card className={`border-2 ${netProfit >= 0 ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
-            <CardContent className="pt-5 pb-4">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${netProfit >= 0 ? 'bg-green-100' : 'bg-red-100'}`}>
-                {netProfit >= 0
-                  ? <TrendingUp className="w-5 h-5 text-green-700" />
-                  : <TrendingDown className="w-5 h-5 text-red-600" />}
-              </div>
-              <p className={`text-xl font-bold leading-tight ${netProfit >= 0 ? 'text-green-700' : 'text-red-600'}`}>
-                {formatCurrency(Math.abs(netProfit), currency)}
-              </p>
-              <p className="text-xs text-gray-500">Net {netProfit >= 0 ? 'Profit' : 'Loss'}</p>
-            </CardContent>
-          </Card>
-          <Card className="border-gray-100">
-            <CardContent className="pt-5 pb-4">
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
                 <UserCheck className="w-5 h-5 text-primary" />
               </div>
@@ -933,14 +948,29 @@ export default function DashboardPage() {
               <p className="text-xs text-gray-500">Clients Served</p>
             </CardContent>
           </Card>
-          {membershipMonthlyRevenue > 0 && (
+          {modulesEnabled('expenses') && (
             <Card className="border-gray-100">
               <CardContent className="pt-5 pb-4">
-                <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center mb-3">
-                  <CreditCard className="w-5 h-5 text-amber-600" />
+                <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center mb-3">
+                  <TrendingDown className="w-5 h-5 text-red-500" />
                 </div>
-                <p className="text-xl font-bold text-gray-900 leading-tight">{formatCurrency(membershipMonthlyRevenue, currency)}</p>
-                <p className="text-xs text-gray-500">Membership Revenue</p>
+                <p className="text-xl font-bold text-gray-900 leading-tight">{formatCurrency(monthExpenses, currency)}</p>
+                <p className="text-xs text-gray-500">Expenses{activeBranch !== 'all' ? ' (Branch)' : ''}</p>
+              </CardContent>
+            </Card>
+          )}
+          {modulesEnabled('expenses') && (
+            <Card className={`border-2 ${netProfit >= 0 ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
+              <CardContent className="pt-5 pb-4">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${netProfit >= 0 ? 'bg-green-100' : 'bg-red-100'}`}>
+                  {netProfit >= 0
+                    ? <TrendingUp className="w-5 h-5 text-green-700" />
+                    : <TrendingDown className="w-5 h-5 text-red-600" />}
+                </div>
+                <p className={`text-xl font-bold leading-tight ${netProfit >= 0 ? 'text-green-700' : 'text-red-600'}`}>
+                  {formatCurrency(Math.abs(netProfit), currency)}
+                </p>
+                <p className="text-xs text-gray-500">Net {netProfit >= 0 ? 'Profit' : 'Loss'}</p>
               </CardContent>
             </Card>
           )}
@@ -948,7 +978,7 @@ export default function DashboardPage() {
       )}
 
       {/* Revenue Trend — 6 months (Line Chart) */}
-      <Card className="border-gray-100">
+      {modulesEnabled('reports') && <Card className="border-gray-100">
         <CardHeader className="pb-2 border-b border-gray-50">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base flex items-center gap-2">
@@ -979,10 +1009,10 @@ export default function DashboardPage() {
             </ResponsiveContainer>
           )}
         </CardContent>
-      </Card>
+      </Card>}
 
       {/* Revenue Chart (last 7 days) */}
-      <Card className="border-gray-100">
+      {modulesEnabled('reports') && <Card className="border-gray-100">
         <CardHeader className="pb-2 border-b border-gray-50">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">Revenue — Last 7 Days</CardTitle>
@@ -1010,7 +1040,7 @@ export default function DashboardPage() {
             </ResponsiveContainer>
           )}
         </CardContent>
-      </Card>
+      </Card>}
 
       {/* Payment Method Donut + Service Popularity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

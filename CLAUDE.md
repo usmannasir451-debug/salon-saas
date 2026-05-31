@@ -269,6 +269,13 @@ NEXT_PUBLIC_ADMIN_EMAIL           # Email address that can access /admin page
 - **Phone as universal identifier**: Phone number is the primary client lookup key across walk-in POS, appointments dialog, memberships assign dialogs, and client profiles. Debounced auto-lookup (500ms) queries client history, loyalty points, and active memberships on phone entry.
 - **Membership redemption in walk-in**: Service-based memberships decrement `services_remaining` JSONB and create a `membership_transactions` record (type='service_redemption'). Balance-based memberships deduct from `client_memberships.balance`. Package redemptions only decrement `client_packages.services_remaining` (no transaction record, since `membership_id` is NOT NULL on membership_transactions).
 - **Discount section collapsed by default**: In walk-in POS, discount and loyalty sections collapsed by default; expand via Tag icon click to keep the UI clean.
+- **Dashboard KPI tiles**: Dashboard shows "Total Sales" (appt + walkin + membership revenue for the period), "Appointments" count, "Walk-Ins" count, "Avg Rating", and "Memberships Sold" (count + revenue, only if memberships module enabled). All tiles respect the active period filter (Today/Week/Month/Custom). Expenses and net profit tiles only shown if `expenses` module enabled. Revenue charts only shown if `reports` module enabled.
+- **Dashboard welcome message**: Header shows "Welcome, [Salon Name]! 👋" with current date and live time.
+- **Service quantity in walk-in POS**: Walk-in cart uses `serviceQuantities: Record<string, number>` instead of a flat array of IDs. The `+` button on service cards increments quantity; cart shows quantity controls (+ / - buttons per item). Min quantity is 1 (X button removes entirely). `selectedServiceIds` is a derived useMemo that expands quantities into a flat list for DB insertion.
+- **Branch mandatory (walk-in)**: Walk-in POS fetches branches; shows branch selector when salon has >1 branch; blocks order completion without branch selection; auto-selects silently when only 1 branch.
+- **Branch mandatory (appointments)**: Appointments form validates branch_id when salon has >1 branch; auto-assigns single branch on openCreate.
+- **walk_ins.branch_id**: Walk-in POS now saves branch_id on every transaction (was previously not sent).
+- **Landing page**: Completely revamped to light-themed design (white/rose) matching Linear/Stripe aesthetic. Sections: Navbar, Hero (with dashboard mockup), Social proof marquee, Features (interactive tabs), How It Works, Feature Checklist, Pricing, Testimonials, CTA banner, Footer, Demo Request Modal. No dark theme on landing page.
 
 ## 8. FOLDER STRUCTURE
 

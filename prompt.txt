@@ -1,146 +1,195 @@
-You are an expert SaaS developer working on "Snipforce". Make these improvements carefully. Review entire codebase before implementing. Run npm run build to confirm zero errors before finishing.
+You are an expert SaaS developer and UI/UX designer working on "Snipforce". Make these improvements carefully. Review entire codebase before implementing. Run npm run build to confirm zero errors before finishing.
 
-PART 1 - MEMBERSHIP INTEGRATION IN WALK-IN POS
+PART 1 - DASHBOARD IMPROVEMENTS
 
-When client phone number is entered in walk-in POS:
-- Query client_memberships and client_packages for that phone number
-- If active membership found: show a prominent banner in right panel
-  * "Active Membership: [Plan Name] - X services remaining"
-  * For service-based: show which services are included and how many remaining
-  * For balance-based: show current balance available
-- If active package found: show package banner with services remaining
-- When a service is added to cart that is covered by membership/package:
-  * Show "Apply Membership" or "Redeem Package" toggle button on that cart item
-  * If toggled on: price becomes 0 or discounted based on membership discount_percentage
-  * Deduct from services_remaining when order is completed
-- For balance-based membership: show "Use Balance" option in payment section
-  * Input: how much balance to use (max = available balance)
-  * Deduct from client_memberships.balance on completion
+TILE RESTRUCTURE:
+- Remove separate "Walk-in Revenue" and "Appointment Revenue" tiles
+- Add ONE "Total Sales" tile showing: appointments + walk-ins + membership payments combined
+- Keep separate count tiles: "Appointments" (count only, no revenue) and "Walk-Ins" (count only, no revenue)
+- Add "Memberships Sold" tile (count + revenue) - only show if memberships module is enabled for this salon
+- All tiles respect Today/This Week/This Month/Custom Range filter
 
-ON ORDER COMPLETION WITH MEMBERSHIP/PACKAGE REDEMPTION:
-- Update client_memberships.services_remaining (decrement redeemed services)
-- Update client_memberships.balance (deduct used balance)
-- Create membership_transactions record: type='service_redemption', amount=value_of_service
-- If services_remaining reaches 0 for all services: update status to 'expired'
-- Membership redemption should appear in sales reports as revenue (use full service price for reporting)
+MODULE-BASED DASHBOARD:
+- Check enabled_modules from RoleContext
+- If memberships module disabled: hide memberships tile completely
+- If expenses module disabled: hide expenses/net profit tile
+- If reports module disabled: hide revenue chart
+- Dashboard adapts to what modules the salon has access to
 
-PART 2 - MEMBERSHIP SALES IN REPORTS AND DASHBOARD
+WELCOME MESSAGE:
+- Add personalized welcome at top of dashboard
+- "Welcome, [Salon Name]! 👋" in large friendly text
+- Show current date below: "Saturday, May 31, 2026"
+- Show live time updating every minute: "3:45 PM"
 
-When membership is purchased (assigned to client):
-- Record in membership_transactions: type='payment', amount=plan.price
-- This should count as revenue in:
-  * Dashboard total revenue
-  * Sales report
-  * P&L income section
-- Add "Membership Revenue" as a separate line in reports
-- Reports breakdown should show:
-  * Appointment Revenue
-  * Walk-in Revenue  
-  * Membership Revenue
-  * Total Revenue
-- Dashboard KPI card: show membership revenue this month
+BRANCH SELECTION - MAKE MANDATORY:
+- Appointments: branch field must be required (not optional) - show validation error if not selected
+- Walk-in POS: branch field must be required - cannot complete order without branch selection
+- Expenses: branch field must be required when adding expense
+- Membership sales: branch field must be required when assigning membership or selling package
+- Only show branch selector if salon has more than 1 branch (single branch salons: auto-select their only branch silently)
+- For single branch salons: automatically assign the only branch_id on save - no UI shown
 
-PART 3 - WALK-IN POS UX IMPROVEMENTS
+BRANCH REVENUE FIX:
+- Root cause: records with null branch_id are counted in "All Branches" but not in individual branches causing mismatch
+- Fix: All Branches total = sum of ALL records for this owner regardless of branch_id
+- Individual branch = sum of records WHERE branch_id = selected branch
+- Records with null branch_id: appear in "All Branches" only
+- Add a warning banner on dashboard if null branch_id records exist: "X records have no branch assigned. Please review."
 
-Layout improvements for cleaner single-screen experience:
+SERVICE QUANTITY IN CART:
+- Walk-in POS: when same service added multiple times OR when + button clicked:
+  * Show quantity selector on cart item: "2 x Haircut - [price x 2]"
+  * + and - buttons on each cart item
+  * Minimum quantity: 1 (cannot go below, remove with x button)
+  * Total updates automatically
+- Appointments: same quantity support for services
 
-LEFT PANEL:
-- Services/deals grid: use smaller cards (compact mode)
-  * Show: service name (truncated if long), price, small + button
-  * 2-3 columns on desktop, 2 on mobile
-  * Reduce padding - make cards more compact
-  * Category filter tabs: scrollable horizontal tabs, not wrapping
-  * Search bar: smaller, inline with category tabs
-- Reduce font sizes throughout left panel by one size
-- Limit left panel height to viewport - internal scroll only for service grid
+PART 2 - REPORTING AND NUMBERS ACCURACY
 
-RIGHT PANEL (Order Summary):
-- Make entire right panel fixed height = viewport height minus header
-- Internal scroll for order items only (not the whole panel)
-- Payment buttons: 2x2 grid instead of vertical stack to save space
-- Compact discount and loyalty sections - collapsed by default, expand on click
-- Total amount: always visible at bottom, sticky
-- "Complete & Save" button: always visible, not scrolled out of view
-- Font sizes: slightly smaller throughout right panel
+Review all revenue calculations:
+- Total revenue = appointments.total_amount + walk_ins.total + membership_transactions.amount (type=payment)
+- Branch revenue = same but filtered by branch_id
+- Make sure no double counting anywhere
+- P&L report: add Membership Revenue as separate income line
+- Reports page: Sales report should show breakdown by source (Appointments/Walk-ins/Memberships)
+- Expenses report: show branch breakdown correctly
+- All CSV exports include branch column
 
-OVERALL:
-- No full page scroll - everything fits in viewport
-- Left panel scrolls internally for services
-- Right panel scrolls internally for order items
-- Header row (client phone, staff) stays fixed at top of left panel
+PART 3 - LANDING PAGE COMPLETE REVAMP
 
-PART 4 - PHONE NUMBER AS UNIVERSAL UNIQUE IDENTIFIER
+Replace the entire landing page with a bright, modern, premium design:
 
-Make phone number the universal client identifier across the entire app:
+DESIGN THEME:
+- WHITE/LIGHT background (not dark) - matching the product's light UI
+- Primary color: rose/pink (#e11d48) for accents, buttons, highlights
+- Clean, airy, premium feel - like Linear, Vercel, or Stripe website
+- Subtle light gray backgrounds for sections (#f8fafc, #f1f5f9)
+- Sharp shadows and depth
+- Professional typography - Inter font, large bold headings
+- Animations: smooth, subtle, professional
 
-WALK-IN: Already has phone lookup - ensure it works perfectly
-APPOINTMENTS: When adding appointment, phone field should auto-lookup client name
-- As user types phone: debounced search in clients table
-- If match found: auto-fill client name field, show loyalty points, show active membership
-- If no match: allow creating new client with that phone
+SECTION 1 - NAVBAR:
+- White background with subtle border bottom
+- Snipforce logo (scissors icon + text)
+- Nav links: Features, How It Works, Pricing
+- "Login" button (rose filled)
+- Sticky with subtle shadow on scroll
 
-MEMBERSHIPS PAGE - Assign membership/package:
-- Phone number field: auto-lookup and show client name
-- Show existing memberships for that phone
-- Prevent duplicate active memberships for same plan
+SECTION 2 - HERO:
+- Clean white background
+- Large headline (black): "The Complete Management Platform for Modern Salons"
+- Subheadline (gray): "Appointments, walk-ins, staff, inventory, payroll and financials — beautifully designed and effortlessly simple."
+- Two CTA buttons: "Request a Demo" (rose filled) and "See Features →" (outlined)
+- Right side: realistic browser mockup showing actual Snipforce dashboard
+  * Light themed browser chrome
+  * Show dashboard with KPI cards, charts, sidebar
+  * Subtle floating animation
+- Below hero: logos/badges row - "Trusted by salons across Pakistan, UAE, Saudi Arabia"
+- Animated stat counters: "500+ Salons" "99.9% Uptime" "24/7 Support"
 
-EVERYWHERE PHONE IS ENTERED:
-- Consistent UX: type phone → see client info appear below input
-- Show: client name, total visits, loyalty points balance, active memberships
+SECTION 3 - SOCIAL PROOF BANNER:
+- Light gray background
+- "Join hundreds of salons already using Snipforce"
+- Scrolling marquee of salon-type names (fade in/out at edges)
 
-CLIENT CREATION:
-- Enforce unique phone number at UI level (check before saving)
-- If phone exists: offer to update existing client or view their profile
-- Backend: unique constraint already exists - handle the error gracefully with clear message
+SECTION 4 - FEATURES (Interactive):
+- White background
+- Headline: "Everything your salon needs"
+- Left side: vertical list of feature names (clickable tabs)
+- Right side: shows feature description + mockup when tab selected
+- Features list:
+  * Smart Appointments - calendar view, staff scheduling
+  * Walk-In POS - instant checkout, multiple payment methods
+  * Staff Management - performance, attendance, payroll
+  * Client Loyalty - points system, membership plans
+  * Inventory Control - stock tracking, low stock alerts
+  * Financial Reports - P&L, expense tracking, revenue breakdown
+  * Multi-Branch - manage all locations from one dashboard
+  * Role-Based Access - control what each team member sees
+- Smooth transition animation between features
+- Right side mockup changes based on selected feature
 
-PART 5 - CLIENT PROFILE PAGE IMPROVEMENTS
+SECTION 5 - HOW IT WORKS:
+- Light gray background
+- 3 steps in horizontal layout with connecting line:
+  1. "We set up your account" - icon, description
+  2. "Add your team and services" - icon, description  
+  3. "Start growing your business" - icon, description
+- Clean icons, not too decorative
 
-Add to client detail page:
-- Loyalty Points Balance: prominent card showing current points balance in currency value
-  * How many points earned total
-  * How many redeemed
-  * Current balance
-  * Points expiry date if set
-- Active Memberships section (already partially done - ensure it shows correctly):
-  * Plan name, status, services remaining, next billing date
-  * Quick action: pause/cancel membership
-- Active Packages section:
-  * Package name, services remaining, expiry date
-- All of above should load correctly using phone number as identifier
+SECTION 6 - FEATURE CHECKLIST:
+- White background
+- Headline: "Everything included, no hidden extras"
+- Two column grid of features with rose checkmarks
+- Remove "Demo request system" from list
+- Keep only real product features:
+  * Appointment booking & calendar
+  * Walk-in POS system
+  * Staff management & attendance
+  * Client profiles & loyalty points
+  * Membership & package plans
+  * Inventory management
+  * Expense tracking
+  * Payroll & commissions
+  * Profit & Loss reports
+  * Multi-branch support
+  * Role-based team access
+  * White-label branding
+  * Dark & light mode
+  * Mobile responsive
+  * PDF invoices & reports
 
-CLIENT LIST PAGE:
-- Add loyalty points column showing current balance
-- Add membership status column (Active Member badge if they have active membership)
-- These should be computed from loyalty_transactions and client_memberships tables
+SECTION 7 - PRICING:
+- Light gray background
+- Headline: "Simple, transparent pricing"
+- 3 cards (white, clean, sharp shadow):
+  * Starter $49/month: 1 Branch, Up to 10 Staff
+  * Growth $100/month (highlighted with rose border): Up to 3 Branches, Up to 30 Staff
+  * Enterprise $200/month: Unlimited Branches, Unlimited Staff
+- Each card: feature list with checkmarks, "Get Started" button
+- All CTAs open demo request modal
 
-PART 6 - ARCHITECTURE REVIEW AND ALIGNMENT
+SECTION 8 - TESTIMONIALS:
+- White background
+- 3 clean cards with quote, name, salon name, star rating
+- Realistic testimonials
 
-Review these specific areas:
+SECTION 9 - CTA BANNER:
+- Rose gradient background
+- "Ready to transform your salon?"
+- "Request a Demo" button (white text)
 
-1. OWNER_ID CONSISTENCY
-- Every table query must use get_effective_owner_id() pattern
-- Sub-users must see owner's data for all new tables (membership_plans, client_memberships, etc.)
-- Verify RLS policies on all 5 new membership tables use get_effective_owner_id()
+SECTION 10 - FOOTER:
+- Dark footer (#0f172a)
+- Logo, links, copyright
+- "Powered by Snipforce"
 
-2. PHONE NUMBER DEDUPLICATION
-- clients table: ensure unique constraint on (owner_id, phone)
-- client_memberships: queries by phone should work correctly
-- loyalty_transactions: queries by phone should work correctly
-- Walk-in client lookup: consistent behavior everywhere
+DEMO REQUEST MODAL:
+- Triggered by all CTA buttons
+- Clean white modal
+- Fields: Full Name, Phone, Salon Name, Number of Branches, City
+- Submit saves to leads table
+- Success message
 
-3. REVENUE TRACKING
-- All revenue sources stored with total_amount at time of transaction
-- Membership payments stored in membership_transactions
-- Dashboard aggregates from: appointments.total_amount + walk_ins.total + membership_transactions.amount (type=payment)
+ANIMATIONS:
+- Hero browser mockup: subtle float
+- Stats: count up on scroll
+- Sections: fade in from bottom on scroll
+- Feature tabs: smooth slide transition
+- Navbar: shadow on scroll
+- All animations subtle and professional - not overdone
 
-4. DATE-FNS IMPORTS
-- Ensure date-fns is imported correctly in all files using it
-- Use format, addDays, addMonths, addYears consistently
+TECHNICAL:
+- Replace app/page.tsx entirely
+- Pure Next.js + Tailwind CSS
+- Mobile fully responsive
+- Fast loading
+- Keep existing demo form Supabase submission logic
 
 TECHNICAL REQUIREMENTS:
-- Run npm run build to confirm zero TypeScript errors
-- Update CLAUDE.md with all changes
-- Mobile responsive throughout
-- Dark mode compatible
-- No breaking changes to existing features
-- Generate SQL migration if any new columns/tables needed
+- Generate SQL migration if any new columns needed (branch_id on membership tables etc)
+- Run npm run build - zero TypeScript errors
+- Update CLAUDE.md
+- Mobile responsive
+- Dark mode compatible for dashboard (landing page is light only)

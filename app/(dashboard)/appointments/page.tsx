@@ -281,7 +281,8 @@ export default function AppointmentsPage() {
 
   function openCreate() {
     setEditingId(null)
-    setForm({ ...emptyForm, appointment_date: filterDate })
+    const autoBranch = branches.length === 1 ? branches[0].id : ''
+    setForm({ ...emptyForm, appointment_date: filterDate, branch_id: autoBranch })
     setPhoneClientInfo(null)
     setDialogOpen(true)
   }
@@ -312,6 +313,14 @@ export default function AppointmentsPage() {
     if (!form.client_name.trim() || !form.appointment_date || !form.appointment_time) {
       toast.error('Please fill required fields')
       return
+    }
+    if (branches.length > 1 && !form.branch_id) {
+      toast.error('Please select a branch')
+      return
+    }
+    // Auto-assign single branch
+    if (branches.length === 1 && !form.branch_id) {
+      setForm(f => ({ ...f, branch_id: branches[0].id }))
     }
     setSaving(true)
     const supabase = createClient()

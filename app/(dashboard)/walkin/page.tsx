@@ -6,14 +6,14 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { useUserContext } from '@/components/RoleContext'
-import type { DiscountType, DiscountReason, PaymentMethod, WalkIn, Service, StaffMember, ClientMembership, ClientPackage } from '@/lib/types'
+import type { DiscountType, DiscountReason, PaymentMethod, WalkIn, Service, StaffMember, ClientMembership, ClientPackage, Branch } from '@/lib/types'
 import FeedbackModal from '@/components/FeedbackModal'
 import InvoiceModal, { type InvoiceData } from '@/components/InvoiceModal'
 import {
   Zap, Loader2, X, Banknote, CreditCard, User, Phone, Search,
   Star, ChevronDown, ChevronUp, CheckCircle2, Receipt, Printer,
   MessageSquare, ShoppingCart, Trash2, Package, Clock, History, LayoutGrid, List,
-  Crown, Tag,
+  Crown, Tag, Building2, Plus, Minus,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -149,6 +149,7 @@ export default function WalkInPage() {
   // Data
   const [services, setServices] = useState<ServiceItem[]>([])
   const [staffList, setStaffList] = useState<StaffItem[]>([])
+  const [branches, setBranches] = useState<Branch[]>([])
   const [deals, setDeals] = useState<DealItem[]>([])
   const [paymentMethodConfig, setPaymentMethodConfig] = useState<PaymentMethodConfig[]>(DEFAULT_PAYMENT_METHODS)
   const [currency, setCurrency] = useState('USD')
@@ -163,7 +164,9 @@ export default function WalkInPage() {
   const [clientPhone, setClientPhone] = useState('')
   const [clientName, setClientName] = useState('')
   const [staffId, setStaffId] = useState('')
-  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([])
+  const [branchId, setBranchId] = useState('')
+  // serviceQuantities: { [serviceId]: quantity }
+  const [serviceQuantities, setServiceQuantities] = useState<Record<string, number>>({})
   const [selectedDealId, setSelectedDealId] = useState('')
   const [discountType, setDiscountType] = useState<DiscountType>('percentage')
   const [discountValue, setDiscountValue] = useState('')
@@ -220,14 +223,19 @@ export default function WalkInPage() {
 
   async function loadData() {
     const supabase = createClient()
-    const [svcRes, staffRes, profileRes, dealsRes] = await Promise.all([
+    const [svcRes, staffRes, profileRes, dealsRes, branchRes] = await Promise.all([
       supabase.from('services').select('id, name, price, duration').eq('user_id', ownerId).order('name'),
       supabase.from('staff').select('id, name').eq('user_id', ownerId).eq('is_active', true).order('name'),
       supabase.from('profiles').select('salon_currency, salon_name, salon_address, tax_percentage, loyalty_enabled, loyalty_earn_pct, payment_methods').eq('id', ownerId).single(),
       supabase.from('deals').select('id, name, description, price, is_active, deal_services(services(id, name, price, duration))').eq('user_id', ownerId).eq('is_active', true).order('name'),
+      supabase.from('branches').select('*').eq('user_id', ownerId).order('name'),
     ])
     setServices((svcRes.data ?? []) as ServiceItem[])
     setStaffList((staffRes.data ?? []) as StaffItem[])
+    const branchList = (branchRes.data ?? []) as Branch[]
+    setBranches(branchList)
+    // Auto-select if only one branch
+    if (branchList.length === 1) setBranchId(branchList[0].id)
     setCurrency(profileRes.data?.salon_currency ?? 'PKR')
     setSalonName(profileRes.data?.salon_name ?? '')
     setSalonAddress(profileRes.data?.salon_address ?? '')
@@ -276,14 +284,40 @@ export default function WalkInPage() {
     setLookingUp(false)
   }, [ownerId, clientName])
 
-  function toggleService(id: string) {
-    setSelectedServiceIds(prev => {
-      if (prev.includes(id)) {
-        setMembershipRedemptions(m => { const n = { ...m }; delete n[id]; return n })
-        setPackageRedemptions(p => { const n = { ...p }; delete n[id]; return n })
-        return prev.filter(sid => sid !== id)
+  function addService(id: string) {
+    setServiceQuantities(prev => ({ ...prev, [id]: (prev[id] ?? 0) + 1 }))
+  }
+
+  function removeService(id: string) {
+    setServiceQuantities(prev => {
+      const n = { ...prev }
+      if (!n[id] || n[id] <= 1) {
+        delete n[id]
+        setMembershipRedemptions(m => { const nm = { ...m }; delete nm[id]; return nm })
+        setPackageRedemptions(p => { const np = { ...p }; delete np[id]; return np })
+      } else {
+        n[id] = n[id] - 1
       }
-      return [...prev, id]
+      return n
+    })
+  }
+
+  function removeServiceCompletely(id: string) {
+    setServiceQuantities(prev => { const n = { ...prev }; delete n[id]; return n })
+    setMembershipRedemptions(m => { const n = { ...m }; delete n[id]; return n })
+    setPackageRedemptions(p => { const n = { ...p }; delete n[id]; return n })
+  }
+
+  // Keep toggleService for backward compatibility with deal selection
+  function toggleService(id: string) {
+    setServiceQuantities(prev => {
+      if (prev[id]) {
+        const n = { ...prev }; delete n[id]
+        setMembershipRedemptions(m => { const nm = { ...m }; delete nm[id]; return nm })
+        setPackageRedemptions(p => { const np = { ...p }; delete np[id]; return np })
+        return n
+      }
+      return { ...prev, [id]: 1 }
     })
   }
 
@@ -308,12 +342,14 @@ export default function WalkInPage() {
   function selectDeal(id: string) {
     if (selectedDealId === id) {
       setSelectedDealId('')
-      setSelectedServiceIds([])
+      setServiceQuantities({})
     } else {
       const deal = deals.find(d => d.id === id)
       const svcIds = deal?.deal_services.map(ds => ds.services?.id).filter(Boolean) as string[] ?? []
       setSelectedDealId(id)
-      setSelectedServiceIds(svcIds)
+      const qtys: Record<string, number> = {}
+      svcIds.forEach(sid => { qtys[sid] = 1 })
+      setServiceQuantities(qtys)
     }
   }
 
@@ -321,7 +357,8 @@ export default function WalkInPage() {
     setClientPhone('')
     setClientName('')
     setStaffId('')
-    setSelectedServiceIds([])
+    if (branches.length !== 1) setBranchId('')
+    setServiceQuantities({})
     setSelectedDealId('')
     setDiscountType('percentage')
     setDiscountValue('')
@@ -338,10 +375,16 @@ export default function WalkInPage() {
     setShowDiscountSection(false)
   }
 
-  // Computed values
+  // Derived service IDs list (flat, with duplicates for quantity)
+  const selectedServiceIds = useMemo(
+    () => Object.entries(serviceQuantities).flatMap(([id, qty]) => Array(qty).fill(id) as string[]),
+    [serviceQuantities]
+  )
+
+  // Unique services in cart
   const selectedServices = useMemo(
-    () => services.filter(s => selectedServiceIds.includes(s.id)),
-    [services, selectedServiceIds]
+    () => services.filter(s => !!serviceQuantities[s.id]),
+    [services, serviceQuantities]
   )
 
   const selectedDeal = useMemo(
@@ -361,14 +404,16 @@ export default function WalkInPage() {
 
   const subtotal = useMemo(() => {
     if (selectedDeal) return Number(selectedDeal.price) + additionalServices.reduce((s, svc) => {
+      const qty = serviceQuantities[svc.id] ?? 1
       const isRedeemed = !!membershipRedemptions[svc.id] || !!packageRedemptions[svc.id]
-      return s + (isRedeemed ? 0 : Number(svc.price))
+      return s + (isRedeemed ? 0 : Number(svc.price) * qty)
     }, 0)
     return selectedServices.reduce((s, svc) => {
+      const qty = serviceQuantities[svc.id] ?? 1
       const isRedeemed = !!membershipRedemptions[svc.id] || !!packageRedemptions[svc.id]
-      return s + (isRedeemed ? 0 : Number(svc.price))
+      return s + (isRedeemed ? 0 : Number(svc.price) * qty)
     }, 0)
-  }, [selectedDeal, selectedServices, additionalServices, membershipRedemptions, packageRedemptions])
+  }, [selectedDeal, selectedServices, additionalServices, membershipRedemptions, packageRedemptions, serviceQuantities])
 
   const discountAmount = useMemo(() => {
     const val = parseFloat(discountValue) || 0
@@ -398,7 +443,7 @@ export default function WalkInPage() {
     return Math.round((total * loyaltyEarnPct) / 100)
   }, [loyaltyEnabled, total, loyaltyEarnPct])
 
-  const orderItemCount = selectedServiceIds.length + (selectedDealId ? 1 : 0)
+  const orderItemCount = Object.keys(serviceQuantities).length + (selectedDealId ? 1 : 0)
 
   const filteredServices = useMemo(() => {
     const q = searchQuery.toLowerCase()
@@ -411,16 +456,19 @@ export default function WalkInPage() {
   }, [deals, searchQuery])
 
   async function handleComplete(method: PaymentMethod) {
-    if (selectedServiceIds.length === 0 && !selectedDealId) {
+    if (Object.keys(serviceQuantities).length === 0 && !selectedDealId) {
       toast.error('Please select at least one service or deal')
+      return
+    }
+    if (branches.length > 1 && !branchId) {
+      toast.error('Please select a branch before completing the order')
       return
     }
     setSubmitting(true)
     const supabase = createClient()
 
-    const allServiceIds = selectedDealId && selectedDeal
-      ? [...dealServiceIds, ...selectedServiceIds.filter(id => !dealServiceIds.includes(id))]
-      : selectedServiceIds
+    // Flat list with quantities (duplicate IDs for qty > 1)
+    const allServiceIds = selectedServiceIds
 
     const { data, error } = await supabase
       .from('walk_ins')
@@ -430,6 +478,7 @@ export default function WalkInPage() {
         client_phone: clientPhone.trim() || null,
         service_id: allServiceIds[0] || null,
         staff_id: staffId || null,
+        branch_id: branchId || null,
         payment_method: method,
         subtotal,
         discount_type: discountValue ? discountType : null,
@@ -647,6 +696,7 @@ export default function WalkInPage() {
               </div>
             ))}
             {!selectedDeal && selectedServices.map(svc => {
+              const qty = serviceQuantities[svc.id] ?? 1
               const coveringMembership = activeMemberships.find(m =>
                 (m.membership_plans as { type?: string } | undefined)?.type === 'service_based' &&
                 Number(m.services_remaining[svc.id] ?? 0) > 0
@@ -655,6 +705,7 @@ export default function WalkInPage() {
               const redeemedByMembership = membershipRedemptions[svc.id]
               const redeemedByPkg = packageRedemptions[svc.id]
               const isRedeemed = !!redeemedByMembership || !!redeemedByPkg
+              const linePrice = Number(svc.price) * qty
               return (
                 <div key={svc.id} className="p-3 rounded-xl bg-gray-50 border border-gray-100 space-y-1.5">
                   <div className="flex items-center justify-between">
@@ -667,14 +718,27 @@ export default function WalkInPage() {
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       {isRedeemed ? (
-                        <span className="text-xs text-gray-400 line-through">{formatCurrency(Number(svc.price), currency)}</span>
+                        <span className="text-xs text-gray-400 line-through">{formatCurrency(linePrice, currency)}</span>
                       ) : (
-                        <span className="text-sm font-bold text-primary">{formatCurrency(Number(svc.price), currency)}</span>
+                        <span className="text-sm font-bold text-primary">{formatCurrency(linePrice, currency)}</span>
                       )}
-                      <button onClick={() => toggleService(svc.id)} className="text-gray-400 hover:text-red-500 p-0.5">
+                      <button onClick={() => removeServiceCompletely(svc.id)} className="text-gray-400 hover:text-red-500 p-0.5">
                         <X className="w-3.5 h-3.5" />
                       </button>
                     </div>
+                  </div>
+                  {/* Quantity controls */}
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={() => removeService(svc.id)}
+                      className="w-6 h-6 rounded-full border border-gray-200 bg-white flex items-center justify-center hover:bg-red-50 hover:border-red-300 transition-colors">
+                      <Minus className="w-3 h-3 text-gray-500" />
+                    </button>
+                    <span className="text-sm font-bold text-gray-800 min-w-[20px] text-center">{qty}</span>
+                    <button type="button" onClick={() => addService(svc.id)}
+                      className="w-6 h-6 rounded-full border border-gray-200 bg-white flex items-center justify-center hover:bg-primary/10 hover:border-primary/40 transition-colors">
+                      <Plus className="w-3 h-3 text-gray-500" />
+                    </button>
+                    <span className="text-xs text-gray-400 ml-1">× {formatCurrency(Number(svc.price), currency)} each</span>
                   </div>
                   {(coveringMembership || coveringPkg) && (
                     <div className="flex gap-1 flex-wrap">
@@ -1135,18 +1199,34 @@ export default function WalkInPage() {
                 </div>
               )
             })}
-            {/* Staff select */}
-            <Select value={staffId || 'none'} onValueChange={(v) => setStaffId(v === 'none' ? '' : (v ?? ''))}>
-              <SelectTrigger className="h-9 text-sm">
-                <SelectValue placeholder="Assign staff (optional)" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">No staff</SelectItem>
-                {staffList.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {/* Staff + Branch row */}
+            <div className="grid grid-cols-2 gap-2">
+              <Select value={staffId || 'none'} onValueChange={(v) => setStaffId(v === 'none' ? '' : (v ?? ''))}>
+                <SelectTrigger className="h-9 text-sm">
+                  <SelectValue placeholder="Assign staff" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No staff</SelectItem>
+                  {staffList.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {branches.length > 1 && (
+                <Select value={branchId || 'none'} onValueChange={(v) => setBranchId(v === 'none' ? '' : (v ?? ''))}>
+                  <SelectTrigger className={cn('h-9 text-sm', !branchId ? 'border-amber-300 text-amber-700' : '')}>
+                    <Building2 className="w-3.5 h-3.5 text-gray-400 mr-1" />
+                    <SelectValue placeholder="Branch *" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Select branch</SelectItem>
+                    {branches.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
           </div>
 
           {/* Search + Tab filters */}
@@ -1245,31 +1325,27 @@ export default function WalkInPage() {
                 ) : serviceViewMode === 'list' ? (
                   <div className="space-y-1">
                     {filteredServices.map(svc => {
-                      const isSelected = selectedServiceIds.includes(svc.id)
+                      const qty = serviceQuantities[svc.id] ?? 0
                       const isDealService = dealServiceIds.includes(svc.id)
                       return (
                         <div
                           key={svc.id}
                           className={cn(
                             'flex items-center gap-3 px-3 py-2 rounded-lg border transition-all',
-                            isSelected ? 'bg-primary/5 border-primary/40' : 'bg-gray-50 border-gray-100 hover:border-primary/20',
-                            isDealService && !isSelected ? 'opacity-50' : ''
+                            qty > 0 ? 'bg-primary/5 border-primary/40' : 'bg-gray-50 border-gray-100 hover:border-primary/20',
+                            isDealService && qty === 0 ? 'opacity-50' : ''
                           )}
                         >
                           <span className="flex-1 text-sm font-medium text-gray-900 truncate">{svc.name}</span>
+                          {qty > 0 && <span className="text-xs font-bold text-primary flex-shrink-0">×{qty}</span>}
                           <span className="text-xs text-gray-400 flex-shrink-0">{svc.duration} min</span>
                           <span className="text-sm font-bold text-primary flex-shrink-0 w-24 text-right">{formatCurrency(Number(svc.price), currency)}</span>
                           <button
                             type="button"
-                            onClick={() => toggleService(svc.id)}
-                            className={cn(
-                              'w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-sm font-bold transition-colors',
-                              isSelected
-                                ? 'bg-primary text-white'
-                                : 'bg-white border border-gray-200 text-gray-500 hover:border-primary hover:text-primary'
-                            )}
+                            onClick={() => addService(svc.id)}
+                            className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-sm font-bold transition-colors bg-primary text-white hover:bg-primary/80"
                           >
-                            {isSelected ? <X className="w-3.5 h-3.5" /> : '+'}
+                            <Plus className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       )
@@ -1278,32 +1354,32 @@ export default function WalkInPage() {
                 ) : (
                   <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
                     {filteredServices.map(svc => {
-                      const isSelected = selectedServiceIds.includes(svc.id)
+                      const qty = serviceQuantities[svc.id] ?? 0
                       const isDealService = dealServiceIds.includes(svc.id)
                       return (
                         <button
                           key={svc.id}
                           type="button"
-                          onClick={() => toggleService(svc.id)}
+                          onClick={() => addService(svc.id)}
                           className={cn(
                             'flex flex-col items-start p-3 rounded-xl text-left transition-all border relative',
-                            isSelected
+                            qty > 0
                               ? 'bg-primary text-white border-primary shadow-md'
                               : 'bg-gray-50 border-gray-200 hover:border-primary/40 hover:bg-primary/5',
-                            isDealService && !isSelected ? 'opacity-50' : ''
+                            isDealService && qty === 0 ? 'opacity-50' : ''
                           )}
                         >
-                          {isSelected && (
-                            <div className="absolute top-2 right-2">
-                              <CheckCircle2 className="w-4 h-4 text-white" />
+                          {qty > 0 && (
+                            <div className="absolute top-2 right-2 bg-white text-primary rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold shadow-sm">
+                              {qty}
                             </div>
                           )}
-                          <span className={cn('font-semibold text-sm leading-tight truncate w-full pr-5', isSelected ? 'text-white' : 'text-gray-900')}>{svc.name}</span>
-                          <div className={cn('flex items-center gap-1 mt-1', isSelected ? 'text-white/70' : 'text-gray-400')}>
+                          <span className={cn('font-semibold text-sm leading-tight truncate w-full pr-5', qty > 0 ? 'text-white' : 'text-gray-900')}>{svc.name}</span>
+                          <div className={cn('flex items-center gap-1 mt-1', qty > 0 ? 'text-white/70' : 'text-gray-400')}>
                             <Clock className="w-3 h-3" />
                             <span className="text-xs">{svc.duration} min</span>
                           </div>
-                          <span className={cn('text-sm font-bold mt-2', isSelected ? 'text-white' : 'text-primary')}>
+                          <span className={cn('text-sm font-bold mt-2', qty > 0 ? 'text-white' : 'text-primary')}>
                             {formatCurrency(Number(svc.price), currency)}
                           </span>
                         </button>
