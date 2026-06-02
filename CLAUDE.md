@@ -188,12 +188,24 @@ NEXT_PUBLIC_ADMIN_EMAIL           # Email address that can access /admin page
 - Custom inventory categories (per owner)
 
 ### Reports & Analytics
-- **Dashboard**: Real-time KPIs — appointments today, revenue, active clients, staff count, walk-ins
-  - Period filters: Today / This Week / This Month / **Previous Month** (shows month name, e.g., "May 2026") / Custom Range
-  - Custom range does dynamic fetch for correct walk-in and appointment data outside current month
-  - Revenue includes ALL three sources: appointments + walk-ins + membership_transactions
-  - **Discounts Given** KPI tile: sum of discount_amount from appointments + walk-ins for the period
-  - **12-month Sales Trend Line chart** with year selector dropdown (shows appointments + walk-ins + membership revenue per month)
+- **Dashboard**: Fully redesigned analytics dashboard with per-period data fetching
+  - Period filters: Today / This Week / This Month / **Previous Month** (shows month name) / Custom Range
+  - **All data re-fetches on filter change** — each filter switch triggers fresh Supabase queries for that exact date range
+  - **ROW 1 (Key Metrics)**: Total Revenue, Appointments, Walk-Ins, Discounts Given — all with % change vs previous period (green ↑ / red ↓)
+  - **ROW 2 (Financial)**: Net Revenue, Avg Rating, Net Profit/Loss (expenses module) — period-aware
+  - **ROW 3 (Clients)**: Unique Clients, Completed Appointments, Memberships Sold (memberships module)
+  - **ROW 4 (Charts)**: Monthly Sales Trend (12-month line chart with year selector), Sales by Source (donut: appointments/walk-ins/memberships)
+  - **ROW 5 (Charts)**: Top Services (horizontal bar from appointments + walk_in_services), Payment Methods (donut)
+  - **ROW 6 (Operations)**: Staff Performance table (appts, walk-ins, revenue per staff), Busy Hours heatmap (8AM–10PM by day)
+  - **ROW 7 (Alerts)**: Today's Schedule, Low Stock Alerts (inventory module), Expiring Memberships within 7 days (memberships module)
+  - Revenue sources: appointments (status=completed, total_amount) + walk_ins (total) + membership_transactions (type=payment)
+  - Net Revenue = Total Revenue − Discounts − Loyalty Redeemed (from loyalty_transactions type=redeem)
+  - **Two-phase loading**: static data (profile, branches, low stock, trend, today's appts, expiring memberships) loaded once; period data (appts, walk-ins, expenses, membership_tx, loyalty, walk_in_services) loaded on every filter change using `Promise.all`
+  - Service popularity uses `walk_in_services` join table for multi-service walk-ins (not just single-service FK)
+  - Staff performance includes both appointment and walk-in revenue (via staff join on both tables)
+  - Skeleton loading for static phase, per-tile inline loading spinners for period changes
+  - All tiles show friendly empty states with icon + message when no data
+  - Previous period comparison: Today→Yesterday, Week→Last Week, Month→Last Month, PrevMonth→2 Months Ago, Custom→Same duration before range
 - **P&L Report**: Revenue vs expense breakdown (filterable by month/branch)
   - Income section: Gross Revenue → Less: Discounts Given → **Less: Loyalty Redeemed** → Net Revenue
   - Gross revenue = appointment revenue + walk-in revenue + membership revenue
@@ -291,10 +303,11 @@ NEXT_PUBLIC_ADMIN_EMAIL           # Email address that can access /admin page
 - **Phone as universal identifier**: Phone number is the primary client lookup key across walk-in POS, appointments dialog, memberships assign dialogs, and client profiles. Debounced auto-lookup (500ms) queries client history, loyalty points, and active memberships on phone entry.
 - **Membership redemption in walk-in**: Service-based memberships decrement `services_remaining` JSONB and create a `membership_transactions` record (type='service_redemption'). Balance-based memberships deduct from `client_memberships.balance`. Package redemptions only decrement `client_packages.services_remaining` (no transaction record, since `membership_id` is NOT NULL on membership_transactions).
 - **Discount section collapsed by default**: In walk-in POS, discount and loyalty sections collapsed by default; expand via Tag icon click to keep the UI clean.
-- **Dashboard KPI tiles**: Dashboard shows "Total Sales", "Appointments", "Walk-Ins", "Avg Rating", "Discounts Given", and "Memberships Sold" (only if memberships module enabled). All tiles respect the active period filter (Today/This Week/This Month/Previous Month/Custom Range). Expenses and net profit tiles only shown if `expenses` module enabled. Revenue charts only shown if `reports` module enabled.
-- **Dashboard Previous Month filter**: Shows previous calendar month name (e.g., "May 2026") as a button. Stats use `lastMonthAppts` and `lastMonthWalkIns` pre-fetched on load.
-- **Dashboard 12-month trend chart**: Line chart showing monthly revenue (appt + walkin + membership) for each month of the selected year. Year selector dropdown. When year != current year, fetches data dynamically via `loadTrendData(year)`.
-- **Dashboard custom range fix**: When custom date range is selected, `loadCustomRangeData(from, to)` fetches appointments, walk-ins, and membership tx for that exact range, avoiding the month-boundary data gap.
+- **Dashboard two-phase loading**: (1) Static load on mount: profile, branches, low stock, 12-month trend, today's appts, expiring memberships, avg rating, birthday clients. (2) Period load on every filter change: appointments, walk-ins, expenses, membership_tx, walk_in_services, loyalty_redeemed for current + previous period. All queries run in `Promise.all`.
+- **Dashboard period-accurate data**: Every filter (Today/Week/Month/PrevMonth/Custom) triggers a fresh Supabase fetch for that exact date range. Appointments filtered by `appointment_date >= from AND <= to`. Walk-ins and membership_tx filtered by `created_at >= from+T00:00:00 AND <= to+T23:59:59`. No more stale cached month data.
+- **Dashboard % change tiles**: Total Revenue, Appointments, Walk-Ins each show % change vs previous period (green/red arrow). Previous period: Today→Yesterday, Week→LastWeek, Month→LastMonth, PrevMonth→2MonthsAgo, Custom→same duration immediately before.
+- **Dashboard service popularity**: Uses `walk_in_services` join table for accurate multi-service walk-in counts, not single-service FK. Combined with appointment service data.
+- **Dashboard expiring soon**: Queries `client_memberships` (next_billing_date within 7 days) and `client_packages` (expiry_date within 7 days) with status=active.
 - **PermissionGuard MODULE_PATH_MAP**: Only optional modules gated (memberships, expenses, reports, inventory, payroll, attendance). Core modules (appointments, staff, services, clients, calendar, walkin) are NOT in the map — they pass isModuleEnabled regardless of enabled_modules array.
 - **Dashboard welcome message**: Header shows "Welcome, [Salon Name]! 👋" with current date and live time.
 - **Service quantity in walk-in POS**: Walk-in cart uses `serviceQuantities: Record<string, number>` instead of a flat array of IDs. The `+` button on service cards increments quantity; cart shows quantity controls (+ / - buttons per item). Min quantity is 1 (X button removes entirely). `selectedServiceIds` is a derived useMemo that expands quantities into a flat list for DB insertion.

@@ -1,177 +1,133 @@
-You are an expert SaaS developer working on "Snipforce". Make these fixes and improvements carefully. Review entire codebase before implementing. Ensure no data is affected. Run npm run build to confirm zero errors before finishing.
+You are an expert SaaS developer working on "Snipforce". The dashboard is completely broken with filter changes. Do a full review and fix everything. This is critical.
 
-PART 1 - DASHBOARD FIXES
+PART 1 - CRITICAL: FIX ALL DASHBOARD DATA FETCHING
 
-ADD PREVIOUS MONTH TILE:
-- Add "Previous Month" as a filter option alongside Today/This Week/This Month/Custom Range
-- When selected: show all KPIs for the previous calendar month
-- Label should show month name: "April 2026"
+ROOT CAUSE INVESTIGATION:
+- Check how date ranges are being passed to Supabase queries
+- Today filter: should use TODAY's date only (appointment_date = today, DATE(created_at) = today)
+- This Week: Monday to Sunday of current week
+- This Month: first day to last day of current month
+- Previous Month: first day to last day of previous month
+- Custom Range: user selected start and end dates
+- PROBLEM: likely the queries are not re-running when filter changes, or date format is wrong
 
-FIX CUSTOM RANGE AND PREVIOUS MONTH NUMBERS:
-- CRITICAL: Revenue calculation must include ALL three sources for ANY date range:
-  * appointments WHERE appointment_date BETWEEN range.from AND range.to AND total_amount IS NOT NULL
-  * walk_ins WHERE DATE(created_at) BETWEEN range.from AND range.to
-  * membership_transactions WHERE type='payment' AND DATE(created_at) BETWEEN range.from AND range.to
-- Current bug: custom range only shows membership data - fix appointments and walk-ins query to use correct date field
-- Appointment count: use appointment_date field
-- Walk-in count: use DATE(created_at)
-- All counts and revenue must use same date range consistently
-- Test: previous month numbers must match sum of individual days in that month
+FIX ALL QUERIES:
+- Every single query on dashboard must re-run when dateRange changes
+- Use useEffect with dateRange as dependency for ALL data fetching
+- Appointments query: filter by appointment_date >= range.from AND appointment_date <= range.to
+- Walk-ins query: filter by created_at >= range.from + 'T00:00:00' AND created_at <= range.to + 'T23:59:59'
+- Membership transactions: filter by created_at >= range.from + 'T00:00:00' AND created_at <= range.to + 'T23:59:59'
+- Expenses query: filter by date >= range.from AND date <= range.to
+- Make sure date formats match exactly what Supabase expects (YYYY-MM-DD for dates, ISO string for timestamps)
 
-ADD SALES TREND CHART:
-- Monthly sales trend line chart showing last 12 months
-- X axis: months (Jan, Feb, Mar...)
-- Y axis: total revenue
-- Filter: select year (dropdown showing available years)
-- Line chart using recharts
-- Show appointments + walk-ins + membership revenue combined per month
-- Place below existing charts on dashboard
+VERIFY EACH TILE INDEPENDENTLY:
+- Total Sales tile: test with Today, This Week, This Month, Previous Month, Custom Range
+- Appointments count tile: same
+- Walk-ins count tile: same
+- Discounts tile: same
+- Memberships tile: same (if enabled)
+- Each tile must show correct non-zero data when data exists for that period
 
-ADD DISCOUNT TILE:
-- New KPI tile: "Discounts Given" showing total discount amount for selected period
-- Source: appointments.discount_amount + walk_ins.discount_amount
-- Show in same currency format
-- Respect Today/This Week/This Month/Previous Month/Custom Range filter
+PART 2 - FIX SERVICE POPULARITY AND STAFF UTILIZATION
 
-PART 2 - MANDATORY FIELDS FIX
+SERVICE POPULARITY:
+- Query appointment_services and walk_in_services tables for the selected date range
+- Join with services table to get service names
+- Count bookings per service and sum revenue per service
+- Show top 5 services by booking count as horizontal bar chart
+- If no data: show "No services data for this period" message not blank
 
-WALK-IN POS - MAKE STAFF MANDATORY:
-- Staff selection must be required before completing order
-- Show validation message if staff not selected: "Please select a staff member"
-- Block "Complete & Save" button if staff not selected
+STAFF UTILIZATION:
+- Query appointments and walk_ins for selected date range
+- Count total bookings per staff member
+- Calculate utilization: (booked slots / total available slots) as percentage
+- Show as progress bars per staff member
+- If no data: show "No staff data for this period" message
 
-APPOINTMENTS - MAKE ALL FIELDS MANDATORY:
-- Client name: required
-- Client phone: required
-- Staff: required
-- Branch: required (when multiple branches exist, auto-assign for single branch)
-- Show clear validation messages for each missing field
-- Block save if any required field missing
+PART 3 - COMPLETE DASHBOARD REDESIGN
 
-FIX ID/CODE SHOWING IN DROPDOWNS:
-- After selecting Staff in walk-in: show staff NAME not UUID
-- After selecting Branch in walk-in: show branch NAME not UUID
-- After selecting Staff in appointments: show staff NAME not UUID
-- After selecting Branch in appointments: show branch NAME not UUID
-- After selecting Branch in expenses: show branch NAME not UUID
-- Root cause: Select components value prop showing id but SelectValue showing code
-- Fix all Select components to display human-readable label after selection
-- Check ALL Select/dropdown components in: walkin/page.tsx, appointments/page.tsx, expenses/page.tsx, calendar/page.tsx
+Remove these tiles/sections completely:
+- Remove "Pending Appointments" tile
+- Remove any redundant or confusing tiles
+- Remove anything showing raw IDs or codes
 
-EXPENSES - BRANCH MANDATORY:
-- Branch field required when salon has multiple branches
-- Auto-assign single branch for single-branch salons
-- Show validation if branch not selected
-- Fix branch dropdown to show branch NAME not ID after selection
-- Remove "Paid By" field completely
-- Remove "Approval Status" field completely
+ADD THESE ANALYTICS TILES (all respect date range filter):
 
-PART 3 - EXPENSE MODULE IMPROVEMENTS
+ROW 1 - KEY METRICS (4 tiles):
+1. Total Revenue - appointments + walk-ins + memberships, with % change vs previous period
+2. Total Appointments - count with % change vs previous period
+3. Total Walk-Ins - count with % change vs previous period
+4. Discounts Given - total discount amount for period
 
-FIX RECEIPT UPLOAD:
-- Create "expense-receipts" storage bucket in Supabase if it doesn't exist
-- Add this to the SQL migration: create the bucket via SQL or add instructions
-- Actually: add code to create bucket programmatically if it doesn't exist using admin client
-- After successful upload: store receipt_url in expenses table
-- View/Download receipt: add eye icon button on expense row that opens receipt in new tab
-- Download button: download the receipt file
+ROW 2 - FINANCIAL (3 tiles):
+5. Net Revenue - Total Revenue minus Discounts minus Loyalty Redeemed
+6. Total Expenses - sum of expenses for period (only if expenses module enabled)
+7. Net Profit - Net Revenue minus Expenses (only if expenses module enabled)
 
-FIX RECURRING EXPENSES:
-- Check if recurring expense functionality actually works
-- Recurring expense: when marked as recurring, it should auto-create the same expense next month
-- Implement a check on dashboard load: if any recurring expenses are due today or past due, auto-create them
-- Show notification when recurring expenses are auto-created
-- Add "Last Created" date to recurring expense display
+ROW 3 - CLIENTS (2 tiles):
+8. New Clients - clients who visited for first time in this period
+9. Returning Clients - clients who visited before this period
 
-PART 4 - APPOINTMENT MODULE SIMPLIFICATION
+ROW 4 - CHARTS (2 columns):
+10. Revenue Trend - line chart, last 12 months monthly revenue
+11. Sales by Source - donut chart: Appointments vs Walk-ins vs Memberships (revenue breakdown)
 
-REMOVE BILLING FROM APPOINTMENTS:
-- Remove "Mark as Paid" button from appointments completely
-- Remove payment method selection from appointments
-- Remove discount application from appointment modal
-- Appointment statuses: Pending, Confirmed, No Show only
-- Remove "Done/Completed" status from appointments (payment happens via walk-in)
-- Keep: book appointment, confirm, cancel, no-show
-- Update appointment_date filtering and calendar accordingly
+ROW 5 - CHARTS (2 columns):
+12. Service Popularity - horizontal bar chart, top 5 services by bookings
+13. Payment Methods - bar or donut chart showing cash vs card vs other
 
-CONNECT APPOINTMENTS TO WALK-IN:
-- On appointments list: add "Check In / Bill" button for Confirmed appointments
-- Clicking "Check In" opens walk-in POS with client details pre-filled:
-  * Client name auto-filled
-  * Client phone auto-filled
-  * Services from appointment pre-selected in cart
-  * Staff from appointment pre-selected
-  * Branch from appointment pre-selected
-- User can add/remove services in walk-in, apply discounts, process payment
-- After walk-in completed: appointment status automatically updated to "Completed"
-- This creates a proper appointment → walk-in billing flow
+ROW 6 - STAFF AND OPERATIONS:
+14. Staff Performance - table showing each staff: appointments count, walk-ins count, revenue, avg rating
+15. Busy Hours Heatmap - 8AM to 10PM by day of week
 
-ALIGN NO-SHOW STATUS:
-- Appointment statuses must be: pending, confirmed, no_show, cancelled, completed
-- completed = set automatically when linked walk-in is processed
-- Calendar filter for no_show must work correctly
-- Appointment form must have these exact status options
+ROW 7 - ALERTS AND QUICK INFO:
+16. Low Stock Alerts - inventory items below reorder level (if inventory module enabled)
+17. Upcoming Appointments Today - list of today's appointments regardless of date filter
+18. Expiring Memberships - clients whose memberships expire within 7 days (if memberships module enabled)
 
-PART 5 - CALENDAR VIEW IMPROVEMENTS
+WELCOME HEADER:
+- "Welcome, [Salon Name]! 👋"
+- Current date and live time
+- Branch filter (All Branches + individual branches)
+- Date range filter: Today, This Week, This Month, Previous Month, Custom Range
 
-STAFF-WISE CALENDAR VIEW (like Mangomint):
-- Add a new view mode: "Staff View" toggle button alongside Day/Week
-- Staff View (Day): show one column per staff member side by side
-  * Each staff has their own column with their name as header
-  * Appointments shown as cards in respective staff column
-  * Time slots on left Y axis (8AM to 10PM)
-  * Drag and drop to reassign staff (optional, nice to have)
-- Staff View (Week): show staff selector dropdown, view one staff week at a time
-- Existing Day/Week views: show staff name ON the appointment card (currently missing)
-- Appointment card shows: client name, service name, staff name, time
+MODULE-BASED VISIBILITY:
+- Expenses tiles: only if expenses module enabled
+- Memberships tiles: only if memberships module enabled
+- Inventory alerts: only if inventory module enabled
+- Reports charts: only if reports module enabled
 
-PART 6 - TEAM MEMBER BRANCH ASSIGNMENT
+PART 4 - PERCENTAGE CHANGE CALCULATIONS
 
-When creating sub-user:
-- Add "Assigned Branch" field (dropdown of branches)
-- Optional: if not selected, sub-user sees all branches
-- If selected: sub-user only sees data for their assigned branch
-  * Walk-in: branch auto-selected and locked to their branch
-  * Appointments: branch auto-selected and locked
-  * Dashboard: shows only their branch data
-  * Reports: filtered to their branch
-- Store branch_id in salon_members table
-- Add branch_id column to salon_members if not exists
+For each metric tile, show comparison vs previous period:
+- Today selected: compare to yesterday
+- This Week: compare to last week
+- This Month: compare to last month
+- Previous Month: compare to month before that
+- Custom Range: compare to same duration before selected range
+- Show: green arrow up with +X% if improved, red arrow down with -X% if decreased
+- Show "N/A" if no previous period data
 
-FIX SUB-USER PERMISSION NAVIGATION:
-- CRITICAL BUG: clicking Staff, Services, Clients redirects to Appointments
-- Root cause: PermissionGuard firstAllowed logic or ROLE_NAV missing these paths
-- Fix: when sub-user has permission for staff/services/clients, those pages must be accessible
-- Debug PermissionGuard - check if module keys match permission keys exactly
-- Check team/page.tsx ALL_PERMISSIONS list - ensure staff, services, clients keys are correct
-- Check Sidebar MODULE_HREFS - ensure staff → /staff, services → /services, clients → /clients
-- Test each permission individually after fix
+PART 5 - EMPTY STATES
 
-PART 7 - PNL IMPROVEMENTS
+Every chart and tile must have proper empty state:
+- When no data for selected period: show friendly message with icon
+- Never show blank/white space
+- Never show NaN, undefined, or 0 without explanation
+- Example: "No appointments this week. Start booking to see data here."
 
-- Add separate line items in P&L:
-  * Gross Revenue (appointments + walk-ins + memberships)
-  * Less: Discounts Given (total discount_amount)
-  * Less: Loyalty Redeemed (total loyalty points redeemed as currency)
-  * Net Revenue
-- These should also show in revenue section of reports
+PART 6 - PERFORMANCE
 
-PART 8 - WALK-IN ORDERS VIEW
-
-- Walk-in POS has Orders tab showing today's orders
-- Add date navigation: < Previous Day | [Date] | Next Day >
-- Show orders for selected date
-- Default: today
-- Each order shows: time, client name/phone, services, staff, total, payment method
-- Cannot navigate to future dates
+- All dashboard queries run in PARALLEL using Promise.all - not sequential
+- Show skeleton loading state while data fetches
+- After initial load: only re-fetch changed data when filter changes
+- Add error handling: if query fails, show error message not blank
 
 TECHNICAL REQUIREMENTS:
-- Generate SQL migration for:
-  * branch_id column on salon_members table
-  * Ensure appointment statuses are aligned (no_show, completed, pending, confirmed, cancelled)
+- No new SQL migrations needed
 - Run npm run build to confirm zero TypeScript errors
-- Update CLAUDE.md with all changes
-- Mobile responsive throughout
+- Update CLAUDE.md
+- Mobile responsive - cards stack vertically on mobile
 - Dark mode compatible
-- No breaking changes to existing data
-- All existing appointments/walk-ins data preserved
+- All amounts use useCurrency hook
+- No hardcoded currency symbols
