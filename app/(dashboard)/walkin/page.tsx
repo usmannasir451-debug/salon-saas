@@ -80,6 +80,23 @@ function phoneVariants(phone: string) {
   return Array.from(variants)
 }
 
+function localDate(dateStr: string) {
+  return new Date(`${dateStr}T00:00:00`)
+}
+
+function localDayRange(dateStr: string) {
+  const start = localDate(dateStr)
+  const end = localDate(dateStr)
+  end.setHours(23, 59, 59, 999)
+  return { start: start.toISOString(), end: end.toISOString() }
+}
+
+function shiftDate(dateStr: string, days: number) {
+  const date = localDate(dateStr)
+  date.setDate(date.getDate() + days)
+  return format(date, 'yyyy-MM-dd')
+}
+
 // ──────────────── Receipt View ────────────────
 
 function ReceiptView({ walkin, currency, salonName, serviceNames }: {
@@ -258,12 +275,13 @@ export default function WalkInPage() {
 
   const fetchOrdersForDate = useCallback(async (dateStr: string) => {
     const supabase = createClient()
+    const range = localDayRange(dateStr)
     const { data } = await supabase
       .from('walk_ins')
       .select('id, client_name, client_phone, total, payment_method, created_at, walk_in_services(services(name))')
       .eq('user_id', ownerId)
-      .gte('created_at', dateStr + 'T00:00:00')
-      .lte('created_at', dateStr + 'T23:59:59')
+      .gte('created_at', range.start)
+      .lte('created_at', range.end)
       .order('created_at', { ascending: false })
     setTodayOrders((data as unknown as TodayOrder[]) ?? [])
   }, [ownerId])
@@ -299,11 +317,13 @@ export default function WalkInPage() {
     else setPaymentMethodConfig(DEFAULT_PAYMENT_METHODS)
 
     const todayStr = format(new Date(), 'yyyy-MM-dd')
+    const todayRange = localDayRange(todayStr)
     const { data: todayData } = await supabase
       .from('walk_ins')
       .select('id, client_name, client_phone, total, payment_method, created_at, walk_in_services(services(name))')
       .eq('user_id', ownerId)
-      .gte('created_at', todayStr + 'T00:00:00')
+      .gte('created_at', todayRange.start)
+      .lte('created_at', todayRange.end)
       .order('created_at', { ascending: false })
     setTodayOrders((todayData as unknown as TodayOrder[]) ?? [])
 
@@ -1163,22 +1183,20 @@ export default function WalkInPage() {
               <button
                 type="button"
                 onClick={() => {
-                  const d = new Date(ordersDate); d.setDate(d.getDate() - 1)
-                  setOrdersDate(format(d, 'yyyy-MM-dd'))
+                  setOrdersDate(shiftDate(ordersDate, -1))
                 }}
                 className="p-0.5 rounded hover:bg-gray-200 transition-colors"
               >
                 <ChevronLeft className="w-4 h-4 text-gray-500" />
               </button>
               <span className="text-xs font-medium text-gray-700 min-w-[90px] text-center">
-                {ordersDate === format(new Date(), 'yyyy-MM-dd') ? 'Today' : format(new Date(ordersDate + 'T00:00:00'), 'MMM d, yyyy')}
+                {ordersDate === format(new Date(), 'yyyy-MM-dd') ? 'Today' : format(localDate(ordersDate), 'MMM d, yyyy')}
               </span>
               <button
                 type="button"
                 disabled={ordersDate >= format(new Date(), 'yyyy-MM-dd')}
                 onClick={() => {
-                  const d = new Date(ordersDate); d.setDate(d.getDate() + 1)
-                  const next = format(d, 'yyyy-MM-dd')
+                  const next = shiftDate(ordersDate, 1)
                   if (next <= format(new Date(), 'yyyy-MM-dd')) setOrdersDate(next)
                 }}
                 className="p-0.5 rounded hover:bg-gray-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
@@ -1263,10 +1281,13 @@ export default function WalkInPage() {
               </div>
             </div>
             {/* Client loyalty banner */}
-            {clientProfile && (
-              <div className="flex items-center gap-2 bg-purple-50 border border-purple-200 rounded-lg px-2.5 py-1.5">
+            {clientProfile && loyaltyEnabled && (
+              <div className={cn(
+                'flex items-center gap-2 rounded-lg px-2.5 py-1.5',
+                loyaltyEnabled ? 'bg-purple-50 border border-purple-200' : 'bg-gray-50 border border-gray-200'
+              )}>
                 <Star className="w-3.5 h-3.5 text-purple-500 flex-shrink-0" />
-                <span className="text-xs text-purple-700 font-medium">
+                <span className={cn('text-xs font-medium', loyaltyEnabled ? 'text-purple-700' : 'text-gray-700')}>
                   {clientProfile.name} · Loyalty: {formatCurrency(clientProfile.loyalty_balance, currency)}
                 </span>
               </div>
