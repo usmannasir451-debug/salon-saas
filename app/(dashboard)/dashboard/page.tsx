@@ -166,6 +166,11 @@ function changePct(current: number, prev: number): number | null {
   return Math.round(((current - prev) / prev) * 100)
 }
 
+function formatPercent(value: number) {
+  if (!Number.isFinite(value)) return '0%'
+  return `${Math.round(value)}%`
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const WEEK_DAYS  = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -559,6 +564,11 @@ export default function DashboardPage() {
     appts.forEach(a => { if (!a.client_phone) names.add(a.client_name) })
     walkIns.forEach(w => { if (!w.client_phone && w.client_name) names.add(w.client_name) })
     const uniqueClients = phones.size + names.size
+    const totalOrders = completed.length + walkIns.length
+    const avgTicket = totalOrders > 0 ? totalRevenue / totalOrders : 0
+    const completionRate = appts.length > 0 ? (completed.length / appts.length) * 100 : 0
+    const discountRate = totalRevenue > 0 ? ((discounts + loyalty) / totalRevenue) * 100 : 0
+    const revenuePerClient = uniqueClients > 0 ? totalRevenue / uniqueClients : 0
 
     return {
       apptCount: appts.length,
@@ -575,6 +585,11 @@ export default function DashboardPage() {
       totalExpenses,
       netProfit,
       uniqueClients,
+      totalOrders,
+      avgTicket,
+      completionRate,
+      discountRate,
+      revenuePerClient,
     }
   }, [currentPeriod, activeBranch]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -588,11 +603,19 @@ export default function DashboardPage() {
     const apptRev     = completed.reduce((s, a) => s + Number(a.total_amount ?? a.services?.price ?? 0), 0)
     const walkinRev   = walkIns.reduce((s, w) => s + Number(w.total ?? 0), 0)
     const memRev      = memTx.reduce((s, t) => s + Number(t.amount ?? 0), 0)
+    const totalRevenue = apptRev + walkinRev + memRev
+    const totalOrders = completed.length + walkIns.length
+    const phones = new Set<string>()
+    appts.forEach(a => { if (a.client_phone) phones.add(a.client_phone) })
+    walkIns.forEach(w => { if (w.client_phone) phones.add(w.client_phone) })
+    const avgTicket = totalOrders > 0 ? totalRevenue / totalOrders : 0
 
     return {
       apptCount:    appts.length,
       walkInCount:  walkIns.length,
-      totalRevenue: apptRev + walkinRev + memRev,
+      totalRevenue,
+      avgTicket,
+      uniqueClients: phones.size,
     }
   }, [prevPeriod, activeBranch]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -706,6 +729,83 @@ export default function DashboardPage() {
       }),
     [trendAppts, trendWalkIns, trendMemTx, activeBranch, trendYear],
   )
+
+  const dailySalesData = useMemo(() => {
+    if (!currentPeriod) return []
+    const range = getDateRange(activeFilter, customFrom, customTo)
+    if (!range) return []
+    const from = parseISO(range.from)
+    const to = parseISO(range.to)
+    const days = Math.max(1, Math.round((to.getTime() - from.getTime()) / 86400000) + 1)
+    const buckets = new Map<string, { date: string; label: string; revenue: number; orders: number }>()
+
+    Array.from({ length: days }, (_, i) => addDays(from, i)).forEach(day => {
+      const key = format(day, 'yyyy-MM-dd')
+      buckets.set(key, { date: key, label: days <= 10 ? format(day, 'MMM d') : format(day, 'd'), revenue: 0, orders: 0 })
+    })
+
+    bFilter(currentPeriod.appts)
+      .filter(a => a.status === 'completed')
+      .forEach(a => {
+        const bucket = buckets.get(a.appointment_date)
+        if (!bucket) return
+        bucket.revenue += Number(a.total_amount ?? a.services?.price ?? 0)
+        bucket.orders += 1
+      })
+
+    bFilter(currentPeriod.walkIns).forEach(w => {
+      const key = format(new Date(w.created_at), 'yyyy-MM-dd')
+      const bucket = buckets.get(key)
+      if (!bucket) return
+      bucket.revenue += Number(w.total ?? 0)
+      bucket.orders += 1
+    })
+
+    currentPeriod.membershipTx.forEach(t => {
+      const key = format(new Date(t.created_at), 'yyyy-MM-dd')
+      const bucket = buckets.get(key)
+      if (!bucket) return
+      bucket.revenue += Number(t.amount ?? 0)
+    })
+
+    return Array.from(buckets.values())
+  }, [currentPeriod, activeFilter, customFrom, customTo, activeBranch]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const businessInsights = useMemo(() => {
+    if (!metrics) return []
+    const revenueChange = prevMetrics ? changePct(metrics.totalRevenue, prevMetrics.totalRevenue) : null
+    const insights: { title: string; body: string; tone: 'good' | 'warn' | 'info'; href?: string }[] = []
+
+    if (metrics.totalRevenue === 0) {
+      insights.push({ title: 'No sales captured', body: 'Create appointments or walk-ins to start building live owner analytics.', tone: 'info', href: '/walkin' })
+    } else if (revenueChange !== null && revenueChange >= 15) {
+      insights.push({ title: 'Revenue momentum is strong', body: `Sales are up ${revenueChange}% versus the comparable period. Protect this pace with staff coverage.`, tone: 'good', href: '/calendar' })
+    } else if (revenueChange !== null && revenueChange <= -15) {
+      insights.push({ title: 'Revenue needs attention', body: `Sales are down ${Math.abs(revenueChange)}%. Check bookings, walk-ins, and top services before the period closes.`, tone: 'warn', href: '/reports/pnl' })
+    }
+
+    if (metrics.discountRate >= 12) {
+      insights.push({ title: 'Discount leakage is high', body: `${formatPercent(metrics.discountRate)} of gross sales is going to discounts or loyalty redemptions. Review discount reasons.`, tone: 'warn', href: '/reports' })
+    }
+
+    if (metrics.completionRate > 0 && metrics.completionRate < 65) {
+      insights.push({ title: 'Appointment completion is low', body: `Only ${formatPercent(metrics.completionRate)} of appointments are completed. Confirm no-shows and cancellations.`, tone: 'warn', href: '/appointments' })
+    }
+
+    if (lowStockItems.length > 0) {
+      insights.push({ title: 'Inventory risk', body: `${lowStockItems.length} item(s) are low. Restock before high-demand services are affected.`, tone: 'warn', href: '/inventory' })
+    }
+
+    if (expiringItems.length > 0) {
+      insights.push({ title: 'Retention opportunity', body: `${expiringItems.length} membership/package item(s) expire soon. Follow up before they lapse.`, tone: 'info', href: '/memberships' })
+    }
+
+    if (insights.length === 0) {
+      insights.push({ title: 'Operations look steady', body: 'No urgent business exceptions found for this filter. Keep monitoring sales mix and staff performance.', tone: 'good', href: '/reports' })
+    }
+
+    return insights.slice(0, 4)
+  }, [metrics, prevMetrics, lowStockItems.length, expiringItems.length])
 
   // ── Busy hours heatmap ────────────────────────────────────────────────────
   const peakHeatmap = useMemo(() => {
@@ -912,6 +1012,108 @@ export default function DashboardPage() {
       </div>
 
       {/* ── ROW 1: Key Metrics ── */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <Card className="xl:col-span-2 border-gray-100 overflow-hidden">
+          <CardHeader className="pb-2 border-b border-gray-50">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Activity className="w-4 h-4 text-primary" /> Business Pulse
+              </CardTitle>
+              <span className="text-xs text-gray-400">{customLabel ?? filterLabels[activeFilter]}</span>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-4 space-y-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-3">
+                <p className="text-[11px] text-gray-500 mb-1">Avg Ticket</p>
+                <p className="text-lg font-bold text-gray-900">{formatAmount(metrics?.avgTicket ?? 0)}</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">
+                  {metrics?.totalOrders ?? 0} paid order{(metrics?.totalOrders ?? 0) !== 1 ? 's' : ''}
+                </p>
+              </div>
+              <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-3">
+                <p className="text-[11px] text-gray-500 mb-1">Revenue / Client</p>
+                <p className="text-lg font-bold text-gray-900">{formatAmount(metrics?.revenuePerClient ?? 0)}</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">
+                  {metrics?.uniqueClients ?? 0} unique client{(metrics?.uniqueClients ?? 0) !== 1 ? 's' : ''}
+                </p>
+              </div>
+              <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-3">
+                <p className="text-[11px] text-gray-500 mb-1">Completion</p>
+                <p className="text-lg font-bold text-gray-900">{formatPercent(metrics?.completionRate ?? 0)}</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">appointments completed</p>
+              </div>
+              <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-3">
+                <p className="text-[11px] text-gray-500 mb-1">Discount Load</p>
+                <p className={`text-lg font-bold ${(metrics?.discountRate ?? 0) >= 12 ? 'text-amber-600' : 'text-gray-900'}`}>
+                  {formatPercent(metrics?.discountRate ?? 0)}
+                </p>
+                <p className="text-[10px] text-gray-400 mt-0.5">discounts + loyalty</p>
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-semibold text-gray-700">Daily Sales Pace</p>
+                <p className="text-[10px] text-gray-400">revenue by business day</p>
+              </div>
+              {periodLoading ? (
+                <div className="h-44 bg-gray-50 animate-pulse rounded-xl" />
+              ) : dailySalesData.every(d => d.revenue === 0) ? (
+                <EmptyState icon={TrendingUp} message="No daily sales for this range yet" />
+              ) : (
+                <ResponsiveContainer width="100%" height={180}>
+                  <BarChart data={dailySalesData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false}
+                      tickFormatter={v => Number(v) >= 1000 ? `${Math.round(Number(v) / 1000)}k` : String(v)} width={34} />
+                    <Tooltip formatter={(v: unknown) => formatAmount(Number(v ?? 0))} />
+                    <Bar dataKey="revenue" fill="#f43f5e" radius={[4, 4, 0, 0]} maxBarSize={34} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-gray-100">
+          <CardHeader className="pb-2 border-b border-gray-50">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-primary" /> Owner Recommendations
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="space-y-3">
+              {businessInsights.map((insight) => (
+                <div key={insight.title} className={`rounded-xl border px-3 py-3 ${
+                  insight.tone === 'good'
+                    ? 'border-green-100 bg-green-50'
+                    : insight.tone === 'warn'
+                      ? 'border-amber-100 bg-amber-50'
+                      : 'border-blue-100 bg-blue-50'
+                }`}>
+                  <div className="flex items-start gap-2">
+                    <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
+                      insight.tone === 'good' ? 'bg-green-500' : insight.tone === 'warn' ? 'bg-amber-500' : 'bg-blue-500'
+                    }`} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-bold text-gray-900">{insight.title}</p>
+                      <p className="text-[11px] leading-relaxed text-gray-600 mt-0.5">{insight.body}</p>
+                      {insight.href && (
+                        <Link href={insight.href} className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary mt-2 hover:underline">
+                          Review <ArrowUpRight className="w-3 h-3" />
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="border-gray-100 hover:shadow-md transition-shadow">
           <CardContent className="pt-5 pb-4">
