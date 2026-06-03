@@ -320,8 +320,24 @@ export default function WalkInPage() {
     }
     setLookingUp(true)
     const supabase = createClient()
-    const [clientRes, membRes, pkgRes] = await Promise.all([
+    const [clientRes, walkinRes, apptRes, membRes, pkgRes] = await Promise.all([
       supabase.from('clients').select('name, loyalty_balance, phone').eq('user_id', ownerId).in('phone', phones).limit(1),
+      supabase
+        .from('walk_ins')
+        .select('client_name, client_phone')
+        .eq('user_id', ownerId)
+        .in('client_phone', phones)
+        .not('client_name', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(1),
+      supabase
+        .from('appointments')
+        .select('client_name, client_phone')
+        .eq('user_id', ownerId)
+        .in('client_phone', phones)
+        .not('client_name', 'is', null)
+        .order('appointment_date', { ascending: false })
+        .limit(1),
       supabase.from('client_memberships')
         .select('*, membership_plans(id, name, type, price, billing_period, discount_percentage)')
         .eq('owner_id', ownerId).in('client_phone', phones).eq('status', 'active'),
@@ -330,8 +346,12 @@ export default function WalkInPage() {
         .eq('owner_id', ownerId).in('client_phone', phones).eq('status', 'active'),
     ])
     const existingClient = clientRes.data?.[0] ?? null
-    setClientProfile(existingClient ? { name: existingClient.name, phone: existingClient.phone, loyalty_balance: existingClient.loyalty_balance ?? 0 } : null)
-    if (existingClient) setClientName(existingClient.name)
+    const historyClient = walkinRes.data?.[0] ?? apptRes.data?.[0] ?? null
+    const matchedName = existingClient?.name || historyClient?.client_name || ''
+    const matchedPhone = existingClient?.phone || historyClient?.client_phone || phones[0]
+
+    setClientProfile(matchedName ? { name: matchedName, phone: matchedPhone, loyalty_balance: existingClient?.loyalty_balance ?? 0 } : null)
+    if (matchedName) setClientName(matchedName)
     setActiveMemberships((membRes.data ?? []) as unknown as ClientMembership[])
     setActivePackages((pkgRes.data ?? []) as unknown as ClientPackage[])
     setLookingUp(false)
