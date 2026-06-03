@@ -285,8 +285,6 @@ export default function DashboardPage() {
     }
   }, [role, router])
 
-  if (!['owner', 'regional_manager', 'manager'].includes(role)) return null
-
   // ── Fetch one period's data ───────────────────────────────────────────────
   const fetchPeriod = useCallback(
     async (r: { from: string; to: string }): Promise<PeriodData> => {
@@ -731,6 +729,8 @@ export default function DashboardPage() {
   }, [currentPeriod, activeBranch]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── Skeleton loading ─────────────────────────────────────────────────────
+
+  if (!['owner', 'regional_manager', 'manager'].includes(role)) return null
 
   if (staticLoading) {
     return (

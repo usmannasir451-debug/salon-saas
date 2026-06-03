@@ -196,7 +196,7 @@ export default function Sidebar({
 
   const initials = salonName ? salonName[0].toUpperCase() : userEmail?.[0]?.toUpperCase() ?? 'S'
 
-  const SidebarContent = () => (
+  const renderSidebarContent = () => (
     <div className="flex flex-col h-full">
       {/* Brand */}
       <div className="px-4 py-4 border-b border-gray-100">
@@ -311,7 +311,7 @@ export default function Sidebar({
     <>
       {/* Desktop Sidebar */}
       <aside className="hidden lg:flex w-60 flex-col h-screen border-r border-gray-100 bg-white fixed top-0 left-0 z-40">
-        <SidebarContent />
+        {renderSidebarContent()}
       </aside>
 
       {/* Mobile Header */}
@@ -373,7 +373,7 @@ export default function Sidebar({
         >
           <X className="w-4 h-4 text-gray-600" />
         </button>
-        <SidebarContent />
+        {renderSidebarContent()}
       </aside>
     </>
   )

@@ -34,7 +34,14 @@ type StaffPerf = {
 }
 
 type MonthlyPoint = { month: string; revenue: number; appointments: number }
+type SupabaseRelation<T> = T | T[] | null | undefined
+type MonthlyAppointmentRow = { services?: SupabaseRelation<{ price: number | null }> }
+type MonthlyWalkInRow = { total: number | null }
 
+function relationOne<T>(value: SupabaseRelation<T>): T | null {
+  if (Array.isArray(value)) return value[0] ?? null
+  return value ?? null
+}
 
 function StarRow({ rating }: { rating: number }) {
   return (
@@ -214,9 +221,8 @@ export default function StaffPerformancePage() {
           .lte('created_at', new Date(mEnd + 'T23:59:59').toISOString()),
       ])
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const apptRev = (apptRes.data ?? []).reduce((sum: number, a: any) => sum + (a.services?.price ?? 0), 0)
-      const walkRev = (walkRes.data ?? []).reduce((sum: number, w: any) => sum + (w.total ?? 0), 0)
+      const apptRev = ((apptRes.data ?? []) as MonthlyAppointmentRow[]).reduce((sum, a) => sum + (relationOne(a.services)?.price ?? 0), 0)
+      const walkRev = ((walkRes.data ?? []) as MonthlyWalkInRow[]).reduce((sum, w) => sum + (w.total ?? 0), 0)
 
       points.push({
         month: monthLabel,

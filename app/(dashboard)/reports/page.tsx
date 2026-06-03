@@ -23,6 +23,7 @@ import { Label } from '@/components/ui/label'
 
 type DateRange = { from: string; to: string }
 type Preset = 'today' | 'week' | 'month' | 'custom'
+type PieLabelProps = { method?: string; pct?: number }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -765,7 +766,7 @@ export default function ReportsPage() {
                 <CardContent>
                   <ResponsiveContainer width="100%" height={200}>
                     <PieChart>
-                      <Pie data={payData} cx="50%" cy="50%" outerRadius={70} dataKey="amount" nameKey="method" label={(props: any) => `${props.method} ${props.pct}%`} labelLine={false}>
+                      <Pie data={payData} cx="50%" cy="50%" outerRadius={70} dataKey="amount" nameKey="method" label={(props: PieLabelProps) => `${props.method ?? ''} ${props.pct ?? 0}%`} labelLine={false}>
                         {payData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
                       </Pie>
                       <Tooltip formatter={(v) => formatAmount(Number(v))} />

@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
 type ExportType = 'appointments' | 'clients' | 'expenses' | 'payroll'
+type SupabaseRelation<T> = T | T[] | null | undefined
 
 interface ExportConfig {
   id: ExportType
@@ -20,6 +21,52 @@ interface ExportConfig {
   desc: string
   icon: React.ElementType
   color: string
+}
+
+type AppointmentExportRow = {
+  appointment_date: string | null
+  appointment_time: string | null
+  client_name: string | null
+  client_phone: string | null
+  services?: SupabaseRelation<{ name: string | null; price: number | null }>
+  staff?: SupabaseRelation<{ name: string | null }>
+  status: string | null
+  notes: string | null
+}
+
+type ClientExportRow = {
+  client_name: string | null
+  client_phone: string | null
+  appointment_date: string | null
+  status: string | null
+  services?: SupabaseRelation<{ price: number | null }>
+}
+
+type ExpenseExportRow = {
+  expense_date: string | null
+  category: string | null
+  description: string | null
+  amount: number | null
+  paid_by: string | null
+  is_recurring: boolean | null
+  notes: string | null
+}
+
+type PayrollExportRow = {
+  staff?: SupabaseRelation<{ name: string | null }>
+  month: number | null
+  year: number | null
+  base_salary: number | null
+  commission_amount: number | null
+  bonus: number | null
+  deductions: number | null
+  net_salary: number | null
+  status: string | null
+}
+
+function relationOne<T>(value: SupabaseRelation<T>): T | null {
+  if (Array.isArray(value)) return value[0] ?? null
+  return value ?? null
 }
 
 const EXPORTS: ExportConfig[] = [
@@ -99,17 +146,21 @@ export default function ExportPage() {
     if (error || !data) { toast.error('Export failed'); setLoading(null); return }
 
     const headers = ['Date', 'Time', 'Client', 'Phone', 'Service', `Price (${currency})`, 'Staff', 'Status', 'Notes']
-    const rows = data.map((a: any) => [
-      a.appointment_date,
-      a.appointment_time?.slice(0, 5) ?? '',
-      a.client_name ?? '',
-      a.client_phone ?? '',
-      a.services?.name ?? '',
-      String(a.services?.price ?? 0),
-      a.staff?.name ?? '',
-      a.status ?? '',
-      a.notes ?? '',
-    ])
+    const rows = (data as AppointmentExportRow[]).map((a) => {
+      const service = relationOne(a.services)
+      const staff = relationOne(a.staff)
+      return [
+        a.appointment_date ?? '',
+        a.appointment_time?.slice(0, 5) ?? '',
+        a.client_name ?? '',
+        a.client_phone ?? '',
+        service?.name ?? '',
+        String(service?.price ?? 0),
+        staff?.name ?? '',
+        a.status ?? '',
+        a.notes ?? '',
+      ]
+    })
 
     downloadCSV(`appointments-${dateFrom}-to-${dateTo}.csv`, [headers, ...rows])
     toast.success(`Exported ${data.length} appointments`)
@@ -130,14 +181,14 @@ export default function ExportPage() {
     if (error || !data) { toast.error('Export failed'); setLoading(null); return }
 
     const map = new Map<string, { phone: string; visits: number; completed: number; spend: number; last: string }>()
-    data.forEach((a: any) => {
+    ;(data as ClientExportRow[]).forEach((a) => {
       if (!a.client_name) return
       if (!map.has(a.client_name)) map.set(a.client_name, { phone: '', visits: 0, completed: 0, spend: 0, last: '' })
       const c = map.get(a.client_name)!
       c.visits++
       if (a.client_phone) c.phone = a.client_phone
-      if (a.status === 'completed') { c.completed++; c.spend += a.services?.price ?? 0 }
-      if (!c.last || a.appointment_date > c.last) c.last = a.appointment_date
+      if (a.status === 'completed') { c.completed++; c.spend += relationOne(a.services)?.price ?? 0 }
+      if (a.appointment_date && (!c.last || a.appointment_date > c.last)) c.last = a.appointment_date
     })
 
     const headers = ['Client Name', 'Phone', 'Total Visits', 'Completed', `Total Spend (${currency})`, 'Last Visit']
@@ -164,11 +215,11 @@ export default function ExportPage() {
     if (error || !data) { toast.error('Export failed'); setLoading(null); return }
 
     const headers = ['Date', 'Category', 'Description', `Amount (${currency})`, 'Paid By', 'Recurring', 'Notes']
-    const rows = data.map((e: any) => [
-      e.expense_date,
+    const rows = (data as ExpenseExportRow[]).map((e) => [
+      e.expense_date ?? '',
       e.category?.replace(/_/g, ' ') ?? '',
       e.description ?? '',
-      String(Math.round(e.amount)),
+      String(Math.round(e.amount ?? 0)),
       e.paid_by ?? '',
       e.is_recurring ? 'Yes' : 'No',
       e.notes ?? '',
@@ -191,8 +242,8 @@ export default function ExportPage() {
     if (error || !data) { toast.error('Export failed'); setLoading(null); return }
 
     const headers = ['Staff', 'Month', 'Year', `Base Salary (${currency})`, `Commission (${currency})`, `Bonus (${currency})`, `Deductions (${currency})`, `Net Salary (${currency})`, 'Status']
-    const rows = data.map((p: any) => [
-      p.staff?.name ?? '',
+    const rows = (data as PayrollExportRow[]).map((p) => [
+      relationOne(p.staff)?.name ?? '',
       String(p.month ?? ''),
       String(p.year ?? ''),
       String(Math.round(p.base_salary ?? 0)),
