@@ -50,6 +50,15 @@ function whatsappUrl(phone: string, clientName: string) {
   return `https://wa.me/${wa}?text=${encodeURIComponent(msg)}`
 }
 
+function phoneVariants(phone: string) {
+  const digits = phone.replace(/\D/g, '')
+  const variants = new Set<string>()
+  if (digits) variants.add(digits)
+  if (digits.startsWith('0')) variants.add(`92${digits.slice(1)}`)
+  if (digits.startsWith('92')) variants.add(`0${digits.slice(2)}`)
+  return Array.from(variants)
+}
+
 export default function ClientProfilePage({ params }: { params: Promise<{ name: string }> }) {
   const { ownerId } = useUserContext()
   const { name } = use(params)
@@ -61,6 +70,7 @@ export default function ClientProfilePage({ params }: { params: Promise<{ name: 
   const [clientPackages, setClientPackages] = useState<ClientPackage[]>([])
   const [loyaltyData, setLoyaltyData] = useState<{ earned: number; redeemed: number; balance: number } | null>(null)
   const [loading, setLoading] = useState(true)
+  const [displayName, setDisplayName] = useState(clientName)
 
   useEffect(() => {
     loadClient()
@@ -69,38 +79,53 @@ export default function ClientProfilePage({ params }: { params: Promise<{ name: 
 
   async function loadClient() {
     const supabase = createClient()
+    const phones = phoneVariants(clientName)
 
-    const { data } = await supabase
+    const { data: clientRows } = phones.length > 0
+      ? await supabase
+          .from('clients')
+          .select('name, phone')
+          .eq('user_id', ownerId)
+          .in('phone', phones)
+          .limit(1)
+      : { data: [] }
+
+    const matchedClient = clientRows?.[0] ?? null
+    if (matchedClient?.name) setDisplayName(matchedClient.name)
+
+    const appointmentQuery = supabase
       .from('appointments')
       .select('id, appointment_date, appointment_time, status, notes, client_phone, services(name, price), staff(name)')
       .eq('user_id', ownerId)
-      .eq('client_name', clientName)
-      .order('appointment_date', { ascending: false })
-      .order('appointment_time', { ascending: false })
+
+    const { data } = phones.length > 0
+      ? await appointmentQuery.in('client_phone', phones).order('appointment_date', { ascending: false }).order('appointment_time', { ascending: false })
+      : await appointmentQuery.eq('client_name', clientName).order('appointment_date', { ascending: false }).order('appointment_time', { ascending: false })
 
     setAppointments((data as unknown as AppRow[]) ?? [])
 
     // Load memberships, packages, and loyalty by phone (if we have the phone)
-    const phone = (data as unknown as AppRow[])?.find(a => a.client_phone)?.client_phone
+    const phone = matchedClient?.phone || (data as unknown as AppRow[])?.find(a => a.client_phone)?.client_phone
     if (phone) {
+      const lookupPhones = phoneVariants(phone)
       const [membRes, pkgRes, loyaltyRes] = await Promise.all([
         supabase
           .from('client_memberships')
           .select('*, membership_plans(id, name, type, price, billing_period, discount_percentage)')
           .eq('owner_id', ownerId)
-          .eq('client_phone', phone)
+          .in('client_phone', lookupPhones)
           .order('created_at', { ascending: false }),
         supabase
           .from('client_packages')
           .select('*, packages(id, name, price, validity_days)')
           .eq('owner_id', ownerId)
-          .eq('client_phone', phone)
+          .in('client_phone', lookupPhones)
           .order('created_at', { ascending: false }),
         supabase
           .from('loyalty_transactions')
           .select('points, type')
           .eq('user_id', ownerId)
-          .eq('client_phone', phone),
+          .in('client_phone', lookupPhones),
       ])
       setMemberships((membRes.data ?? []) as unknown as ClientMembership[])
       setClientPackages((pkgRes.data ?? []) as unknown as ClientPackage[])
@@ -153,10 +178,10 @@ export default function ClientProfilePage({ params }: { params: Promise<{ name: 
       {/* Profile Header */}
       <div className="flex items-start gap-4 mb-6">
         <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-          <span className="text-primary text-2xl font-bold">{clientName[0]?.toUpperCase()}</span>
+          <span className="text-primary text-2xl font-bold">{displayName[0]?.toUpperCase()}</span>
         </div>
         <div className="flex-1">
-          <h1 className="text-2xl font-bold text-gray-900">{clientName}</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{displayName}</h1>
           <p className="text-sm text-gray-500 mt-0.5">
             {appointments.length} appointment{appointments.length !== 1 ? 's' : ''} •{' '}
             {lastVisit
@@ -166,7 +191,7 @@ export default function ClientProfilePage({ params }: { params: Promise<{ name: 
           </p>
           {clientPhone && (
             <a
-              href={whatsappUrl(clientPhone, clientName)}
+              href={whatsappUrl(clientPhone, displayName)}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 mt-2 text-xs text-green-600 bg-green-50 hover:bg-green-100 px-3 py-1.5 rounded-full transition-colors font-medium"

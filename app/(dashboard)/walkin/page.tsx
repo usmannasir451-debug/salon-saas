@@ -71,6 +71,15 @@ function formatCurrency(n: number, currency = 'USD') {
   return `${currency} ${Math.round(n).toLocaleString()}`
 }
 
+function phoneVariants(phone: string) {
+  const digits = phone.replace(/\D/g, '')
+  const variants = new Set<string>()
+  if (digits) variants.add(digits)
+  if (digits.startsWith('0')) variants.add(`92${digits.slice(1)}`)
+  if (digits.startsWith('92')) variants.add(`0${digits.slice(2)}`)
+  return Array.from(variants)
+}
+
 // ──────────────── Receipt View ────────────────
 
 function ReceiptView({ walkin, currency, salonName, serviceNames }: {
@@ -302,7 +311,8 @@ export default function WalkInPage() {
   }
 
   const lookupClient = useCallback(async (phone: string) => {
-    if (!phone || phone.length < 7) {
+    const phones = phoneVariants(phone)
+    if (phones.length === 0 || phones[0].length < 7) {
       setClientProfile(null)
       setActiveMemberships([])
       setActivePackages([])
@@ -311,20 +321,21 @@ export default function WalkInPage() {
     setLookingUp(true)
     const supabase = createClient()
     const [clientRes, membRes, pkgRes] = await Promise.all([
-      supabase.from('clients').select('name, loyalty_balance').eq('user_id', ownerId).eq('phone', phone).maybeSingle(),
+      supabase.from('clients').select('name, loyalty_balance, phone').eq('user_id', ownerId).in('phone', phones).limit(1),
       supabase.from('client_memberships')
         .select('*, membership_plans(id, name, type, price, billing_period, discount_percentage)')
-        .eq('owner_id', ownerId).eq('client_phone', phone).eq('status', 'active'),
+        .eq('owner_id', ownerId).in('client_phone', phones).eq('status', 'active'),
       supabase.from('client_packages')
         .select('*, packages(id, name, price, validity_days)')
-        .eq('owner_id', ownerId).eq('client_phone', phone).eq('status', 'active'),
+        .eq('owner_id', ownerId).in('client_phone', phones).eq('status', 'active'),
     ])
-    setClientProfile(clientRes.data ? { name: clientRes.data.name, loyalty_balance: clientRes.data.loyalty_balance ?? 0 } : null)
-    if (clientRes.data && !clientName) setClientName(clientRes.data.name)
+    const existingClient = clientRes.data?.[0] ?? null
+    setClientProfile(existingClient ? { name: existingClient.name, loyalty_balance: existingClient.loyalty_balance ?? 0 } : null)
+    if (existingClient) setClientName(existingClient.name)
     setActiveMemberships((membRes.data ?? []) as unknown as ClientMembership[])
     setActivePackages((pkgRes.data ?? []) as unknown as ClientPackage[])
     setLookingUp(false)
-  }, [ownerId, clientName])
+  }, [ownerId])
 
   function addService(id: string) {
     setServiceQuantities(prev => ({ ...prev, [id]: (prev[id] ?? 0) + 1 }))
@@ -555,7 +566,7 @@ export default function WalkInPage() {
     }
 
     if (loyaltyEnabled && clientPhone.trim()) {
-      const phone = clientPhone.trim()
+      const phone = phoneVariants(clientPhone)[0] ?? clientPhone.trim()
       await supabase.from('clients').upsert(
         { user_id: ownerId, phone, name: clientName.trim() || phone },
         { onConflict: 'user_id,phone' }

@@ -77,6 +77,15 @@ function whatsappUrl(phone: string, clientName: string) {
   return `https://wa.me/${wa}?text=${encodeURIComponent(msg)}`
 }
 
+function normalizePhone(phone: string | null | undefined) {
+  return phone?.replace(/\D/g, '') ?? ''
+}
+
+function clientKey(name: string | null | undefined, phone: string | null | undefined) {
+  const normalizedPhone = normalizePhone(phone)
+  return normalizedPhone || `name:${name?.trim().toLowerCase() ?? ''}`
+}
+
 
 function isBirthdayThisMonth(birthday: string | null) {
   if (!birthday) return false
@@ -150,19 +159,22 @@ export default function ClientsPage() {
     const map = new Map<string, Omit<ClientSummary, 'segment'>>()
 
     // Extended client data (birthday, etc.)
-    const extendedMap = new Map<string, { phone: string; birthday: string | null }>()
+    const extendedMap = new Map<string, { name: string; phone: string; birthday: string | null }>()
     for (const c of clientsRes.data ?? []) {
-      extendedMap.set(c.name, { phone: c.phone ?? '', birthday: c.birthday })
+      const key = clientKey(c.name, c.phone)
+      if (!key || extendedMap.has(key)) continue
+      extendedMap.set(key, { name: c.name, phone: c.phone ?? '', birthday: c.birthday })
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const a of (apptRes.data ?? []) as any[]) {
       const name = a.client_name?.trim()
-      if (!name) continue
-      if (!map.has(name)) {
-        const ext = extendedMap.get(name)
-        map.set(name, {
-          name,
+      const key = clientKey(name, a.client_phone)
+      if (!key || (!name && !a.client_phone)) continue
+      if (!map.has(key)) {
+        const ext = extendedMap.get(key)
+        map.set(key, {
+          name: ext?.name || name || a.client_phone || 'Walk-in Client',
           phone: ext?.phone || a.client_phone || '',
           birthday: ext?.birthday ?? null,
           totalVisits: 0,
@@ -176,7 +188,7 @@ export default function ClientsPage() {
           activeMembership: null,
         })
       }
-      const c = map.get(name)!
+      const c = map.get(key)!
       c.totalVisits++
       if (a.client_phone && !c.phone) c.phone = a.client_phone
       if (a.status === 'completed') {
@@ -191,11 +203,12 @@ export default function ClientsPage() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const w of (walkRes.data ?? []) as any[]) {
       const name = w.client_name?.trim()
-      if (!name) continue
-      if (!map.has(name)) {
-        const ext = extendedMap.get(name)
-        map.set(name, {
-          name,
+      const key = clientKey(name, w.client_phone)
+      if (!key || (!name && !w.client_phone)) continue
+      if (!map.has(key)) {
+        const ext = extendedMap.get(key)
+        map.set(key, {
+          name: ext?.name || name || w.client_phone || 'Walk-in Client',
           phone: ext?.phone || w.client_phone || '',
           birthday: ext?.birthday ?? null,
           totalVisits: 0,
@@ -209,7 +222,7 @@ export default function ClientsPage() {
           activeMembership: null,
         })
       }
-      const c = map.get(name)!
+      const c = map.get(key)!
       c.totalVisits++
       c.completedVisits++
       c.totalSpend += w.total ?? 0
@@ -242,7 +255,8 @@ export default function ClientsPage() {
       const matchSearch =
         !search ||
         c.name.toLowerCase().includes(search.toLowerCase()) ||
-        c.phone.includes(search)
+        c.phone.includes(search) ||
+        normalizePhone(c.phone).includes(normalizePhone(search))
       const matchSegment = segmentFilter === 'All' || c.segment === segmentFilter
       return matchSearch && matchSegment
     })
@@ -292,7 +306,7 @@ export default function ClientsPage() {
           </div>
           <div className="flex flex-wrap gap-2">
             {birthdayThisMonth.map((c) => (
-              <div key={c.name} className="flex items-center gap-2 bg-white border border-pink-200 rounded-lg px-3 py-1.5">
+              <div key={c.phone || c.name} className="flex items-center gap-2 bg-white border border-pink-200 rounded-lg px-3 py-1.5">
                 <p className="text-xs font-medium text-gray-900">{c.name}</p>
                 {c.birthday && (
                   <p className="text-xs text-pink-500">
@@ -389,7 +403,7 @@ export default function ClientsPage() {
                   const segConfig = SEGMENT_CONFIG[c.segment]
                   const SegIcon = segConfig.icon
                   return (
-                    <tr key={c.name} className="hover:bg-gray-50 transition-colors group">
+                    <tr key={c.phone || c.name} className="hover:bg-gray-50 transition-colors group">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2.5">
                           <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs flex-shrink-0">
@@ -461,7 +475,7 @@ export default function ClientsPage() {
                             </a>
                           )}
                           <Link
-                            href={`/clients/${encodeURIComponent(c.name)}`}
+                            href={`/clients/${encodeURIComponent(c.phone || c.name)}`}
                             className="p-1.5 rounded-lg hover:bg-primary/10 text-primary transition-colors"
                             title="View profile"
                           >
