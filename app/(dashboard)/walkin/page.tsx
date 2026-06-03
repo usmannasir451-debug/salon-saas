@@ -37,7 +37,7 @@ type DealItem = {
 type PaymentMethodConfig = { value: string; label: string; enabled: boolean }
 type ServiceItem = Pick<Service, 'id' | 'name' | 'price' | 'duration'>
 type StaffItem = Pick<StaffMember, 'id' | 'name'>
-type ClientProfile = { name: string; loyalty_balance: number }
+type ClientProfile = { name: string; phone: string; loyalty_balance: number }
 
 type TodayOrder = {
   id: string
@@ -330,7 +330,7 @@ export default function WalkInPage() {
         .eq('owner_id', ownerId).in('client_phone', phones).eq('status', 'active'),
     ])
     const existingClient = clientRes.data?.[0] ?? null
-    setClientProfile(existingClient ? { name: existingClient.name, loyalty_balance: existingClient.loyalty_balance ?? 0 } : null)
+    setClientProfile(existingClient ? { name: existingClient.name, phone: existingClient.phone, loyalty_balance: existingClient.loyalty_balance ?? 0 } : null)
     if (existingClient) setClientName(existingClient.name)
     setActiveMemberships((membRes.data ?? []) as unknown as ClientMembership[])
     setActivePackages((pkgRes.data ?? []) as unknown as ClientPackage[])
@@ -526,13 +526,33 @@ export default function WalkInPage() {
 
     // Flat list with quantities (duplicate IDs for qty > 1)
     const allServiceIds = selectedServiceIds
+    const phoneCandidates = phoneVariants(clientPhone)
+    const typedPhone = phoneCandidates[0] ?? clientPhone.trim()
+    const existingClientRes = typedPhone
+      ? await supabase
+          .from('clients')
+          .select('name, phone, loyalty_balance')
+          .eq('user_id', ownerId)
+          .in('phone', phoneCandidates)
+          .limit(1)
+      : { data: [] }
+    const existingClient = existingClientRes.data?.[0] ?? null
+    const canonicalPhone = existingClient?.phone || typedPhone
+    const resolvedClientName = existingClient?.name || clientName.trim() || canonicalPhone || null
+
+    if (canonicalPhone && !existingClient) {
+      await supabase.from('clients').upsert(
+        { user_id: ownerId, phone: canonicalPhone, name: resolvedClientName || canonicalPhone },
+        { onConflict: 'user_id,phone', ignoreDuplicates: true }
+      )
+    }
 
     const { data, error } = await supabase
       .from('walk_ins')
       .insert({
         user_id: ownerId,
-        client_name: clientName.trim() || null,
-        client_phone: clientPhone.trim() || null,
+        client_name: resolvedClientName,
+        client_phone: canonicalPhone || null,
         service_id: allServiceIds[0] || null,
         staff_id: staffId || null,
         branch_id: branchId || null,
@@ -565,20 +585,14 @@ export default function WalkInPage() {
       )
     }
 
-    if (loyaltyEnabled && clientPhone.trim()) {
-      const phone = phoneVariants(clientPhone)[0] ?? clientPhone.trim()
-      await supabase.from('clients').upsert(
-        { user_id: ownerId, phone, name: clientName.trim() || phone },
-        { onConflict: 'user_id,phone' }
-      )
-
+    if (loyaltyEnabled && canonicalPhone) {
       const loyaltyTasks: Promise<unknown>[] = []
       if (loyaltyRedeemAmount > 0) {
         loyaltyTasks.push(
-          Promise.resolve(supabase.rpc('decrement_loyalty', { p_user_id: ownerId, p_phone: phone, p_amount: loyaltyRedeemAmount })),
+          Promise.resolve(supabase.rpc('decrement_loyalty', { p_user_id: ownerId, p_phone: canonicalPhone, p_amount: loyaltyRedeemAmount })),
           Promise.resolve(supabase.from('loyalty_transactions').insert({
-            user_id: ownerId, client_phone: phone,
-            client_name: clientName.trim() || null,
+            user_id: ownerId, client_phone: canonicalPhone,
+            client_name: resolvedClientName,
             transaction_type: 'redeemed', amount: loyaltyRedeemAmount,
             reference_id: walkinData.id, reference_type: 'walk_in',
           }))
@@ -587,11 +601,11 @@ export default function WalkInPage() {
       if (loyaltyEarned > 0) {
         loyaltyTasks.push(
           Promise.resolve(supabase.from('clients')
-            .update({ loyalty_balance: (clientProfile?.loyalty_balance ?? 0) - loyaltyRedeemAmount + loyaltyEarned })
-            .eq('user_id', ownerId).eq('phone', phone)),
+            .update({ loyalty_balance: (existingClient?.loyalty_balance ?? clientProfile?.loyalty_balance ?? 0) - loyaltyRedeemAmount + loyaltyEarned })
+            .eq('user_id', ownerId).eq('phone', canonicalPhone)),
           Promise.resolve(supabase.from('loyalty_transactions').insert({
-            user_id: ownerId, client_phone: phone,
-            client_name: clientName.trim() || null,
+            user_id: ownerId, client_phone: canonicalPhone,
+            client_name: resolvedClientName,
             transaction_type: 'earned', amount: loyaltyEarned,
             reference_id: walkinData.id, reference_type: 'walk_in',
           }))
