@@ -40,6 +40,10 @@ function downloadCSV(filename: string, rows: string[][]) {
   URL.revokeObjectURL(url)
 }
 
+function pct(value: number, total: number) {
+  return total > 0 ? `${Math.round((value / total) * 100)}%` : '0%'
+}
+
 const CHART_COLORS = ['#f43f5e', '#ec4899', '#a855f7', '#3b82f6', '#f97316', '#10b981', '#6b7280', '#eab308']
 
 function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
@@ -141,9 +145,14 @@ export default function ReportsPage() {
   const [salesLoading, setSalesLoading] = useState(false)
   const [salesData, setSalesData] = useState<{
     totalRevenue: number; txCount: number; avgTx: number
-    byService: { name: string; revenue: number }[]
-    top10: { name: string; revenue: number }[]
-    daily: { date: string; revenue: number }[]
+    totalServices: number
+    appointmentRevenue: number; walkinRevenue: number
+    byService: { name: string; revenue: number; count: number; avgRevenue: number }[]
+    top10: { name: string; revenue: number; count: number; avgRevenue: number }[]
+    daily: {
+      date: string; displayDate: string; revenue: number; orders: number; services: number
+      appointmentRevenue: number; walkinRevenue: number
+    }[]
   } | null>(null)
 
   const loadSales = useCallback(async () => {
@@ -165,43 +174,87 @@ export default function ReportsPage() {
     const appts = ((apptRes.data ?? []) as unknown) as { total_amount: number | null; services: { name: string; price: number } | null; appointment_date: string }[]
     const walkins = ((walkinRes.data ?? []) as unknown) as { total: number; walk_in_services: { services: { name: string; price: number } | null }[]; created_at: string }[]
 
-    const apptRev = appts.reduce((s, a) => s + Number(a.total_amount ?? a.services?.price ?? 0), 0)
-    const walkinRev = walkins.reduce((s, w) => s + Number(w.total ?? 0), 0)
-    const totalRevenue = apptRev + walkinRev
+    const appointmentRevenue = appts.reduce((s, a) => s + Number(a.total_amount ?? a.services?.price ?? 0), 0)
+    const walkinRevenue = walkins.reduce((s, w) => s + Number(w.total ?? 0), 0)
+    const totalRevenue = appointmentRevenue + walkinRevenue
     const txCount = appts.length + walkins.length
     const avgTx = txCount > 0 ? Math.round(totalRevenue / txCount) : 0
+    const totalServices = appts.length + walkins.reduce((s, w) => s + w.walk_in_services.length, 0)
 
-    const svcMap = new Map<string, number>()
+    const svcMap = new Map<string, { revenue: number; count: number }>()
     appts.forEach(a => {
       const name = a.services?.name ?? 'Unknown'
-      svcMap.set(name, (svcMap.get(name) ?? 0) + Number(a.total_amount ?? a.services?.price ?? 0))
-    })
-    walkins.forEach(w => {
-      w.walk_in_services.forEach(ws => {
-        const name = ws.services?.name ?? 'Unknown'
-        svcMap.set(name, (svcMap.get(name) ?? 0) + Number(ws.services?.price ?? 0))
+      const cur = svcMap.get(name) ?? { revenue: 0, count: 0 }
+      svcMap.set(name, {
+        revenue: cur.revenue + Number(a.total_amount ?? a.services?.price ?? 0),
+        count: cur.count + 1,
       })
     })
-    const byService = Array.from(svcMap.entries()).map(([name, revenue]) => ({ name, revenue })).sort((a, b) => b.revenue - a.revenue)
+    walkins.forEach(w => {
+      const servicePrices = w.walk_in_services.map(ws => Number(ws.services?.price ?? 0))
+      const listedTotal = servicePrices.reduce((sum, price) => sum + price, 0)
+      const paidTotal = Number(w.total ?? 0)
+      w.walk_in_services.forEach(ws => {
+        const name = ws.services?.name ?? 'Unknown'
+        const listedPrice = Number(ws.services?.price ?? 0)
+        const allocatedRevenue = listedTotal > 0
+          ? (paidTotal * listedPrice) / listedTotal
+          : w.walk_in_services.length > 0
+            ? paidTotal / w.walk_in_services.length
+            : 0
+        const cur = svcMap.get(name) ?? { revenue: 0, count: 0 }
+        svcMap.set(name, {
+          revenue: cur.revenue + allocatedRevenue,
+          count: cur.count + 1,
+        })
+      })
+    })
+    const byService = Array.from(svcMap.entries())
+      .map(([name, v]) => ({
+        name,
+        revenue: Math.round(v.revenue),
+        count: v.count,
+        avgRevenue: v.count > 0 ? Math.round(v.revenue / v.count) : 0,
+      }))
+      .sort((a, b) => b.revenue - a.revenue)
     const top10 = byService.slice(0, 10)
 
     // Daily breakdown
-    const dayMap = new Map<string, number>()
-    appts.forEach(a => dayMap.set(a.appointment_date, (dayMap.get(a.appointment_date) ?? 0) + Number(a.total_amount ?? a.services?.price ?? 0)))
+    const dayMap = new Map<string, { revenue: number; orders: number; services: number; appointmentRevenue: number; walkinRevenue: number }>()
+    appts.forEach(a => {
+      const curDay = dayMap.get(a.appointment_date) ?? { revenue: 0, orders: 0, services: 0, appointmentRevenue: 0, walkinRevenue: 0 }
+      const amount = Number(a.total_amount ?? a.services?.price ?? 0)
+      dayMap.set(a.appointment_date, {
+        revenue: curDay.revenue + amount,
+        orders: curDay.orders + 1,
+        services: curDay.services + 1,
+        appointmentRevenue: curDay.appointmentRevenue + amount,
+        walkinRevenue: curDay.walkinRevenue,
+      })
+    })
     walkins.forEach(w => {
       const d = w.created_at.slice(0, 10)
-      dayMap.set(d, (dayMap.get(d) ?? 0) + Number(w.total ?? 0))
+      const curDay = dayMap.get(d) ?? { revenue: 0, orders: 0, services: 0, appointmentRevenue: 0, walkinRevenue: 0 }
+      const amount = Number(w.total ?? 0)
+      dayMap.set(d, {
+        revenue: curDay.revenue + amount,
+        orders: curDay.orders + 1,
+        services: curDay.services + w.walk_in_services.length,
+        appointmentRevenue: curDay.appointmentRevenue,
+        walkinRevenue: curDay.walkinRevenue + amount,
+      })
     })
     const days = []
     let cur = new Date(range.from + 'T00:00:00')
     const end = new Date(range.to + 'T00:00:00')
     while (cur <= end && days.length < 31) {
       const ds = format(cur, 'yyyy-MM-dd')
-      days.push({ date: format(cur, 'MMM d'), revenue: dayMap.get(ds) ?? 0 })
+      const v = dayMap.get(ds) ?? { revenue: 0, orders: 0, services: 0, appointmentRevenue: 0, walkinRevenue: 0 }
+      days.push({ date: ds, displayDate: format(cur, 'MMM d'), ...v })
       cur = subDays(cur, -1)
     }
 
-    setSalesData({ totalRevenue, txCount, avgTx, byService, top10, daily: days })
+    setSalesData({ totalRevenue, txCount, avgTx, totalServices, appointmentRevenue, walkinRevenue, byService, top10, daily: days })
     setSalesLoading(false)
   }, [ownerId, range])
 
@@ -209,10 +262,10 @@ export default function ReportsPage() {
 
   const [walkinLoading, setWalkinLoading] = useState(false)
   const [walkinData, setWalkinData] = useState<{
-    count: number; revenue: number
+    count: number; revenue: number; avgOrder: number
     byStaff: { name: string; count: number; revenue: number }[]
-    byHour: { hour: string; count: number }[]
-    byDay: { day: string; count: number }[]
+    byHour: { hour: string; count: number; revenue: number }[]
+    byDay: { day: string; count: number; revenue: number }[]
   } | null>(null)
 
   const loadWalkins = useCallback(async () => {
@@ -228,6 +281,7 @@ export default function ReportsPage() {
     const rows = ((data ?? []) as unknown) as { id: string; total: number; created_at: string; staff: { name: string } | null; payment_method: string }[]
     const count = rows.length
     const revenue = rows.reduce((s, r) => s + Number(r.total ?? 0), 0)
+    const avgOrder = count > 0 ? Math.round(revenue / count) : 0
 
     const staffMap = new Map<string, { count: number; revenue: number }>()
     rows.forEach(r => {
@@ -237,26 +291,32 @@ export default function ReportsPage() {
     })
     const byStaff = Array.from(staffMap.entries()).map(([name, v]) => ({ name, ...v })).sort((a, b) => b.revenue - a.revenue)
 
-    const hourMap = new Map<number, number>()
+    const hourMap = new Map<number, { count: number; revenue: number }>()
     rows.forEach(r => {
       const h = new Date(r.created_at).getHours()
-      hourMap.set(h, (hourMap.get(h) ?? 0) + 1)
+      const cur = hourMap.get(h) ?? { count: 0, revenue: 0 }
+      hourMap.set(h, { count: cur.count + 1, revenue: cur.revenue + Number(r.total ?? 0) })
     })
     const byHour = Array.from({ length: 16 }, (_, i) => {
       const h = 7 + i
       const label = h < 12 ? `${h}am` : h === 12 ? '12pm' : `${h - 12}pm`
-      return { hour: label, count: hourMap.get(h) ?? 0 }
+      const v = hourMap.get(h) ?? { count: 0, revenue: 0 }
+      return { hour: label, count: v.count, revenue: Math.round(v.revenue) }
     })
 
     const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-    const dowMap = new Map<number, number>()
+    const dowMap = new Map<number, { count: number; revenue: number }>()
     rows.forEach(r => {
       const d = new Date(r.created_at).getDay()
-      dowMap.set(d, (dowMap.get(d) ?? 0) + 1)
+      const cur = dowMap.get(d) ?? { count: 0, revenue: 0 }
+      dowMap.set(d, { count: cur.count + 1, revenue: cur.revenue + Number(r.total ?? 0) })
     })
-    const byDay = DAYS.map((day, i) => ({ day, count: dowMap.get(i) ?? 0 }))
+    const byDay = DAYS.map((day, i) => {
+      const v = dowMap.get(i) ?? { count: 0, revenue: 0 }
+      return { day, count: v.count, revenue: Math.round(v.revenue) }
+    })
 
-    setWalkinData({ count, revenue, byStaff, byHour, byDay })
+    setWalkinData({ count, revenue, avgOrder, byStaff, byHour, byDay })
     setWalkinLoading(false)
   }, [ownerId, range])
 
@@ -308,8 +368,8 @@ export default function ReportsPage() {
 
   const [apptLoading, setApptLoading] = useState(false)
   const [apptData, setApptData] = useState<{
-    total: number; completed: number; cancelled: number; noShow: number; revenue: number
-    byStaff: { name: string; count: number; revenue: number }[]
+    total: number; completed: number; cancelled: number; noShow: number; pending: number; revenue: number; avgCompletedSale: number
+    byStaff: { name: string; count: number; completed: number; cancelled: number; noShow: number; revenue: number }[]
   } | null>(null)
 
   const loadAppointments = useCallback(async () => {
@@ -326,18 +386,23 @@ export default function ReportsPage() {
     const completed = rows.filter(r => r.status === 'completed').length
     const cancelled = rows.filter(r => r.status === 'cancelled').length
     const noShow = rows.filter(r => r.status === 'no_show').length
+    const pending = total - completed - cancelled - noShow
     const revenue = rows.filter(r => r.status === 'completed').reduce((s, r) => s + Number(r.total_amount ?? r.services?.price ?? 0), 0)
-    const staffMap = new Map<string, { count: number; revenue: number }>()
+    const avgCompletedSale = completed > 0 ? Math.round(revenue / completed) : 0
+    const staffMap = new Map<string, { count: number; completed: number; cancelled: number; noShow: number; revenue: number }>()
     rows.forEach(r => {
       const name = r.staff?.name ?? 'Unassigned'
-      const cur = staffMap.get(name) ?? { count: 0, revenue: 0 }
+      const cur = staffMap.get(name) ?? { count: 0, completed: 0, cancelled: 0, noShow: 0, revenue: 0 }
       staffMap.set(name, {
         count: cur.count + 1,
+        completed: cur.completed + (r.status === 'completed' ? 1 : 0),
+        cancelled: cur.cancelled + (r.status === 'cancelled' ? 1 : 0),
+        noShow: cur.noShow + (r.status === 'no_show' ? 1 : 0),
         revenue: cur.revenue + (r.status === 'completed' ? Number(r.total_amount ?? r.services?.price ?? 0) : 0),
       })
     })
     const byStaff = Array.from(staffMap.entries()).map(([name, v]) => ({ name, ...v })).sort((a, b) => b.revenue - a.revenue)
-    setApptData({ total, completed, cancelled, noShow, revenue, byStaff })
+    setApptData({ total, completed, cancelled, noShow, pending, revenue, avgCompletedSale, byStaff })
     setApptLoading(false)
   }, [ownerId, range])
 
@@ -519,62 +584,180 @@ export default function ReportsPage() {
 
   function exportSalesCSV() {
     if (!salesData) return
-    const headers = ['Service', `Revenue (${currency})`]
-    const rows = salesData.top10.map(s => [s.name, String(s.revenue)])
-    downloadCSV(`sales-report-${range.from}-to-${range.to}.csv`, [headers, ...rows])
+    const rows: string[][] = [
+      ['Sales Report'],
+      ['Period', range.from, range.to],
+      ['Total Sales', String(Math.round(salesData.totalRevenue))],
+      ['Total Orders', String(salesData.txCount)],
+      ['Total Services Sold', String(salesData.totalServices)],
+      ['Average Order Value', String(salesData.avgTx)],
+      ['Appointment Sales', String(Math.round(salesData.appointmentRevenue)), pct(salesData.appointmentRevenue, salesData.totalRevenue)],
+      ['Walk-In Sales', String(Math.round(salesData.walkinRevenue)), pct(salesData.walkinRevenue, salesData.totalRevenue)],
+      [],
+      ['Daily Sales'],
+      ['Date', `Total Sales (${currency})`, 'Orders', 'Services Sold', `Appointment Sales (${currency})`, `Walk-In Sales (${currency})`, `Average Order (${currency})`],
+      ...salesData.daily.map(d => [
+        d.date,
+        String(Math.round(d.revenue)),
+        String(d.orders),
+        String(d.services),
+        String(Math.round(d.appointmentRevenue)),
+        String(Math.round(d.walkinRevenue)),
+        String(d.orders > 0 ? Math.round(d.revenue / d.orders) : 0),
+      ]),
+      [],
+      ['Service Breakdown'],
+      ['Service', 'Services Sold', `Revenue (${currency})`, `Average Revenue (${currency})`, 'Share of Sales'],
+      ...salesData.byService.map(s => [
+        s.name,
+        String(s.count),
+        String(s.revenue),
+        String(s.avgRevenue),
+        pct(s.revenue, salesData.totalRevenue),
+      ]),
+    ]
+    downloadCSV(`sales-report-${range.from}-to-${range.to}.csv`, rows)
   }
 
   function exportWalkinCSV() {
     if (!walkinData) return
-    const headers = ['Staff', 'Walk-Ins', `Revenue (${currency})`]
-    const rows = walkinData.byStaff.map(s => [s.name, String(s.count), String(Math.round(s.revenue))])
-    downloadCSV(`walkin-report-${range.from}-to-${range.to}.csv`, [headers, ...rows])
+    const rows: string[][] = [
+      ['Walk-In Report'],
+      ['Period', range.from, range.to],
+      ['Total Walk-Ins', String(walkinData.count)],
+      ['Walk-In Revenue', String(Math.round(walkinData.revenue))],
+      ['Average Walk-In Order', String(walkinData.avgOrder)],
+      [],
+      ['Staff Breakdown'],
+      ['Staff', 'Walk-Ins', `Revenue (${currency})`, `Average Order (${currency})`, 'Share of Walk-In Sales'],
+      ...walkinData.byStaff.map(s => [s.name, String(s.count), String(Math.round(s.revenue)), String(s.count > 0 ? Math.round(s.revenue / s.count) : 0), pct(s.revenue, walkinData.revenue)]),
+      [],
+      ['Hourly Breakdown'],
+      ['Hour', 'Walk-Ins', `Revenue (${currency})`],
+      ...walkinData.byHour.map(h => [h.hour, String(h.count), String(h.revenue)]),
+      [],
+      ['Day of Week Breakdown'],
+      ['Day', 'Walk-Ins', `Revenue (${currency})`],
+      ...walkinData.byDay.map(d => [d.day, String(d.count), String(d.revenue)]),
+    ]
+    downloadCSV(`walkin-report-${range.from}-to-${range.to}.csv`, rows)
   }
 
   function exportPaymentsCSV() {
     if (!payData) return
-    const headers = ['Payment Method', `Amount (${currency})`, 'Transactions', 'Percentage']
-    const rows = payData.map(p => [p.method, String(p.amount), String(p.count), `${p.pct}%`])
-    downloadCSV(`payment-methods-${range.from}-to-${range.to}.csv`, [headers, ...rows])
+    const totalAmount = payData.reduce((s, p) => s + p.amount, 0)
+    const totalTx = payData.reduce((s, p) => s + p.count, 0)
+    const rows: string[][] = [
+      ['Payment Methods Report'],
+      ['Period', range.from, range.to],
+      ['Total Collected', String(totalAmount)],
+      ['Total Transactions', String(totalTx)],
+      [],
+      ['Payment Breakdown'],
+      ['Payment Method', `Amount (${currency})`, 'Transactions', 'Percentage', `Average Transaction (${currency})`],
+      ...payData.map(p => [p.method, String(p.amount), String(p.count), `${p.pct}%`, String(p.count > 0 ? Math.round(p.amount / p.count) : 0)]),
+    ]
+    downloadCSV(`payment-methods-${range.from}-to-${range.to}.csv`, rows)
   }
 
   function exportApptsCSV() {
     if (!apptData) return
-    const headers = ['Staff', 'Appointments', `Revenue (${currency})`]
-    const rows = apptData.byStaff.map(s => [s.name, String(s.count), String(Math.round(s.revenue))])
-    downloadCSV(`appointments-report-${range.from}-to-${range.to}.csv`, [headers, ...rows])
+    const rows: string[][] = [
+      ['Appointments Report'],
+      ['Period', range.from, range.to],
+      ['Total Appointments', String(apptData.total)],
+      ['Completed', String(apptData.completed), pct(apptData.completed, apptData.total)],
+      ['Cancelled', String(apptData.cancelled), pct(apptData.cancelled, apptData.total)],
+      ['No Show', String(apptData.noShow), pct(apptData.noShow, apptData.total)],
+      ['Pending / Other', String(apptData.pending), pct(apptData.pending, apptData.total)],
+      ['Completed Revenue', String(Math.round(apptData.revenue))],
+      ['Average Completed Sale', String(apptData.avgCompletedSale)],
+      [],
+      ['Staff Breakdown'],
+      ['Staff', 'Total Appointments', 'Completed', 'Cancelled', 'No Show', `Revenue (${currency})`, 'Completion Rate'],
+      ...apptData.byStaff.map(s => [s.name, String(s.count), String(s.completed), String(s.cancelled), String(s.noShow), String(Math.round(s.revenue)), pct(s.completed, s.count)]),
+    ]
+    downloadCSV(`appointments-report-${range.from}-to-${range.to}.csv`, rows)
   }
 
   function exportStaffCSV() {
     if (!staffPerf) return
-    const headers = ['Staff', 'Appointments', 'Walk-Ins', `Revenue (${currency})`, 'Avg Rating', `Commission (${currency})`]
-    const rows = staffPerf.map(s => [s.name, String(s.apptCount), String(s.walkinCount), String(s.revenue), String(s.avgRating), String(s.commission)])
-    downloadCSV(`staff-performance-${range.from}-to-${range.to}.csv`, [headers, ...rows])
+    const totalRevenue = staffPerf.reduce((sum, s) => sum + s.revenue, 0)
+    const totalCommission = staffPerf.reduce((sum, s) => sum + s.commission, 0)
+    const rows: string[][] = [
+      ['Staff Performance Report'],
+      ['Period', range.from, range.to],
+      ['Total Staff Revenue', String(totalRevenue)],
+      ['Total Estimated Commission', String(totalCommission)],
+      [],
+      ['Staff Breakdown'],
+      ['Staff', 'Appointments', 'Walk-Ins', 'Total Orders', `Revenue (${currency})`, `Average Sale (${currency})`, 'Avg Rating', `Commission (${currency})`, 'Revenue Share'],
+      ...staffPerf.map(s => {
+        const orders = s.apptCount + s.walkinCount
+        return [s.name, String(s.apptCount), String(s.walkinCount), String(orders), String(s.revenue), String(orders > 0 ? Math.round(s.revenue / orders) : 0), String(s.avgRating || ''), String(s.commission), pct(s.revenue, totalRevenue)]
+      }),
+    ]
+    downloadCSV(`staff-performance-${range.from}-to-${range.to}.csv`, rows)
   }
 
   function exportClientsCSV() {
     if (!clientData) return
-    const headers = ['Name', 'Phone', `Total Spend (${currency})`, 'Visits']
-    const rows = clientData.top10.map(c => [c.name, c.phone, String(c.spend), String(c.visits)])
-    downloadCSV(`client-report-${range.from}-to-${range.to}.csv`, [headers, ...rows])
+    const totalSpend = clientData.top10.reduce((sum, c) => sum + c.spend, 0)
+    const rows: string[][] = [
+      ['Client Report'],
+      ['Period', range.from, range.to],
+      ['New Clients', String(clientData.newClients)],
+      ['Returning Clients', String(clientData.returning)],
+      ['Retention Rate', `${clientData.retentionRate}%`],
+      [],
+      ['Top Clients by Spend'],
+      ['Name', 'Phone', `Total Spend (${currency})`, 'Visits', `Average Visit Value (${currency})`, 'Share of Top Client Spend'],
+      ...clientData.top10.map(c => [c.name, c.phone, String(c.spend), String(c.visits), String(c.visits > 0 ? Math.round(c.spend / c.visits) : 0), pct(c.spend, totalSpend)]),
+    ]
+    downloadCSV(`client-report-${range.from}-to-${range.to}.csv`, rows)
   }
 
   function exportInventoryCSV() {
     if (!invData) return
-    const headers = ['Name', 'Category', 'Quantity', 'Unit', `Cost (${currency})`, 'Reorder Level', 'Status']
-    const rows = invData.items.map(i => [
-      i.name, i.category, String(i.quantity), i.unit,
-      String(i.cost_price), String(i.reorder_level),
-      Number(i.quantity) <= Number(i.reorder_level) ? 'Low Stock' : 'OK',
-    ])
-    downloadCSV('inventory-report.csv', [headers, ...rows])
+    const rows: string[][] = [
+      ['Inventory Report'],
+      ['Total Items', String(invData.items.length)],
+      ['Low Stock Items', String(invData.lowStockCount)],
+      ['Total Stock Value', String(Math.round(invData.totalValue))],
+      [],
+      ['Stock Breakdown'],
+      ['Name', 'Category', 'Quantity', 'Unit', `Cost Per Unit (${currency})`, `Stock Value (${currency})`, 'Reorder Level', 'Reorder Needed', 'Status'],
+      ...invData.items.map(i => {
+        const qty = Number(i.quantity)
+        const reorder = Number(i.reorder_level)
+        return [
+          i.name,
+          i.category,
+          String(i.quantity),
+          i.unit,
+          String(i.cost_price),
+          String(Math.round(qty * Number(i.cost_price ?? 0))),
+          String(i.reorder_level),
+          String(Math.max(0, reorder - qty)),
+          qty <= reorder ? 'Low Stock' : 'OK',
+        ]
+      }),
+    ]
+    downloadCSV('inventory-report.csv', rows)
   }
 
   function exportExpensesCSV() {
     if (!expData) return
-    const headers = ['Category', `Amount (${currency})`]
-    const rows = expData.byCategory.map(e => [e.category, String(e.amount)])
-    downloadCSV(`expense-report-${range.from}-to-${range.to}.csv`, [headers, ...rows])
+    const rows: string[][] = [
+      ['Expense Report'],
+      ['Period', range.from, range.to],
+      ['Total Expenses', String(Math.round(expData.total))],
+      [],
+      ['Expense Breakdown'],
+      ['Category', `Amount (${currency})`, 'Share of Expenses'],
+      ...expData.byCategory.map(e => [e.category, String(e.amount), pct(e.amount, expData.total)]),
+    ]
+    downloadCSV(`expense-report-${range.from}-to-${range.to}.csv`, rows)
   }
 
   // ── Render ───────────────────────────────────────────────────────────────────
@@ -638,9 +821,10 @@ export default function ReportsPage() {
             <div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
           ) : salesData ? (
             <>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <StatCard label="Total Revenue" value={formatAmount(salesData.totalRevenue)} />
                 <StatCard label="Transactions" value={String(salesData.txCount)} />
+                <StatCard label="Services Sold" value={String(salesData.totalServices)} />
                 <StatCard label="Avg Transaction" value={formatAmount(salesData.avgTx)} />
               </div>
               {salesData.daily.length > 1 && (
@@ -650,7 +834,7 @@ export default function ReportsPage() {
                     <ResponsiveContainer width="100%" height={180}>
                       <BarChart data={salesData.daily} margin={{ left: -10 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                        <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                        <XAxis dataKey="displayDate" tick={{ fontSize: 10 }} />
                         <YAxis tick={{ fontSize: 10 }} />
                         <Tooltip formatter={(v) => formatAmount(Number(v))} />
                         <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[3, 3, 0, 0]} />
@@ -667,8 +851,9 @@ export default function ReportsPage() {
                       {salesData.top10.map((s, i) => (
                         <div key={s.name} className="flex items-center gap-3">
                           <span className="text-xs text-gray-400 w-5 text-right">{i + 1}</span>
-                          <span className="flex-1 text-sm text-gray-700 truncate">{s.name}</span>
-                          <span className="text-sm font-semibold text-primary">{formatAmount(s.revenue)}</span>
+                            <span className="flex-1 text-sm text-gray-700 truncate">{s.name}</span>
+                            <span className="text-xs text-gray-400">{s.count} sold</span>
+                            <span className="text-sm font-semibold text-primary">{formatAmount(s.revenue)}</span>
                         </div>
                       ))}
                     </div>
@@ -693,9 +878,10 @@ export default function ReportsPage() {
               <div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
             ) : walkinData ? (
               <>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   <StatCard label="Total Walk-Ins" value={String(walkinData.count)} />
                   <StatCard label="Walk-In Revenue" value={formatAmount(walkinData.revenue)} />
+                  <StatCard label="Avg Walk-In Order" value={formatAmount(walkinData.avgOrder)} />
                 </div>
                 {walkinData.byHour.some(h => h.count > 0) && (
                   <Card>
@@ -814,10 +1000,11 @@ export default function ReportsPage() {
               <div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
             ) : apptData ? (
               <>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                   <StatCard label="Total" value={String(apptData.total)} />
                   <StatCard label="Completed" value={String(apptData.completed)} sub={`${apptData.total > 0 ? Math.round((apptData.completed / apptData.total) * 100) : 0}%`} />
                   <StatCard label="Cancelled" value={String(apptData.cancelled)} />
+                  <StatCard label="No Show" value={String(apptData.noShow)} />
                   <StatCard label="Revenue" value={formatAmount(apptData.revenue)} />
                 </div>
                 {apptData.byStaff.length > 0 && (
